@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.modelSelectSchema = void 0;
-var zod_1 = require("zod");
+const zod_1 = require("zod");
 exports.modelSelectSchema = zod_1.z.object({
     messages: zod_1.z
         .array(zod_1.z.object({

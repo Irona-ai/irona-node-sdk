@@ -1,3 +1,8 @@
+import { ChatOpenAI } from "@langchain/openai";
+import { ChatModelConfig } from "../types";
+/*
+import { OpenAI } from "@langchain/openai";
+
 const { ChatOpenAI } = require("@langchain/openai");
 require("dotenv").config();
 async function main() {
@@ -28,4 +33,10 @@ async function main() {
 
 
 }
-main();
+
+*/
+
+export function OpenAIChatModel(chatModelConfig: ChatModelConfig){
+    const chatModel = new ChatOpenAI(chatModelConfig);
+    return chatModel;
+}

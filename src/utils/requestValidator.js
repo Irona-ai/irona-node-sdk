@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateSchema = validateSchema;
-var zod_1 = require("zod");
-var logger_1 = require("./logger"); // Assuming logger is in the same directory
+const zod_1 = require("zod");
+const logger_1 = require("./logger"); // Assuming logger is in the same directory
 /**
  * Validates the input data against the provided zod schema.
  * @param schema - The zod schema to validate against.
@@ -16,9 +16,9 @@ function validateSchema(schema, data) {
     }
     catch (error) {
         if (error instanceof zod_1.ZodError) {
-            var errorMessages = error.errors.map(function (issue) { return ({
-                message: "".concat(issue.path.join("."), " is ").concat(issue.message),
-            }); });
+            const errorMessages = error.errors.map((issue) => ({
+                message: `${issue.path.join(".")} is ${issue.message}`,
+            }));
             // Log the validation error
             logger_1.logger.error("Validation error: ", errorMessages);
             return {

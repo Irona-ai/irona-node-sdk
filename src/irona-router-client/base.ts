@@ -3,11 +3,9 @@ import { logger } from "../utils/logger"; //using relative path so that client n
 import { Config } from "../types";
 
 export abstract class Base {
-  protected apiKey: string;
   protected baseUrl: string;
 
   constructor(config: Config) {
-    this.apiKey = config.apiKey;
     this.baseUrl = config.baseUrl as string;
   }
 
@@ -26,14 +24,10 @@ export abstract class Base {
 
     try {
       logger.info(`Calling the the endpoint ${url} inside SDK `);
-      return await axios(config);
+      const response = await axios.request<T>(config);
+      return response.data;
     } catch (error) {
-      return Promise.reject({
-        message: "Some error occured",
-        statusCode: 500,
-        data: error,
-        success: false,
-      });
+      throw error;
     }
   }
 }

@@ -24,5 +24,3 @@ export class IronaAI {
     },
   };
 }
-
-export default IronaAI;

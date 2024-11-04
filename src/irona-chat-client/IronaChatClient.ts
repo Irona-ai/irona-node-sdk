@@ -6,7 +6,6 @@ import { ChatMistralAI } from "@langchain/mistralai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { MissingApiKeyError, UnsupportedModelError } from "../errors";
 import { isSupportedModel, providerApiKeyName } from "../supported_models";
-const { logger } = require("../utils/logger");
 
 export class IronaChatClient {
   constructor() {}

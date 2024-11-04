@@ -27,14 +27,14 @@ const body = {
 };
 
 const testCompletions = async (sdkClient: any, body: any) => {
-  const openAI = "openai/gpt-3.5-turbo";
-  const togetherAI = "togetherai/mistralai/Mixtral-8x7B-Instruct-v0.1";
-  const anthropicAI = "anthropic/claude-3-haiku";
-  const mistralAI = "mistralai/mistral-large-latest";
-  const googleGenAI = "google/gemini-pro";
+  const openAI = "openai/gpt-4-1106-preview";
+  const togetherAI = "togetherai/Phind-CodeLlama-34B-v2";
+  const anthropicAI = "anthropic/claude-2.1";
+  const mistralAI = "mistral/open-mixtral-8x22b";
+  const googleGenAI = "google/gemini-1.0-pro-latest";
   try {
     const data = {
-      model: googleGenAI,
+      model: mistralAI,
       messages: body.messages,
       temperature: 0.7,
       maxTokens: 20,
@@ -48,7 +48,7 @@ const testCompletions = async (sdkClient: any, body: any) => {
     } catch (error) {}
     logger.info("Chat Response:\n" + JSON.stringify(chatResponse, null, 2));
   } catch (error) {
-    logger.error("Error in SDK Completion usage:" + error);
+    logger.error("Error in SDK Completion usage:\n" + error);
   }
 };
 
@@ -74,6 +74,6 @@ const testSelectModel = async (sdkClient: any, body: any) => {
   }
   const sdkClient = new IronaAI();
 
-  await testSelectModel(sdkClient, body);
-  //   await  testCompletions(sdkClient, body);
+//   await testSelectModel(sdkClient, body);
+    await  testCompletions(sdkClient, body);
 })();

@@ -30,7 +30,6 @@ export class IronaChatClient {
       maxRetries: body?.maxRetries,
       maxTokens: body?.maxTokens,
     };
-    logger.info(chatModelConfig);
 
     const chatModel = this.getChatModel(provider, chatModelConfig);
     if (!chatModel) {

@@ -1,4 +1,4 @@
-import { ValidationError } from "./errors";
+import { BadRequestError } from "./errors";
 
 const { logger } = require("./utils/logger");
 
@@ -58,7 +58,7 @@ const testSelectModel = async (sdkClient: any, body: any) => {
     const modelResponse = await sdkClient.modelSelect(body);
     logger.info("Model selected:" + JSON.stringify(modelResponse));
   } catch (error) {
-    if (error instanceof ValidationError) {
+    if (error instanceof BadRequestError) {
       logger.error(error.message);
     } else {
       logger.error(error);

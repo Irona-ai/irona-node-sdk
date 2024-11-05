@@ -2,7 +2,7 @@ import { Base } from "./base";
 import { validateSchema } from "../utils/requestValidator";
 import { modelSelectSchema } from "../validators/modelSelect.validator";
 import { Config } from "../types";
-import { MissingApiKeyError, ValidationError } from "../errors";
+import { MissingApiKeyError, BadRequestError } from "../errors";
 const resources = "/api/v1/model-router/select-model"; // TODO: will change this to model-select in the irona-web-server repo
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
@@ -17,7 +17,7 @@ export class IronaRouterClient extends Base {
     }
     const validationResult = validateSchema(modelSelectSchema, body);
     if (!validationResult.success) {
-      throw new ValidationError(validationResult.errors);
+      throw new BadRequestError(validationResult.errors);
     }
 
     try {

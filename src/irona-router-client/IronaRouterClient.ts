@@ -12,7 +12,7 @@ export class IronaRouterClient extends Base {
     const apiKey = process.env.IRONAAI_API_KEY;
     if (!apiKey) {
       throw new MissingApiKeyError(
-        "IRONAAI_API_KEY is not set in the environment variables."
+        "The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables."
       );
     }
     const validationResult = validateSchema(modelSelectSchema, body);

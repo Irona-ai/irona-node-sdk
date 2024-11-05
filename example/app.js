@@ -35,7 +35,7 @@ const testCompletions = async (sdkClient, body) => {
       messages: body.messages,
       temperature: 0.7,
       maxTokens: 100,
-        // stream: true,
+      // stream: true,
     };
     const chatResponse = await sdkClient.completions.create(data);
     try {
@@ -45,7 +45,8 @@ const testCompletions = async (sdkClient, body) => {
     } catch (error) {}
     console.info("Chat Response:\n" + JSON.stringify(chatResponse, null, 2));
   } catch (error) {
-    console.error("Error in SDK Completion usage:\n" + error);
+    console.log("Error in SDK Completion usage:\n");
+    console.error(error);
   }
 };
 
@@ -55,18 +56,13 @@ const testSelectModel = async (sdkClient, body) => {
     const modelResponse = await sdkClient.modelSelect(body);
     console.info("Model selected:" + JSON.stringify(modelResponse));
   } catch (error) {
-    console.error("Error in SDK selectModel usage:\n" + error);
+    console.log("Error in SDK selectModel usage:\n");
+    console.error(error);
   }
 };
 
 async function main() {
-  const apiKey = process.env.IRONAAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("IRONAAI_API_KEY is not set in the environment variables.");
-  }
   const sdkClient = new IronaAI();
-
   await testSelectModel(sdkClient, body);
   await testCompletions(sdkClient, body);
 }

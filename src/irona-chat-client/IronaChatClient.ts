@@ -4,7 +4,11 @@ import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatMistralAI } from "@langchain/mistralai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { MissingApiKeyError, UnsupportedModelError, BadRequestError } from "../errors";
+import {
+  MissingApiKeyError,
+  UnsupportedModelError,
+  BadRequestError,
+} from "../errors";
 import { isSupportedModel, providerApiKeyName } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import { completionsSchema } from "../validators/completions.validator";
@@ -26,7 +30,7 @@ export class IronaChatClient {
     const apiKey = process.env[apiKeyName];
     if (!apiKey) {
       throw new MissingApiKeyError(
-        `${apiKeyName} is not set in the environment variables, which is required for the model ${provider}/${model}.`
+        `The environment variable ${apiKeyName} is missing or empty. Please ensure that ${apiKeyName} is set in the environment variables for the ${provider}/${model} model.`
       );
     }
     const chatModelConfig: ChatModelConfig = {

@@ -4,13 +4,13 @@ import { Config } from "./types";
 require("dotenv").config();
 
 // Constants
-const DEFAULT_API_URL = "https://api.ironaai.com";
+const DEFAULT_BASE_URL = 'https://app.irona.ai';
 
 export class IronaAI {
   private ironaRouter: IronaRouterClient;
   private llmChatService: IronaChatClient;
   constructor(config: Config = {}) {
-    config.baseUrl = config?.baseUrl || process.env.BASE_URL;
+    config.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;
     this.ironaRouter = new IronaRouterClient(config);
     this.llmChatService = new IronaChatClient();
   }

@@ -1,9 +1,6 @@
-import { ValidationError } from "./errors";
+// require("dotenv").config({ path: "./.env" });
+const { IronaAI } = require("ironaai");
 
-const { logger } = require("./utils/logger");
-
-const { IronaAI } = require("./IronaAI");
-require("dotenv").config();
 const body = {
   messages: [
     { role: "system", content: "You are a world class software developer." },
@@ -13,10 +10,10 @@ const body = {
   llm_providers: [
     {
       provider: "openai",
-        model: "gpt-4-1106-preview",
+      model: "gpt-4-1106-preview",
     },
     {
-        provider: "openai",
+      provider: "openai",
       model: "gpt-4-turbo",
     },
     {
@@ -26,7 +23,7 @@ const body = {
   ],
 };
 
-const testCompletions = async (sdkClient: any, body: any) => {
+const testCompletions = async (sdkClient, body) => {
   const openAI = "openai/gpt-4-1106-preview";
   const togetherAI = "togetherai/Phind-CodeLlama-34B-v2";
   const anthropicAI = "anthropic/claude-2.1";
@@ -34,46 +31,39 @@ const testCompletions = async (sdkClient: any, body: any) => {
   const googleGenAI = "google/gemini-1.0-pro-latest";
   try {
     const data = {
-      model: mistralAI,
+      model: openAI,
       messages: body.messages,
       temperature: 0.7,
-      maxTokens: 20,
-      //   stream: true,
+      maxTokens: 100,
+      // stream: true,
     };
     const chatResponse = await sdkClient.completions.create(data);
     try {
       for await (const chunk of chatResponse) {
-        logger.info(JSON.stringify(chunk, null, 2));
+        console.info(JSON.stringify(chunk, null, 2));
       }
     } catch (error) {}
-    logger.info("Chat Response:\n" + JSON.stringify(chatResponse, null, 2));
+    console.info("Chat Response:\n" + JSON.stringify(chatResponse, null, 2));
   } catch (error) {
-    logger.error("Error in SDK Completion usage:\n" + error);
+    console.log("Error in SDK Completion usage:\n");
+    console.error(error);
   }
 };
 
-const testSelectModel = async (sdkClient: any, body: any) => {
+const testSelectModel = async (sdkClient, body) => {
   try {
     // Select a model
     const modelResponse = await sdkClient.modelSelect(body);
-    logger.info("Model selected:" + JSON.stringify(modelResponse));
+    console.info("Model selected:" + JSON.stringify(modelResponse));
   } catch (error) {
-    if (error instanceof ValidationError) {
-      logger.error(error.message);
-    } else {
-      logger.error(error);
-    }
+    console.log("Error in SDK selectModel usage:\n");
+    console.error(error);
   }
 };
 
-(async () => {
-  const apiKey = process.env.IRONAAI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("IRONAAI_API_KEY is not set in the environment variables.");
-  }
+async function main() {
   const sdkClient = new IronaAI();
-
-//   await testSelectModel(sdkClient, body);
-    await  testCompletions(sdkClient, body);
-})();
+  await testSelectModel(sdkClient, body);
+  await testCompletions(sdkClient, body);
+}
+main();

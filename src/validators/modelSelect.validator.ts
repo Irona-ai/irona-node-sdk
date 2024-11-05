@@ -1,22 +1,11 @@
 import { z } from "zod";
+import { messageSchema, llmProviderSchema } from "./common.validators";
 
 export const modelSelectSchema = z.object({
-  messages: z
-    .array(
-      z.object({
-        role: z.enum(["system", "assistant", "user"]),
-        content: z.string().min(1, "Content cannot be empty"), // Non-empty string
-      })
-    )
-    .nonempty("Messages array cannot be empty"), // Ensure array is not empty
+  messages: z.array(messageSchema).nonempty("Messages array cannot be empty"),
   llm_providers: z
-    .array(
-      z.object({
-        provider: z.string().min(1, "Provider cannot be empty"), // Non-empty string
-        model: z.string().min(1, "Model cannot be empty"), // Non-empty string
-      })
-    )
-    .nonempty("LLM Providers array cannot be empty"), // Ensure array is not empty
+    .array(llmProviderSchema)
+    .nonempty("LLM Providers array cannot be empty"),
 });
 
-export type modelSelectPayload = z.infer<typeof modelSelectSchema>;
+export type ModelSelectPayload = z.infer<typeof modelSelectSchema>;

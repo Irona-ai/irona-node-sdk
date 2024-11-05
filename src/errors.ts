@@ -13,17 +13,17 @@ export class MissingApiKeyError extends Error {
   }
 }
 
-export class ValidationError extends Error {
+export class BadRequestError extends Error {
   constructor(message = "Validation error occurred") {
     super(message);
-    this.name = "ValidationError";
+    this.name = "BadRequestError";
 
     // Set the prototype explicitly for better compatibility across environments
-    Object.setPrototypeOf(this, ValidationError.prototype);
+    Object.setPrototypeOf(this, BadRequestError.prototype);
 
     // Capture the stack trace for easier debugging, ignoring this constructor call
     if (Error.captureStackTrace) {
-      Error.captureStackTrace(this, ValidationError);
+      Error.captureStackTrace(this, BadRequestError);
     }
   }
 }

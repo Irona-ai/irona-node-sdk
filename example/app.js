@@ -55,7 +55,7 @@ const testSelectModel = async (sdkClient, body) => {
     const modelResponse = await sdkClient.modelSelect(body);
     console.info("Model selected:" + JSON.stringify(modelResponse));
   } catch (error) {
-    console.error(error);
+    console.error("Error in SDK selectModel usage:\n" + error);
   }
 };
 

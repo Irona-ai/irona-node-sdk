@@ -1,6 +1,8 @@
 import { IronaChatClient } from "./irona-chat-client/IronaChatClient";
 import { IronaRouterClient } from "./irona-router-client/IronaRouterClient";
 import { Config } from "./types";
+import { ModelSelectPayload } from "./validators/modelSelect.validator";
+import { CompletionsPayload } from "./validators/completions.validator";
 require("dotenv").config();
 
 // Constants
@@ -14,12 +16,12 @@ export class IronaAI {
     this.ironaRouter = new IronaRouterClient(config);
     this.llmChatService = new IronaChatClient();
   }
-  private modelSelect(body: any): Promise<any> {
+  private modelSelect(body: ModelSelectPayload): Promise<any> {
     return this.ironaRouter.modelSelect(body);
   }
 
   private completions = {
-    create: (body: any): Promise<any> => {
+    create: (body: CompletionsPayload): Promise<any> => {
       return this.llmChatService.completions(body);
     },
   };

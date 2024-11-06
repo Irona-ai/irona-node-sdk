@@ -7,23 +7,15 @@ const body = {
     { role: "assistant", content: "How can I assist you today?" },
     { role: "user", content: "Write a merge sort in python" },
   ],
-  llm_providers: [
-    {
-      provider: "openai",
-      model: "gpt-4-1106-preview",
-    },
-    {
-      provider: "openai",
-      model: "gpt-4-turbo",
-    },
-    {
-      provider: "anthropic",
-      model: "claude-3-opus-20240229",
-    },
+  models: [
+    "openai/gpt-4-1106-preview",
+    "openai/gpt-4-turbo",
+    "anthropic/claude-3-opus-20240229",
   ],
 };
 
 const testCompletions = async (sdkClient, body) => {
+  // TODO: as of now model-select does not support all the models provided below, so we are using them here separately. Once model-select supports all the models, we can use them using body.models[index],
   const openAI = "openai/gpt-4-1106-preview";
   const togetherAI = "togetherai/Phind-CodeLlama-34B-v2";
   const anthropicAI = "anthropic/claude-2.1";
@@ -31,7 +23,7 @@ const testCompletions = async (sdkClient, body) => {
   const googleGenAI = "google/gemini-1.0-pro-latest";
   try {
     const data = {
-      model: openAI,
+      model: openAI, // TODO: body.models[0],
       messages: body.messages,
       temperature: 0.7,
       maxTokens: 100,

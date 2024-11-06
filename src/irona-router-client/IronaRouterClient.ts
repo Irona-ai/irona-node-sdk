@@ -1,6 +1,9 @@
 import { Base } from "./base";
 import { validateSchema } from "../utils/requestValidator";
-import { modelSelectSchema } from "../validators/modelSelect.validator";
+import {
+  ModelSelectPayload,
+  modelSelectSchema,
+} from "../validators/modelSelect.validator";
 import { Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
 const resources = "/api/v1/model-router/select-model"; // TODO: will change this to model-select in the irona-web-server repo
@@ -8,7 +11,17 @@ export class IronaRouterClient extends Base {
   constructor(config: Config) {
     super(config);
   }
-  async modelSelect(body: any): Promise<any> {
+  private formatModelSelectPayload(body: ModelSelectPayload) {
+    const data: { messages: Object[]; llm_providers: Object[] } = {
+      messages: body.messages,
+      llm_providers: body.models.map((model) => {
+        const [provider, ...modelParts] = model.toLowerCase().split("/");
+        return { provider, model: modelParts.join("/") };
+      }),
+    };
+    return data;
+  }
+  async modelSelect(body: ModelSelectPayload): Promise<any> {
     const apiKey = process.env.IRONAAI_API_KEY;
     if (!apiKey) {
       throw new MissingApiKeyError(
@@ -23,7 +36,7 @@ export class IronaRouterClient extends Base {
     try {
       const result = await this.request(`${resources}`, {
         method: "POST",
-        data: body,
+        data: this.formatModelSelectPayload(body),
         headers: {
           Authorization: "Bearer " + apiKey,
           "Content-Type": "application/json",

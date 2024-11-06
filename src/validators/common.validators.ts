@@ -9,11 +9,10 @@ export const messageSchema = z.object({
     .min(1, "Content cannot be empty"), // Non-empty string
 });
 
-export const llmProviderSchema = z.object({
-  provider: z
-    .string({ required_error: "Provider is required" })
-    .min(1, "Provider cannot be empty"),
-  model: z
-    .string({ required_error: "Model is required" })
-    .min(1, "Model cannot be empty"),
-});
+// Define modelSchema to validate format like "openai/gpt-4-1106-preview"
+export const modelSchema = z
+  .string({ required_error: "Model is required" })
+  .regex(
+    /^[^/]+\/[^/]+$/,
+    "Model must contain a '/' separating provider and model"
+  );

@@ -1,12 +1,10 @@
 // completionsSchema.ts
 import { z } from "zod";
-import { messageSchema } from "./common.validators";
+import { messageSchema, modelSchema } from "./common.validators";
 
 export const completionsSchema = z.object({
   messages: z.array(messageSchema).nonempty("Messages array cannot be empty"),
-  model: z
-    .string({ required_error: "Model is required" })
-    .min(1, "Model cannot be empty"),
+  model: modelSchema,
   temperature: z
     .number()
     .min(0, "Temperature must be at least 0")

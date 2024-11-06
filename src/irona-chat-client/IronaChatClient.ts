@@ -11,11 +11,11 @@ import {
 } from "../errors";
 import { isSupportedModel, providerApiKeyName } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
-import { completionsSchema } from "../validators/completions.validator";
+import { CompletionsPayload, completionsSchema } from "../validators/completions.validator";
 
 export class IronaChatClient {
   constructor() {}
-  async completions(body: any) {
+  async completions(body: CompletionsPayload) {
     // validate input
     const validationResult = validateSchema(completionsSchema, body);
     if (!validationResult.success) {

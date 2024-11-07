@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const messageSchema = z.object({
+export const MessageSchema = z.object({
   role: z.enum(["system", "assistant", "user"], {
     required_error: "Role is required",
   }),
@@ -10,9 +10,10 @@ export const messageSchema = z.object({
 });
 
 // Define modelSchema to validate format like "openai/gpt-4-1106-preview"
-export const modelSchema = z
+export const ModelSchema = z
   .string({ required_error: "Model is required" })
   .regex(
     /^[^/]+\/[^/]+$/,
     "Model must contain a '/' separating provider and model"
   );
+export type ModelPayload = z.infer<typeof ModelSchema>;

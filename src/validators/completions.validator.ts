@@ -1,10 +1,8 @@
 // completionsSchema.ts
 import { z } from "zod";
-import { messageSchema, modelSchema } from "./common.validators";
+import { ModelSelectSchema } from "./modelSelect.validator";
 
-export const completionsSchema = z.object({
-  messages: z.array(messageSchema).nonempty("Messages array cannot be empty"),
-  model: modelSchema,
+export const CompletionsSchema = ModelSelectSchema.extend({
   temperature: z
     .number()
     .min(0, "Temperature must be at least 0")
@@ -23,4 +21,4 @@ export const completionsSchema = z.object({
   stream: z.boolean().optional(),
 });
 
-export type CompletionsPayload = z.infer<typeof completionsSchema>;
+export type CompletionsPayload = z.infer<typeof CompletionsSchema>;

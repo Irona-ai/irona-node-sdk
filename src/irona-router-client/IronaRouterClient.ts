@@ -2,25 +2,22 @@ import { Base } from "./base";
 import { validateSchema } from "../utils/requestValidator";
 import {
   ModelSelectPayload,
-  modelSelectSchema,
+  ModelSelectSchema,
 } from "../validators/modelSelect.validator";
+import { ModelPayload } from "../validators/common.validators";
 import { Config } from "../types";
-import { MissingApiKeyError, BadRequestError } from "../errors";
+import {
+  MissingApiKeyError,
+  BadRequestError,
+  UnsupportedModelError,
+} from "../errors";
+import { isSupportedModel } from "../supported_models";
 const resources = "/api/v1/model-router/select-model"; // TODO: will change this to model-select in the irona-web-server repo
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
     super(config);
   }
-  private formatModelSelectPayload(body: ModelSelectPayload) {
-    const data: { messages: Object[]; llm_providers: Object[] } = {
-      messages: body.messages,
-      llm_providers: body.models.map((model) => {
-        const [provider, ...modelParts] = model.toLowerCase().split("/");
-        return { provider, model: modelParts.join("/") };
-      }),
-    };
-    return data;
-  }
+
   async modelSelect(body: ModelSelectPayload): Promise<any> {
     const apiKey = process.env.IRONAAI_API_KEY;
     if (!apiKey) {
@@ -28,7 +25,8 @@ export class IronaRouterClient extends Base {
         "The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables."
       );
     }
-    const validationResult = validateSchema(modelSelectSchema, body);
+    const validationResult = validateSchema(ModelSelectSchema, body);
+
     if (!validationResult.success) {
       throw new BadRequestError(validationResult.errors);
     }
@@ -46,5 +44,23 @@ export class IronaRouterClient extends Base {
     } catch (error) {
       throw error;
     }
+  }
+  private validateAndGetProviderAndModel(modelPayload: ModelPayload) {
+    const [provider, ...modelParts] = modelPayload.toLowerCase().split("/");
+    const model = modelParts.join("/");
+    if (!isSupportedModel(provider, model)) {
+      throw new UnsupportedModelError(`${provider}/${model} is not supported.`);
+    }
+    return { provider, model };
+  }
+
+  private formatModelSelectPayload(body: ModelSelectPayload) {
+    const data: { messages: Object[]; llm_providers: Object[] } = {
+      messages: body.messages,
+      llm_providers: body.models.map((model) => {
+        return this.validateAndGetProviderAndModel(model);
+      }),
+    };
+    return data;
   }
 }

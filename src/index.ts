@@ -23,11 +23,11 @@ export class IronaAI {
     this.ironaRouter = new IronaRouterClient(config);
     this.llmChatService = new IronaChatClient(this.ironaRouter);
   }
-  private modelSelect(body: ModelSelectPayload): Promise<any> {
+  public modelSelect(body: ModelSelectPayload): Promise<any> {
     return this.ironaRouter.modelSelect(body);
   }
 
-  private completions = {
+  public completions = {
     create: (body: CompletionsPayload): Promise<any> => {
       return this.llmChatService.completions(body);
     },

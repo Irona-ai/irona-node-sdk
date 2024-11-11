@@ -23,18 +23,19 @@ const testCompletions = async (sdkClient, body) => {
     const data = {
       ...body,
       temperature: 0.7,
-      maxTokens: 100,
-    //   maxRetries: 3,
+      maxTokens: 10,
+      //   maxRetries: 3,
     //   stream: true,
-    //   disableModelSelection: true,
     };
     const chatResponse = await sdkClient.completions.create(data);
+    console.log(chatResponse.provider);
+    console.log(chatResponse.model);
     try {
-      for await (const chunk of chatResponse) {
-        console.info(JSON.stringify(chunk, null, 2));
+      for await (const chunk of chatResponse.response) {
+        console.info(chunk);
       }
     } catch (error) {}
-    console.info("Chat Response:\n" + JSON.stringify(chatResponse, null, 2));
+    console.log(chatResponse.response);
   } catch (error) {
     console.log("Error in SDK Completion usage:\n");
     console.error(error);

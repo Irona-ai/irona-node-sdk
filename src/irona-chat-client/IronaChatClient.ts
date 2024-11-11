@@ -48,9 +48,9 @@ export class IronaChatClient {
       throw Error("No chat model found");
     }
     if (body.stream) {
-      return await chatModel.stream(body.messages);
+      return {  response: await chatModel.stream(body.messages), provider, model };
     } else {
-      return await chatModel.invoke(body.messages);
+      return { response: await chatModel.invoke(body.messages), provider, model};
     }
   }
 

@@ -12,9 +12,9 @@ const body = {
     "openai/gpt-4-turbo",
     "anthropic/claude-3-opus-20240229",
     // "togetherai/Phind-CodeLlama-34B-v2",
-    // "anthropic/claude-2.1",
-    // "mistral/open-mixtral-8x22b",
-    // "google/gemini-1.0-pro-latest"
+    "anthropic/claude-2.1",
+    "mistral/open-mixtral-8x22b",
+    "google/gemini-1.0-pro-latest",
   ],
 };
 
@@ -24,8 +24,9 @@ const testCompletions = async (sdkClient, body) => {
       ...body,
       temperature: 0.7,
       maxTokens: 100,
-      //   maxRetries: 3,
-      // stream: true,
+    //   maxRetries: 3,
+    //   stream: true,
+    //   disableModelSelection: true,
     };
     const chatResponse = await sdkClient.completions.create(data);
     try {

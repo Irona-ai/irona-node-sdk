@@ -55,11 +55,13 @@ export class IronaRouterClient extends Base {
   }
 
   private formatModelSelectPayload(body: ModelSelectPayload) {
-    const data: { messages: Object[]; llm_providers: Object[] } = {
+    const data = {
+      topk_models: body?.topk_models,
       messages: body.messages,
       llm_providers: body.models.map((model) => {
         return this.validateAndGetProviderAndModel(model);
       }),
+      kwargs: body?.kwargs,
     };
     return data;
   }

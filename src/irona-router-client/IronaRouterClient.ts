@@ -12,7 +12,7 @@ import {
   UnsupportedModelError,
 } from "../errors";
 import { isSupportedModel } from "../supported_models";
-const resources = "/api/v1/model-router/select-model"; // TODO: will change this to model-select in the irona-web-server repo
+const resources = "/api/v1/model-router/model-select";
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
     super(config);

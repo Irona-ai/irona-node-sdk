@@ -32,7 +32,7 @@
     "intelligent router"
   ],
   "author": "Chandraprakash Pal <chandraprakash@irona.ai>",
-  "license": "ISC",
+  "license": "MIT",
   "files": [
     "dist"
   ],

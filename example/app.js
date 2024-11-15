@@ -2,16 +2,14 @@
 const { IronaAI } = require("ironaai");
 
 const body = {
+  topk_models: 3,
   messages: [
-    { role: "system", content: "You are a world class software developer." },
-    { role: "assistant", content: "How can I assist you today?" },
-    { role: "user", content: "Write a merge sort in python" },
+    { role: "user", content: "Write a poem?" },
   ],
   models: [
     "openai/gpt-4-1106-preview",
     "openai/gpt-4-turbo",
     "anthropic/claude-3-opus-20240229",
-    // "togetherai/Phind-CodeLlama-34B-v2",
     "anthropic/claude-2.1",
     "mistral/open-mixtral-8x22b",
     "google/gemini-1.0-pro-latest",
@@ -21,10 +19,11 @@ const body = {
 const testCompletions = async (sdkClient, body) => {
   try {
     const data = {
-      ...body,
+      messages: body.messages,
+      models: body.models,
       temperature: 0.7,
       maxTokens: 10,
-      //   maxRetries: 3,
+    //   maxRetries: 3,
     //   stream: true,
     };
     const chatResponse = await sdkClient.completions.create(data);
@@ -55,7 +54,7 @@ const testSelectModel = async (sdkClient, body) => {
 
 async function main() {
   const sdkClient = new IronaAI();
-  //   await testSelectModel(sdkClient, body);
-  await testCompletions(sdkClient, body);
+    await testSelectModel(sdkClient, body);
+//   await testCompletions(sdkClient, body);
 }
 main();

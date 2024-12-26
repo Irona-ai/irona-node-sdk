@@ -1,29 +1,40 @@
 import { Base } from "./base";
 import { validateSchema } from "../utils/requestValidator";
-import { modelSelectSchema } from "../validators/modelSelect.validator";
+import {
+  ModelSelectPayload,
+  ModelSelectSchema,
+} from "../validators/modelSelect.validator";
+import { ModelPayload } from "../validators/common.validators";
 import { Config } from "../types";
-import { MissingApiKeyError, ValidationError } from "../errors";
-const resources = "/api/v1/model-router/select-model"; // TODO: will change this to model-select in the irona-web-server repo
+import {
+  MissingApiKeyError,
+  BadRequestError,
+  UnsupportedModelError,
+} from "../errors";
+import { isSupportedModel } from "../supported_models";
+const resources = "/api/v1/model-router/model-select";
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
     super(config);
   }
-  async modelSelect(body: any): Promise<any> {
+
+  async modelSelect(body: ModelSelectPayload): Promise<any> {
     const apiKey = process.env.IRONAAI_API_KEY;
     if (!apiKey) {
       throw new MissingApiKeyError(
-        "IRONAAI_API_KEY is not set in the environment variables."
+        "The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables."
       );
     }
-    const validationResult = validateSchema(modelSelectSchema, body);
+    const validationResult = validateSchema(ModelSelectSchema, body);
+
     if (!validationResult.success) {
-      throw new ValidationError(validationResult.errors);
+      throw new BadRequestError(validationResult.errors);
     }
 
     try {
       const result = await this.request(`${resources}`, {
         method: "POST",
-        data: body,
+        data: this.formatModelSelectPayload(body),
         headers: {
           Authorization: "Bearer " + apiKey,
           "Content-Type": "application/json",
@@ -33,5 +44,25 @@ export class IronaRouterClient extends Base {
     } catch (error) {
       throw error;
     }
+  }
+  private validateAndGetProviderAndModel(modelPayload: ModelPayload) {
+    const [provider, ...modelParts] = modelPayload.toLowerCase().split("/");
+    const model = modelParts.join("/");
+    if (!isSupportedModel(provider, model)) {
+      throw new UnsupportedModelError(`${provider}/${model} is not supported.`);
+    }
+    return { provider, model };
+  }
+
+  private formatModelSelectPayload(body: ModelSelectPayload) {
+    const data = {
+      topk_models: body?.topk_models,
+      messages: body.messages,
+      llm_providers: body.models.map((model) => {
+        return this.validateAndGetProviderAndModel(model);
+      }),
+      kwargs: body?.kwargs,
+    };
+    return data;
   }
 }

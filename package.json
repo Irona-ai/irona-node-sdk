@@ -1,6 +1,6 @@
 {
-  "name": "irona-node-sdk",
-  "version": "1.0.0",
+  "name": "ironaai",
+  "version": "0.0.1",
   "main": "dist/index.js",
   "module": "dist/index.m.js",
   "unpkg": "dist/index.umd.js",
@@ -32,7 +32,7 @@
     "intelligent router"
   ],
   "author": "Chandraprakash Pal <chandraprakash@irona.ai>",
-  "license": "ISC",
+  "license": "MIT",
   "files": [
     "dist"
   ],
@@ -46,9 +46,6 @@
     "@langchain/openai": "^0.3.11",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
-    "express": "^4.21.1",
-    "pino": "^9.4.0",
-    "pino-pretty": "^11.2.2",
     "tsconfig-paths": "^4.2.0",
     "zod": "^3.23.8"
   },

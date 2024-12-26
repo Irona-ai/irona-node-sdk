@@ -41,6 +41,7 @@ export class IronaChatClient {
       temperature: body?.temperature,
       maxRetries: body?.maxRetries,
       maxTokens: body?.maxTokens,
+      baseUrl: 'https://api.perplexity.ai'
     };
 
     const chatModel = this.getChatModel(provider, chatModelConfig);
@@ -118,6 +119,8 @@ export class IronaChatClient {
         return new ChatOpenAI(chatModelConfig);
       case "togetherai":
         return new ChatTogetherAI(chatModelConfig);
+     case "perplexityai":
+        return new ChatOpenAI(chatModelConfig);
       default:
         throw new Error(`No chat model found for provider: ${provider}`);
     }

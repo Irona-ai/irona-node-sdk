@@ -8,15 +8,24 @@ require("dotenv").config();
 
 // Constants
 const DEFAULT_BASE_URL = "https://app.irona.ai";
+const IRONAAI_API_KEY_PREFIX = "sk_";
 
 export class IronaAI {
   private ironaRouter: IronaRouterClient;
   private llmChatService: IronaChatClient;
   constructor(config: Config = {}) {
-    const apiKey = process.env.IRONAAI_API_KEY;
+    const apiKey = config.apiKey || process.env.IRONAAI_API_KEY;
     if (!apiKey) {
       throw new MissingApiKeyError(
-        "The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables."
+        "The API key is missing. Please provide the API key either through the 'IRONAAI_API_KEY' environment variable or the 'config.apiKey' property."
+      );
+    }
+    if (
+      typeof apiKey !== "string" ||
+      !apiKey.startsWith(IRONAAI_API_KEY_PREFIX)
+    ) {
+      throw new MissingApiKeyError(
+        "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."
       );
     }
     config.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;

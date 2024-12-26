@@ -108,10 +108,8 @@ export class IronaChatClient {
   private getChatModel(provider: string, chatModelConfig: ChatModelConfig) {
     switch (provider) {
       case "anthropic":
-        console.log("Anthropic API Key:", chatModelConfig.apiKey);
         return new ChatAnthropic(chatModelConfig);
       case "google":
-        console.log(chatModelConfig.apiKey);
         return new ChatGoogleGenerativeAI(chatModelConfig);
       case "mistral":
         return new ChatMistralAI(chatModelConfig);

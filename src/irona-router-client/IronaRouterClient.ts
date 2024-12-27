@@ -4,14 +4,12 @@ import {
   ModelSelectPayload,
   ModelSelectSchema,
 } from "../validators/modelSelect.validator";
-import { ModelPayload } from "../validators/common.validators";
 import { Config } from "../types";
 import {
   MissingApiKeyError,
   BadRequestError,
-  UnsupportedModelError,
 } from "../errors";
-import { isSupportedModel } from "../supported_models";
+import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 const resources = "/api/v1/model-router/model-select";
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
@@ -35,7 +33,7 @@ export class IronaRouterClient extends Base {
       topk_models: body?.topk_models,
       messages: body.messages,
       llm_providers: body.models.map((model) => {
-        return this.validateAndGetProviderAndModel(model);
+        return validateAndGetProviderAndModel(model);
       }),
       kwargs: body?.kwargs,
     };
@@ -53,13 +51,5 @@ export class IronaRouterClient extends Base {
     } catch (error) {
       throw error;
     }
-  }
-  private validateAndGetProviderAndModel(modelPayload: ModelPayload) {
-    const [provider, ...modelParts] = modelPayload.toLowerCase().split("/");
-    const model = modelParts.join("/");
-    if (!isSupportedModel(provider, model)) {
-      throw new UnsupportedModelError(`${provider}/${model} is not supported.`);
-    }
-    return { provider, model };
   }
 }

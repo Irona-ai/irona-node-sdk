@@ -7,9 +7,8 @@ import { ChatModelConfig } from "../types";
 import {
   MissingApiKeyError,
   BadRequestError,
-  UnsupportedModelError,
 } from "../errors";
-import { providerApiKeyName, isSupportedModel } from "../supported_models";
+import { providerApiKeyName } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
@@ -19,8 +18,8 @@ import {
   ModelSelectPayload,
   ModelSelectSchema,
 } from "../validators/modelSelect.validator";
-import { ModelPayload } from "../validators/common.validators";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
+import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 
 export class IronaChatClient {
   constructor(private readonly ironaRouter: IronaRouterClient) {}
@@ -73,14 +72,7 @@ export class IronaChatClient {
 
     return modelSelectBody;
   }
-  private validateAndGetProviderAndModel(modelPayload: ModelPayload) {
-    const [provider, ...modelParts] = modelPayload.toLowerCase().split("/");
-    const model = modelParts.join("/");
-    if (!isSupportedModel(provider, model)) {
-      throw new UnsupportedModelError(`${provider}/${model} is not supported.`);
-    }
-    return { provider, model };
-  }
+
   private async selectBestModel(body: CompletionsPayload) {
     if (body.models.length != 1) {
       const response = await this.ironaRouter.modelSelect(
@@ -89,7 +81,7 @@ export class IronaChatClient {
       const providers = response.data.providers;
       return providers[0];
     } else {
-      return this.validateAndGetProviderAndModel(body.models[0]);
+      return validateAndGetProviderAndModel(body.models[0]);
     }
   }
 

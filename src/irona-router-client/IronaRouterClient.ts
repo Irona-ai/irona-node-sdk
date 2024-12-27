@@ -39,7 +39,7 @@ export class IronaRouterClient extends Base {
     };
 
     try {
-      const result = await this.request(`${resources}`, {
+      let result = await this.request<{sucess: boolean, message: String, data: any, statusCode: number}>(`${resources}`, {
         method: "POST",
         data: formattedPayload,
         headers: {
@@ -47,6 +47,9 @@ export class IronaRouterClient extends Base {
           "Content-Type": "application/json",
         },
       });
+      if(result && result.data.error){
+      result.data.fallback_models = [ {"provider": "openai", "model": "gpt-4o-mini"}, {"provider": "anthropic", "model": "claude-3-haiku-20240307"}]
+      }
       return result;
     } catch (error) {
       throw error;

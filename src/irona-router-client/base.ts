@@ -1,5 +1,4 @@
 import axios, { AxiosRequestConfig } from "axios";
-import { logger } from "../utils/logger"; //using relative path so that client need to to configure its path in tsconfig.json
 import { Config } from "../types";
 
 export abstract class Base {
@@ -23,7 +22,6 @@ export abstract class Base {
     };
 
     try {
-      logger.info(`Calling the the endpoint ${url} inside SDK `);
       const response = await axios.request<T>(config);
       return response.data;
     } catch (error) {

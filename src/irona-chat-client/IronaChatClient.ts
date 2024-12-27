@@ -41,7 +41,6 @@ export class IronaChatClient {
       temperature: body?.temperature,
       maxRetries: body?.maxRetries,
       maxTokens: body?.maxTokens,
-      baseUrl: 'https://api.perplexity.ai'
     };
 
     const chatModel = this.getChatModel(provider, chatModelConfig);

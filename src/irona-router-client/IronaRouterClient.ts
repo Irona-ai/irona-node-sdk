@@ -31,10 +31,19 @@ export class IronaRouterClient extends Base {
       throw new BadRequestError(validationResult.errors);
     }
 
+    const formattedPayload = {
+      topk_models: body?.topk_models,
+      messages: body.messages,
+      llm_providers: body.models.map((model) => {
+        return this.validateAndGetProviderAndModel(model);
+      }),
+      kwargs: body?.kwargs,
+    };
+
     try {
       const result = await this.request(`${resources}`, {
         method: "POST",
-        data: this.formatModelSelectPayload(body),
+        data: formattedPayload,
         headers: {
           Authorization: "Bearer " + apiKey,
           "Content-Type": "application/json",
@@ -52,17 +61,5 @@ export class IronaRouterClient extends Base {
       throw new UnsupportedModelError(`${provider}/${model} is not supported.`);
     }
     return { provider, model };
-  }
-
-  private formatModelSelectPayload(body: ModelSelectPayload) {
-    const data = {
-      topk_models: body?.topk_models,
-      messages: body.messages,
-      llm_providers: body.models.map((model) => {
-        return this.validateAndGetProviderAndModel(model);
-      }),
-      kwargs: body?.kwargs,
-    };
-    return data;
   }
 }

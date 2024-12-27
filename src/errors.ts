@@ -14,7 +14,7 @@ export class MissingApiKeyError extends Error {
 }
 
 export class BadRequestError extends Error {
-  constructor(message = "Validation error occurred") {
+  constructor(message = "Bad Request, Error occurred in request validation.") {
     super(message);
     this.name = "BadRequestError";
 

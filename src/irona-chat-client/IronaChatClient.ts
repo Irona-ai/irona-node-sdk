@@ -4,10 +4,7 @@ import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatMistralAI } from "@langchain/mistralai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatModelConfig } from "../types";
-import {
-  MissingApiKeyError,
-  BadRequestError,
-} from "../errors";
+import { MissingApiKeyError, BadRequestError } from "../errors";
 import { providerApiKeyName } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
@@ -47,9 +44,17 @@ export class IronaChatClient {
       throw Error("No chat model found");
     }
     if (body.stream) {
-      return {  response: await chatModel.stream(body.messages), provider, model };
+      return {
+        response: await chatModel.stream(body.messages),
+        provider,
+        model,
+      };
     } else {
-      return { response: await chatModel.invoke(body.messages), provider, model};
+      return {
+        response: await chatModel.invoke(body.messages),
+        provider,
+        model,
+      };
     }
   }
 
@@ -78,7 +83,10 @@ export class IronaChatClient {
       const response = await this.ironaRouter.modelSelect(
         this.extractModelSelectPayloadFromCompletionsPayload(body)
       );
-      const providers = response.data.providers;
+      const providers = response.data.error
+        ? response.data.fallback_providers
+        : response.data.providers;
+
       return providers[0];
     } else {
       return validateAndGetProviderAndModel(body.models[0]);

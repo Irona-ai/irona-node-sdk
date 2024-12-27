@@ -5,10 +5,7 @@ import {
   ModelSelectSchema,
 } from "../validators/modelSelect.validator";
 import { Config } from "../types";
-import {
-  MissingApiKeyError,
-  BadRequestError,
-} from "../errors";
+import { MissingApiKeyError, BadRequestError } from "../errors";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 const resources = "/api/v1/model-router/model-select";
 export class IronaRouterClient extends Base {
@@ -39,7 +36,12 @@ export class IronaRouterClient extends Base {
     };
 
     try {
-      let result = await this.request<{sucess: boolean, message: String, data: any, statusCode: number}>(`${resources}`, {
+      let result = await this.request<{
+        sucess: boolean;
+        message: String;
+        data: any;
+        statusCode: number;
+      }>(`${resources}`, {
         method: "POST",
         data: formattedPayload,
         headers: {
@@ -47,8 +49,23 @@ export class IronaRouterClient extends Base {
           "Content-Type": "application/json",
         },
       });
-      if(result && result.data.error){
-      result.data.fallback_models = [ {"provider": "openai", "model": "gpt-4o-mini"}, {"provider": "anthropic", "model": "claude-3-haiku-20240307"}]
+      // Default fallback_providers
+      let fallback_providers: { provider: string; model: string }[] = [
+        { provider: "openai", model: "gpt-4o-mini" },
+        { provider: "anthropic", model: "claude-3-haiku-20240307" },
+      ];
+      // Use fallback_providers if they are provided in the request
+      if (body.fallback_models && body.fallback_models.length > 0) {
+        fallback_providers = body.fallback_models.map((modelPayload) => {
+          const [provider, ...modelParts] = modelPayload
+            .toLowerCase()
+            .split("/");
+          const model = modelParts.join("/");
+          return { provider, model };
+        });
+      }
+      if (result && result.data.error) {
+        result.data.fallback_providers = fallback_providers;
       }
       return result;
     } catch (error) {

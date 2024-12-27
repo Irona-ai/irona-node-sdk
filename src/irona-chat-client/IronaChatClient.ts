@@ -116,8 +116,6 @@ export class IronaChatClient {
         return new ChatOpenAI(chatModelConfig);
       case "togetherai":
         return new ChatTogetherAI(chatModelConfig);
-     case "perplexityai":
-        return new ChatOpenAI(chatModelConfig);
       default:
         throw new Error(`No chat model found for provider: ${provider}`);
     }

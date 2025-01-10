@@ -10,6 +10,7 @@ const body = {
     "mistral/open-mixtral-8x22b",
     "google/gemini-1.0-pro-latest",
   ],
+  fallback_models: ["mistral/open-mixtral-8x22b", "openai/gpt-4-turbo"],
 };
 
 async function modelSelectTest() {
@@ -22,7 +23,7 @@ async function modelSelectTest() {
     console.log("Error in SDK selectModel usage:\n");
     console.error(error);
   }
-};
+}
 async function CompletionsTest() {
   const sdkClient = new IronaAI();
   try {
@@ -35,6 +36,6 @@ async function CompletionsTest() {
     console.log("Error in SDK Completion usage:\n");
     console.error(error);
   }
-};
+}
 modelSelectTest();
 CompletionsTest();

@@ -4,14 +4,9 @@ import {
   ModelSelectPayload,
   ModelSelectSchema,
 } from "../validators/modelSelect.validator";
-import { ModelPayload } from "../validators/common.validators";
 import { Config } from "../types";
-import {
-  MissingApiKeyError,
-  BadRequestError,
-  UnsupportedModelError,
-} from "../errors";
-import { isSupportedModel } from "../supported_models";
+import { MissingApiKeyError, BadRequestError } from "../errors";
+import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 const resources = "/api/v1/model-router/model-select";
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
@@ -31,38 +26,50 @@ export class IronaRouterClient extends Base {
       throw new BadRequestError(validationResult.errors);
     }
 
+    const formattedPayload = {
+      topk_models: body?.topk_models,
+      messages: body.messages,
+      llm_providers: body.models.map((model) => {
+        return validateAndGetProviderAndModel(model);
+      }),
+      kwargs: body?.kwargs,
+    };
+
     try {
-      const result = await this.request(`${resources}`, {
+      let result = await this.request<{
+        sucess: boolean;
+        message: String;
+        data: any;
+        statusCode: number;
+      }>(`${resources}`, {
         method: "POST",
-        data: this.formatModelSelectPayload(body),
+        data: formattedPayload,
         headers: {
           Authorization: "Bearer " + apiKey,
           "Content-Type": "application/json",
         },
       });
+      // Default fallback_providers
+      let fallback_providers: { provider: string; model: string }[] = [
+        { provider: "openai", model: "gpt-4o-mini" },
+        { provider: "anthropic", model: "claude-3-haiku-20240307" },
+      ];
+      // Use fallback_providers if they are provided in the request
+      if (body.fallback_models && body.fallback_models.length > 0) {
+        fallback_providers = body.fallback_models.map((modelPayload) => {
+          const [provider, ...modelParts] = modelPayload
+            .toLowerCase()
+            .split("/");
+          const model = modelParts.join("/");
+          return { provider, model };
+        });
+      }
+      if (result && result.data.error) {
+        result.data.fallback_providers = fallback_providers;
+      }
       return result;
     } catch (error) {
       throw error;
     }
-  }
-  private validateAndGetProviderAndModel(modelPayload: ModelPayload) {
-    const [provider, ...modelParts] = modelPayload.toLowerCase().split("/");
-    const model = modelParts.join("/");
-    if (!isSupportedModel(provider, model)) {
-      throw new UnsupportedModelError(`${provider}/${model} is not supported.`);
-    }
-    return { provider, model };
-  }
-
-  private formatModelSelectPayload(body: ModelSelectPayload) {
-    const data = {
-      topk_models: body?.topk_models,
-      messages: body.messages,
-      llm_providers: body.models.map((model) => {
-        return this.validateAndGetProviderAndModel(model);
-      }),
-      kwargs: body?.kwargs,
-    };
-    return data;
   }
 }

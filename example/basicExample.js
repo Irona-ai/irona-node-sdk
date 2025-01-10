@@ -3,12 +3,13 @@ const { IronaAI } = require("ironaai");
 const body = {
   messages: [{ role: "user", content: "Write a poem?" }],
   models: [
-    "openai/gpt-4-1106-preview",
-    "openai/gpt-4-turbo",
-    "anthropic/claude-3-opus-20240229",
-    "anthropic/claude-2.1",
-    "mistral/open-mixtral-8x22b",
-    "google/gemini-1.0-pro-latest",
+    // "openai/gpt-4-1106-preview",
+    // "openai/gpt-4-turbo",
+    // "anthropic/claude-3-opus-20240229",
+    // "anthropic/claude-2.1",
+    // "mistral/open-mixtral-8x22b",
+    // "google/gemini-1.0-pro-latest",
+    "perplexity/llama-3.1-sonar-large-128k-online"
   ],
   fallback_models: ["mistral/open-mixtral-8x22b", "openai/gpt-4-turbo"],
 };
@@ -37,5 +38,5 @@ async function CompletionsTest() {
     console.error(error);
   }
 }
-modelSelectTest();
+// modelSelectTest();
 CompletionsTest();

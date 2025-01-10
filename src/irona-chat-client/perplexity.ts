@@ -15,13 +15,33 @@ export class ChatPerplexity {
     this.model = model;
   }
 
-  async invoke(messages: MessagePayload): Promise<any> {
+  private validateMessages(messages: MessagePayload): void {
     if (!messages.length) {
       throw new Error("No messages provided.");
     }
     if (typeof messages[0].content !== "string") {
       throw new Error("Multimodal messages are not supported.");
     }
+  }
+
+  private mapResponseToAIMessage(data: any): AIMessageFields {
+    return {
+      id: data?.id,
+      usage_metadata: {
+        input_tokens: data?.usage?.prompt_tokens,
+        output_tokens: data?.usage?.completion_tokens,
+        total_tokens: data?.usage?.total_tokens,
+      },
+      content: data.choices[0]?.message?.content || "",
+      additional_kwargs: { ...data },
+      response_metadata: {
+        finish_reason: data?.choices?.[0]?.finish_reason,
+      },
+    };
+  }
+
+  async invoke(messages: MessagePayload): Promise<any> {
+    this.validateMessages(messages);
     try {
       const { data } = await axios.post(
         PERPLEXITY_URL,
@@ -35,23 +55,7 @@ export class ChatPerplexity {
           },
         }
       );
-      const aiMessageFields: AIMessageFields = {
-        id: data?.id,
-        usage_metadata: {
-          input_tokens: data?.usage?.prompt_tokens,
-          output_tokens: data?.usage?.completion_tokens,
-          total_tokens: data?.usage?.total_tokens,
-        },
-        content: data.choices[0]?.message?.content || "",
-        additional_kwargs: {
-          ...data,
-        },
-        response_metadata: {
-          finish_reason: data?.choices?.[0]?.finish_reason,
-          finishReason: data?.choices?.[0]?.finish_reason,
-        },
-      };
-
+      const aiMessageFields = this.mapResponseToAIMessage(data);
       return new AIMessage(aiMessageFields);
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
@@ -61,13 +65,7 @@ export class ChatPerplexity {
     }
   }
   async *stream(messages: MessagePayload): AsyncGenerator<AIMessageChunk> {
-    if (!messages.length) {
-      throw new Error("No messages provided.");
-    }
-
-    if (typeof messages[0].content !== "string") {
-      throw new Error("Multimodal messages are not supported.");
-    }
+    this.validateMessages(messages);
     try {
       const response = await axios.post(
         PERPLEXITY_URL,

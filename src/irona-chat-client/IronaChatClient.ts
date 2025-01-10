@@ -17,6 +17,7 @@ import {
 } from "../validators/modelSelect.validator";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
+import { ChatPerplexity } from "./perplexity";
 
 export class IronaChatClient {
   constructor(private readonly ironaRouter: IronaRouterClient) {}
@@ -116,6 +117,8 @@ export class IronaChatClient {
         return new ChatOpenAI(chatModelConfig);
       case "togetherai":
         return new ChatTogetherAI(chatModelConfig);
+      case "perplexity":
+        return new ChatPerplexity({model: chatModelConfig.modelName, apiKey: chatModelConfig.apiKey});
       default:
         throw new Error(`No chat model found for provider: ${provider}`);
     }

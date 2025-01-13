@@ -203,7 +203,7 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
             "gemini-1.5-flash-latest": {"input": 0.35, "output": 1.05},
         },
         "name": {
-            "gemini-1.5-flash-latest": "Gemini-1.5 Flash ",
+            "gemini-1.5-flash-latest": "Gemini-1.5 Flash",
             "gemini-1.5-pro-latest": "Gemini-1.5 Pro",
         },
     },

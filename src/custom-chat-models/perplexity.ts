@@ -5,11 +5,13 @@ import {
   AIMessage,
   BaseMessage,
   AIMessageChunk,
+  AIMessageFields,
 } from "@langchain/core/messages";
 import { ChatGenerationChunk } from "@langchain/core/outputs";
 import axios from "axios";
 import { ChatModelConfig } from "../types";
 
+const PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions";
 /**
  * Perplexity model for LangChain.
  */
@@ -19,7 +21,7 @@ export class ChatPerplexity extends SimpleChatModel {
 
   constructor(chatModelConfig: ChatModelConfig) {
     super(chatModelConfig);
-    const { apiKey, modelName, ...rest } = chatModelConfig;
+    const { apiKey, modelName } = chatModelConfig;
     this.apiKey = apiKey;
     this.model = modelName;
   }
@@ -27,21 +29,39 @@ export class ChatPerplexity extends SimpleChatModel {
   _llmType(): string {
     return "perplexity";
   }
-
-  async _call(messages: BaseMessage[]): Promise<any> {
+  private validateMessages(messages: BaseMessage[]): void {
     if (!messages.length) {
       throw new Error("No messages provided.");
     }
-    // Pass `runManager?.getChild()` when invoking internal runnables to enable tracing
-    // await subRunnable.invoke(params, runManager?.getChild());
-    if (typeof messages[0].content !== "string") {
-      throw new Error("Multimodal messages are not supported.");
+    for (const message of messages) {
+      // Pass `runManager?.getChild()` when invoking internal runnables to enable tracing
+      // await subRunnable.invoke(params, runManager?.getChild());
+      if (typeof message.content !== "string") {
+        throw new Error("Multimodal messages are not supported.");
+      }
     }
+  }
+  private mapResponseToAIMessage(data: any): AIMessageFields {
+    return {
+      id: data?.id,
+      usage_metadata: {
+        input_tokens: data?.usage?.prompt_tokens,
+        output_tokens: data?.usage?.completion_tokens,
+        total_tokens: data?.usage?.total_tokens,
+      },
+      content: data.choices[0]?.message?.content || "",
+      additional_kwargs: { ...data },
+      response_metadata: {
+        finish_reason: data?.choices?.[0]?.finish_reason,
+      },
+    };
+  }
+
+  async _call(messages: BaseMessage[]): Promise<any> {
+    this.validateMessages(messages);
     try {
-      const { data } = await axios.post<{
-        choices: [{ message: { content: string } }];
-      }>(
-        "https://api.perplexity.ai/chat/completions",
+      const { data } = await axios.post(
+        PERPLEXITY_URL,
         {
           model: this.model,
           messages: messages.map((m) => ({
@@ -55,8 +75,8 @@ export class ChatPerplexity extends SimpleChatModel {
           },
         }
       );
-
-      return new AIMessage(data.choices[0].message.content);
+      const aiMessageFields = this.mapResponseToAIMessage(data);
+      return new AIMessage(aiMessageFields);
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(`Perplexity API error: ${error.response.statusText}`);
@@ -69,17 +89,10 @@ export class ChatPerplexity extends SimpleChatModel {
     _options: this["ParsedCallOptions"],
     runManager?: CallbackManagerForLLMRun
   ): AsyncGenerator<ChatGenerationChunk> {
-    if (!messages.length) {
-      throw new Error("No messages provided.");
-    }
-    // Pass `runManager?.getChild()` when invoking internal runnables to enable tracing
-    // await subRunnable.invoke(params, runManager?.getChild());
-    if (typeof messages[0].content !== "string") {
-      throw new Error("Multimodal messages are not supported.");
-    }
+    this.validateMessages(messages);
     try {
       const response = await axios.post(
-        "https://api.perplexity.ai/chat/completions",
+        PERPLEXITY_URL,
         {
           model: this.model,
           messages: messages.map((m) => ({
@@ -120,10 +133,10 @@ export class ChatPerplexity extends SimpleChatModel {
             const payload = JSON.parse(rawPayload.replace("data: ", ""));
             const textChunk = payload?.choices?.[0]?.delta?.content ?? "";
             const finish_reason = payload?.choices?.[0]?.finish_reason;
-
             if (textChunk) {
               yield new ChatGenerationChunk({
                 message: new AIMessageChunk({
+                  id: payload?.id,
                   content: textChunk,
                   usage_metadata: {
                     input_tokens: payload?.usage?.prompt_tokens,
@@ -133,6 +146,9 @@ export class ChatPerplexity extends SimpleChatModel {
                   response_metadata: {
                     finish_reason: finish_reason,
                     finishReason: finish_reason,
+                  },
+                  additional_kwargs: {
+                    citations: payload?.citations,
                   },
                 }),
                 text: textChunk,

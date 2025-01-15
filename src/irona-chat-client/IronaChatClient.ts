@@ -17,6 +17,7 @@ import {
 } from "../validators/modelSelect.validator";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
+import { ChatPerplexity } from "../custom-chat-models/perplexity";
 
 export class IronaChatClient {
   constructor(private readonly ironaRouter: IronaRouterClient) {}
@@ -39,7 +40,7 @@ export class IronaChatClient {
       maxTokens: body?.maxTokens,
     };
 
-    const chatModel = this.getChatModel(provider, chatModelConfig);
+    const chatModel = this.getChatModel(provider, chatModelConfig); 
     if (!chatModel) {
       throw Error("No chat model found");
     }
@@ -116,6 +117,8 @@ export class IronaChatClient {
         return new ChatOpenAI(chatModelConfig);
       case "togetherai":
         return new ChatTogetherAI(chatModelConfig);
+      case "perplexity":
+        return new ChatPerplexity(chatModelConfig);
       default:
         throw new Error(`No chat model found for provider: ${provider}`);
     }

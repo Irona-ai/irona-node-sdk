@@ -18,6 +18,7 @@ import {
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 import { ChatPerplexity } from "../custom-chat-models/perplexity";
+import { ChatCohere } from "@langchain/cohere";
 
 export class IronaChatClient {
   constructor(private readonly ironaRouter: IronaRouterClient) {}
@@ -119,6 +120,8 @@ export class IronaChatClient {
         return new ChatTogetherAI(chatModelConfig);
       case "perplexity":
         return new ChatPerplexity(chatModelConfig);
+      case "cohere":
+        return new ChatCohere(chatModelConfig);
       default:
         throw new Error(`No chat model found for provider: ${provider}`);
     }

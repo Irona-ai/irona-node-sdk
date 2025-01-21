@@ -1,0 +1,7 @@
+Please login with appropriate account and publish the sdk;
+
+Instructions:
+1. update the version in package.json
+2. npm run build
+3. npm login 
+4. npm publish

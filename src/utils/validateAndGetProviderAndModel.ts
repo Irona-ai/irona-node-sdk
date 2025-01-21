@@ -9,7 +9,7 @@ import { ModelPayload } from "../validators/common.validators";
  * @throws {UnsupportedModelError} If the provider/model combination is not supported
  */
 export function validateAndGetProviderAndModel(modelPayload: ModelPayload) {
-  const [provider, ...modelParts] = modelPayload.toLowerCase().split("/");
+  const [provider, ...modelParts] = modelPayload.split("/");
   const model = modelParts.join("/");
   if (!isSupportedModel(provider, model)) {
     throw new UnsupportedModelError(`${provider}/${model} is not supported.`);

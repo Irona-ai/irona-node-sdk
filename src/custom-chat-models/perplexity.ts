@@ -95,10 +95,14 @@ export class ChatPerplexity extends SimpleChatModel {
         PERPLEXITY_URL,
         {
           model: this.model,
-          messages: messages.map((m) => ({
-            role: m.getType() === "human" ? "user" : m.getType(),
-            content: m.content,
-          })),
+          messages: messages.map((m) => {
+            const type = m.getType();
+            return {
+              role:
+                type === "human" ? "user" : type === "ai" ? "assistant" : type,
+              content: m.content,
+            };
+          }),
           stream: true, // Conceptual flag for streaming response
         },
         {

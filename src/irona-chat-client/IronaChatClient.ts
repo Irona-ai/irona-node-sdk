@@ -18,6 +18,7 @@ import {
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 import { ChatPerplexity } from "../custom-chat-models/perplexity";
+import { MessagePayload } from "@/validators/common.validators";
 
 export class IronaChatClient {
   constructor(private readonly ironaRouter: IronaRouterClient) {}
@@ -40,19 +41,20 @@ export class IronaChatClient {
       maxTokens: body?.maxTokens,
     };
 
-    const chatModel = this.getChatModel(provider, chatModelConfig); 
+    const chatModel = this.getChatModel(provider, chatModelConfig);
     if (!chatModel) {
       throw Error("No chat model found");
     }
+    const messages = this.formatInputMessages(body.messages, model);
     if (body.stream) {
       return {
-        response: await chatModel.stream(body.messages),
+        response: await chatModel.stream(messages),
         provider,
         model,
       };
     } else {
       return {
-        response: await chatModel.invoke(body.messages),
+        response: await chatModel.invoke(messages),
         provider,
         model,
       };
@@ -123,4 +125,22 @@ export class IronaChatClient {
         throw new Error(`No chat model found for provider: ${provider}`);
     }
   }
+
+  /**
+   * Formats messages for "o1" models by remapping the "system" role to "user".
+   * This is a workaround to handle limitations in "o1" models ("o1", "o1-mini", "o1-preview") that do not support the "system" role directly.
+   * @param {MessagePayload[]} messages - List of input messages containing role and content.
+   * @param {string} model - Target model name. If the model belongs to the "o1" family, roles are remapped.
+   * @returns {MessagePayload[]} - Messages with "system" roles remapped to "user" for "o1" models.
+   */
+  private formatInputMessages = (messages: MessagePayload[], model: string) => {
+    const o1Models = ["o1", "o1-mini", "o1-preview"];
+
+    return o1Models.includes(model)
+      ? messages.map((m) => ({
+          role: m.role === "system" ? "user" : m.role,
+          content: m.content,
+        }))
+      : messages;
+  };
 }

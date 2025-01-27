@@ -9,6 +9,7 @@ export const MessageSchema = z.object({
     .min(1, "Content cannot be empty"), // Non-empty string
 });
 
+export type MessagePayload = z.infer<typeof MessageSchema>;
 // Define modelSchema to validate format like "openai/gpt-4-1106-preview"
 export const ModelSchema = z
   .string({ required_error: "Model is required" })

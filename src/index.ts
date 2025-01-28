@@ -30,7 +30,7 @@ export class IronaAI {
     }
     config.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;
     this.ironaRouter = new IronaRouterClient(config);
-    this.llmChatService = new IronaChatClient(this.ironaRouter);
+    this.llmChatService = new IronaChatClient(config, this.ironaRouter);
   }
   public modelSelect(body: ModelSelectPayload): Promise<any> {
     return this.ironaRouter.modelSelect(body);

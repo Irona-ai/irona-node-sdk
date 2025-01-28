@@ -1,7 +1,7 @@
 const { IronaAI } = require("ironaai");
 
 const body = {
-  messages: [{ role: "user", content: "Write a poem?" }],
+  "messages": [{"role": "user","content": "short greeting message"}],
   models: [
     "openai/gpt-4-1106-preview",
     "openai/gpt-4-turbo",
@@ -11,7 +11,7 @@ const body = {
     "mistral/open-mixtral-8x22b",
     "google/gemini-1.0-pro-latest",
   ],
-  fallback_models: ["mistral/open-mixtral-8x22b", "openai/gpt-4-turbo"],
+  fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest",],
   stream: true,
 };
 
@@ -27,7 +27,7 @@ async function modelSelectTest() {
   }
 }
 async function CompletionsTest() {
-  const sdkClient = new IronaAI();
+  const sdkClient = new IronaAI({fallback_models: ["openai/gpt-4o-mini"]});
   try {
     const { provider, model, response } = await sdkClient.completions.create(
       body

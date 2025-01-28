@@ -3,7 +3,7 @@ import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { ChatAnthropic } from "@langchain/anthropic";
 import { ChatMistralAI } from "@langchain/mistralai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatModelConfig } from "../types";
+import { ChatModelConfig, Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
 import { providerApiKeyName } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
@@ -19,48 +19,103 @@ import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 import { ChatPerplexity } from "../custom-chat-models/perplexity";
 import { MessagePayload } from "@/validators/common.validators";
+import { Base } from "@/irona-router-client/base";
 
 export class IronaChatClient {
-  constructor(private readonly ironaRouter: IronaRouterClient) {}
+  constructor(
+    private readonly config: Config,
+    private readonly ironaRouter: IronaRouterClient
+  ) {}
 
-  async completions(body: CompletionsPayload) {
-    // validate input
-    const validationResult = validateSchema(CompletionsSchema, body);
+  /**
+   * Processes a completions request and retries with fallback models if necessary.
+   */
+  async completions(payload: CompletionsPayload) {
+    // Validate input
+    const validationResult = validateSchema(CompletionsSchema, payload);
     if (!validationResult.success) {
       throw new BadRequestError(validationResult.errors);
     }
 
-    const { provider, model } = await this.selectBestModel(body);
-    const apiKey = this.loadApiKeyForProvider(provider, model);
+    // Select the best model
+    const { provider, model } = await this.selectBestModel(payload);
 
-    const chatModelConfig: ChatModelConfig = {
-      apiKey,
-      modelName: model,
-      temperature: body?.temperature,
-      maxRetries: body?.maxRetries,
-      maxTokens: body?.maxTokens,
-    };
+     // Prepare the model priority queue
+     // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
+     const modelPriorityQueue = [
+      { provider, model },
+      ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
+        (fallback) => validateAndGetProviderAndModel(fallback)
+      ),
+    ];
 
-    const chatModel = this.getChatModel(provider, chatModelConfig);
-    if (!chatModel) {
-      throw Error("No chat model found");
+    // Attempt execution for each model in the priority queue
+    for (const { provider, model } of modelPriorityQueue) {
+      console.log(`Invoking chat completions with provider: ${provider}, model: ${model}`);
+      try {
+        const response = await this.invokeChatCompletions(
+          provider,
+          model,
+          payload
+        );
+        console.log(
+          `Successfully executed chat completions with provider: ${provider}, model: ${model}`
+        );
+        return response; // Return on first success
+      } catch (error) {
+        console.error(`Error during chat completions execution. Provider: ${provider}, Model: ${model}.`);
+        // TODO: Fix Logging of Error Details
+        // console.error(`Error: ${JSON.stringify(error,null,2)}`);
+      }
     }
-    const messages = this.formatInputMessages(body.messages, model);
-    if (body.stream) {
-      return {
-        response: await chatModel.stream(messages),
-        provider,
-        model,
-      };
-    } else {
-      return {
-        response: await chatModel.invoke(messages),
-        provider,
-        model,
-      };
-    }
+    // If all retries fail, throw an error
+    throw new Error(`All attempts to process the completions request failed. Please verify the providers and models in your configuration.`);
   }
 
+  /**
+   * Handles the invocation of chat completions to a specific provider and model.
+   */
+  private async invokeChatCompletions(
+    provider: string,
+    model: string,
+    payload: CompletionsPayload
+  ) {
+    try {
+      const apiKey = this.loadApiKeyForProvider(provider, model);
+
+      const chatModelConfig: ChatModelConfig = {
+        apiKey,
+        modelName: model,
+        temperature: payload?.temperature,
+        maxRetries: payload?.maxRetries,
+        maxTokens: payload?.maxTokens,
+      };
+
+      const chatModel = this.getChatModel(provider, chatModelConfig);
+      if (!chatModel) {
+        throw new Error(`No chat model instance found for provider: ${provider}`);
+      }
+
+      const messages = this.formatInputMessages(payload.messages, model);
+
+      if (payload.stream) {
+        return {
+          response: await chatModel.stream(messages),
+          provider,
+          model,
+        };
+      } else {
+        return {
+          response: await chatModel.invoke(messages),
+          provider,
+          model,
+        };
+      }
+    } catch (error) {
+      throw new Error(`Failed to execute chat completions for provider: ${provider}, model: ${model}. Error: ${JSON.stringify(error,null,2)}`);
+    }
+  }
+  
   private extractModelSelectPayloadFromCompletionsPayload(
     body: CompletionsPayload
   ): ModelSelectPayload {

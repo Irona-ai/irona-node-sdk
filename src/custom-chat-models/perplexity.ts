@@ -166,8 +166,12 @@ export class ChatPerplexity extends SimpleChatModel {
         }
       }
     } catch (error) {
-      console.error("Error in streaming generator:", error);
-      throw error;
+      console.error(
+        "Error in Perplexity streaming generator:",
+        (error as Error).message
+      );
+      const message = (error as Error).message;
+      throw new Error(message);
     }
   }
 }

@@ -63,7 +63,7 @@ export class IronaChatClient {
         );
         return response; // Return on first success
       } catch (error) {
-        console.error(`Error during chat completions execution. Provider: ${provider}, Model: ${model}.`);
+        console.error(error);
         // TODO: Fix Logging of Error Details
         // console.error(`Error: ${JSON.stringify(error,null,2)}`);
       }
@@ -112,7 +112,7 @@ export class IronaChatClient {
         };
       }
     } catch (error) {
-      throw new Error(`Failed to execute chat completions for provider: ${provider}, model: ${model}. Error: ${JSON.stringify(error,null,2)}`);
+      throw new Error(`Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${(error as Error).message}`);
     }
   }
   

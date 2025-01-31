@@ -40,9 +40,9 @@ export class IronaChatClient {
     // Select the best model
     const { provider, model } = await this.selectBestModel(payload);
 
-     // Prepare the model priority queue
-     // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
-     const modelPriorityQueue = [
+    // Prepare the model priority queue
+    // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
+    const modelPriorityQueue = [
       { provider, model },
       ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
         (fallback) => validateAndGetProviderAndModel(fallback)
@@ -51,7 +51,9 @@ export class IronaChatClient {
 
     // Attempt execution for each model in the priority queue
     for (const { provider, model } of modelPriorityQueue) {
-      console.log(`Invoking chat completions with provider: ${provider}, model: ${model}`);
+      console.log(
+        `Invoking chat completions with provider: ${provider}, model: ${model}`
+      );
       try {
         const response = await this.invokeChatCompletions(
           provider,
@@ -69,7 +71,9 @@ export class IronaChatClient {
       }
     }
     // If all retries fail, throw an error
-    throw new Error(`All attempts to process the completions request failed. Please verify the providers and models in your configuration.`);
+    throw new Error(
+      `All attempts to process the completions request failed. Please verify the providers and models in your configuration.`
+    );
   }
 
   /**
@@ -93,7 +97,9 @@ export class IronaChatClient {
 
       const chatModel = this.getChatModel(provider, chatModelConfig);
       if (!chatModel) {
-        throw new Error(`No chat model instance found for provider: ${provider}`);
+        throw new Error(
+          `No chat model instance found for provider: ${provider}`
+        );
       }
 
       const messages = this.formatInputMessages(payload.messages, model);
@@ -112,10 +118,14 @@ export class IronaChatClient {
         };
       }
     } catch (error) {
-      throw new Error(`Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${(error as Error).message}`);
+      throw new Error(
+        `Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${
+          (error as Error).message
+        }`
+      );
     }
   }
-  
+
   private extractModelSelectPayloadFromCompletionsPayload(
     body: CompletionsPayload
   ): ModelSelectPayload {
@@ -141,9 +151,10 @@ export class IronaChatClient {
       const response = await this.ironaRouter.modelSelect(
         this.extractModelSelectPayloadFromCompletionsPayload(body)
       );
-      const providers = response.data.error
-        ? response.data.fallback_providers
-        : response.data.providers;
+      const providers =
+        response && response.error
+          ? response.fallback_providers
+          : response.providers;
 
       return providers[0];
     } else {

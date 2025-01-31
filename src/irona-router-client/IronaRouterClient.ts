@@ -7,7 +7,7 @@ import {
 import { Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
-const resources = "/api/v1/model-router/model-select";
+const resources = "";
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
     super(config);
@@ -37,9 +37,10 @@ export class IronaRouterClient extends Base {
 
     try {
       let result = await this.request<{
+        fallback_providers: { provider: string; model: string }[];
+        error: any;
         sucess: boolean;
         message: String;
-        data: any;
         statusCode: number;
       }>(`${resources}`, {
         method: "POST",
@@ -64,8 +65,8 @@ export class IronaRouterClient extends Base {
           return { provider, model };
         });
       }
-      if (result && result.data.error) {
-        result.data.fallback_providers = fallback_providers;
+      if (result && result.error) {
+        result.fallback_providers = fallback_providers;
       }
       return result;
     } catch (error) {

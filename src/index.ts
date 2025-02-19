@@ -7,7 +7,7 @@ import { MissingApiKeyError } from "./errors";
 require("dotenv").config();
 
 // Constants
-const DEFAULT_BASE_URL = "https://app.irona.ai";
+const DEFAULT_BASE_URL = "https://irona-ai--model-select.modal.run";
 const IRONAAI_API_KEY_PREFIX = "sk_";
 
 export class IronaAI {

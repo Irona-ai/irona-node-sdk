@@ -4,6 +4,7 @@ import { Config } from "./types";
 import { ModelSelectPayload } from "./validators/modelSelect.validator";
 import { CompletionsPayload } from "./validators/completions.validator";
 import { MissingApiKeyError } from "./errors";
+import { updateProvidersFromGist } from "./supported_models";
 require("dotenv").config();
 
 // Constants
@@ -28,6 +29,7 @@ export class IronaAI {
         "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."
       );
     }
+    updateProvidersFromGist();
     config.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;
     this.ironaRouter = new IronaRouterClient(config);
     this.llmChatService = new IronaChatClient(config, this.ironaRouter);

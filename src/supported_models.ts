@@ -292,6 +292,7 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
             "Meta-Llama-3.1-8B-Instruct-Turbo",
             "Meta-Llama-3.1-70B-Instruct-Turbo",
             "Meta-Llama-3.1-405B-Instruct-Turbo",
+            "DeepSeek-R1",
         ],
         "api_key": "TOGETHER_API_KEY",
         "model_prefix": {

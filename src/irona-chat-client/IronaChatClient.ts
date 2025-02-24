@@ -43,7 +43,7 @@ export class IronaChatClient {
     // Prepare the model priority queue
     // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
     const modelPriorityQueue = [
-      { provider, model },
+      ...(provider && model ? [{ provider, model }] : []),
       ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
         (fallback) => validateAndGetProviderAndModel(fallback)
       ),
@@ -148,15 +148,20 @@ export class IronaChatClient {
 
   private async selectBestModel(body: CompletionsPayload) {
     if (body.models.length != 1) {
-      const response = await this.ironaRouter.modelSelect(
-        this.extractModelSelectPayloadFromCompletionsPayload(body)
-      );
-      const providers =
-        response && response.error
-          ? response.fallback_providers
-          : response.providers;
+      try {
+        const response = await this.ironaRouter.modelSelect(
+          this.extractModelSelectPayloadFromCompletionsPayload(body)
+        );
+        const providers =
+          response && response.error
+            ? response.fallback_providers
+            : response.providers;
 
-      return providers[0];
+        return providers[0];
+      } catch (error) {
+        console.error(error);
+        return { provider: null, model: null };
+      }
     } else {
       return validateAndGetProviderAndModel(body.models[0]);
     }

@@ -9,6 +9,8 @@ require("dotenv").config();
 
 // Constants
 const DEFAULT_BASE_URL = "https://irona-ai--model-select.modal.run";
+const SUPPORTED_MODELS_DEFAULT_URL =
+  "https://gist.githubusercontent.com/tshrjn/f55b3ebd90eda8a0e65bf8435419edff/raw/supported_models_pricing.json";
 const IRONAAI_API_KEY_PREFIX = "sk_";
 
 export class IronaAI {
@@ -41,22 +43,24 @@ export class IronaAI {
 
   private static async ensureProvidersLoaded(
     retries = 3,
-    delay = 2000
+    delay = 1000
   ): Promise<void> {
+    const SUPPORTED_MODELS_GIST_URL =
+      process.env.SUPPORTED_MODELS_URL ?? SUPPORTED_MODELS_DEFAULT_URL;
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        await updateProvidersFromGist();
+        await updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL);
         return;
       } catch (error) {
         console.warn(
-          `Attempt ${attempt} to load providers failed. Retrying...`
+          `Attempt ${attempt} to load Supported Models details failed. Retrying...`
         );
         if (attempt < retries)
           await new Promise((res) => setTimeout(res, delay));
       }
     }
     throw new Error(
-      "Failed to load providers from Gist after multiple attempts."
+      "Cannot instantiate IronaAI as it failed to load Supported Models details from Gist after multiple attempts. Please provide correct value of environment key SUPPORTED_MODELS_URL or leave it undefined."
     );
   }
   public modelSelect(body: ModelSelectPayload): Promise<any> {

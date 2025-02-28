@@ -11,19 +11,13 @@ interface ProviderInfo {
   name?: Record<string, string>;
 }
 
-const SUPPORTED_MODELS_DEFAULT_URL =
-  "https://gist.githubusercontent.com/tshrjn/f55b3ebd90eda8a0e65bf8435419edff/raw/supported_models_pricing.json";
-
 let PROVIDERS: Record<string, ProviderInfo> = {};
 
-export async function updateProvidersFromGist() {
-  const SUPPORTED_MODELS_GIST_URL =
-    process.env.SUPPORTED_MODELS_URL ?? SUPPORTED_MODELS_DEFAULT_URL;
+export async function updateProvidersFromGist(
+  SUPPORTED_MODELS_GIST_URL: string
+) {
   try {
     const response = await axios.get(SUPPORTED_MODELS_GIST_URL);
-    console.log(
-      `Supported Models URLs: Default - ${SUPPORTED_MODELS_DEFAULT_URL}, Environment - ${process.env.SUPPORTED_MODELS_URL}, Used - ${SUPPORTED_MODELS_GIST_URL}`
-    );
     const data = response.data;
     PROVIDERS = typeof data === "string" ? JSON.parse(data) : data;
     console.info("Supported Models details loaded from Gist.");

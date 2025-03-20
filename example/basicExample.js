@@ -35,14 +35,17 @@ async function CompletionsTest() {
       body
     );
     console.log(`Selected provider: ${provider}, model: ${model}\n`);
-
+    let accumulated = "";
     if (body.stream) {
       for await (const chunk of response) {
         console.log(chunk);
+        accumulated += chunk.content;
       }
     } else {
       console.log(response);
+      accumulated += response.content;
     }
+    console.log(accumulated);
   } catch (error) {
     console.log("Error in SDK Completion usage:\n");
     console.error(error);

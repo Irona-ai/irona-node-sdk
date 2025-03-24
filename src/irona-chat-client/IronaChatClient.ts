@@ -10,15 +10,15 @@ import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
   CompletionsSchema,
-} from "../validators/completions.validator";
+} from "../schemas/completions.schema";
 import {
   ModelSelectPayload,
   ModelSelectSchema,
-} from "../validators/modelSelect.validator";
+} from "../schemas/modelSelect.schema";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 import { ChatPerplexity } from "../custom-chat-models/perplexity";
-import { MessagePayload } from "@/validators/common.validators";
+import { MessagePayload } from "@/schemas/common.schema";
 import { Base } from "@/irona-router-client/base";
 
 export class IronaChatClient {

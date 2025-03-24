@@ -3,7 +3,7 @@ import { validateSchema } from "../utils/requestValidator";
 import {
   ModelSelectPayload,
   ModelSelectSchema,
-} from "../validators/modelSelect.validator";
+} from "../schemas/modelSelect.schema";
 import { Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";

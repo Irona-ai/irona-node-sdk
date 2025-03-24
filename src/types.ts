@@ -1,4 +1,4 @@
-import { ModelPayload } from "./validators/common.validators";
+import { ModelPayload } from "./schemas/common.schema";
 export type Config = {
   baseUrl?: string;
   apiKey?: string;

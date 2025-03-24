@@ -1,6 +1,6 @@
 // completionsSchema.ts
 import { z } from "zod";
-import { ModelSelectSchema } from "./modelSelect.validator";
+import { ModelSelectSchema } from "./modelSelect.schema";
 
 export const CompletionsSchema = ModelSelectSchema.extend({
   temperature: z

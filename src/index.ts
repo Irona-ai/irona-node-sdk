@@ -103,12 +103,11 @@ export class IronaAI {
       try{
         return this.llmChatService.completions(body);
       }catch(error){
-        return Promise.reject({
+        return Promise.resolve({
           error: (error instanceof Error) ? error.message : "Unknown error in completions",
-          errorTrace: []
+          error_trace: [] 
         });
       }
-      
     },
   };
 }

@@ -12,20 +12,24 @@ const ImageUrlContent = z.object({
   image_url: z.object({
     url: z.string().url(),
   }),
+  name: z.string().optional(),
 });
 
-// Schema for file content (e.g., PDF documents)
-const FileContent = z.object({
-  type: z.literal("file"),
-  data: z.any(), // This will hold the file buffer or base64 data
-  mimeType: z.string(), // Ensure correct MIME type
+// Schema for document content (with URL source)
+const DocumentContent = z.object({
+  type: z.literal("document"),
+  source: z.object({
+    type: z.literal("url"),
+    url: z.string().url(),
+  }),
+  name: z.string().optional(),
 });
 
 // Create a discriminated union based on the 'type' field
 const ContentItem = z.discriminatedUnion("type", [
   TextContent,
   ImageUrlContent,
-  FileContent,
+  DocumentContent,
 ]);
 
 // Message schema supporting both array and string formats for `content`

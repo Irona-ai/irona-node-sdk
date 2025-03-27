@@ -7,20 +7,21 @@ const body = {
       role: "user",
       content: [
         {
-            "type": "file",
-            "data": "https://assets.anthropic.com/m/1cd9d098ac3e6467/original/Claude-3-Model-Card-October-Addendum.pdf",
-            "mimeType": "application/pdf",
-            "filename": "document.pdf",
+          type: "document",
+          source: {
+            type: "url",
+            url: "https://assets.anthropic.com/m/1cd9d098ac3e6467/original/Claude-3-Model-Card-October-Addendum.pdf",
+          },
+          filename: "document.pdf",
         },
         {
-            "type": "text",
-            "text": "What are the key findings in this document?"
-        }
-    ],
+          type: "text",
+          text: "What are the key findings in this document?",
+        },
+      ],
     },
   ],
   models: ["openai/gpt-4o"],
-  fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
   stream: true,
 };
 
@@ -37,9 +38,7 @@ async function modelSelectTest() {
 }
 
 async function CompletionsTest(body) {
-  const sdkClient = await IronaAI.createInstance({
-    fallback_models: ["openai/gpt-4o-mini"],
-  });
+  const sdkClient = await IronaAI.createInstance({});
   try {
     const { provider, model, response } = await sdkClient.completions.create(
       body

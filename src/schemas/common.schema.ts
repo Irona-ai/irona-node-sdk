@@ -12,7 +12,7 @@ const ImageUrlContent = z.object({
   image_url: z.object({
     url: z.string().url(),
   }),
-  name: z.string().optional(),
+  filename: z.string().optional(),
 });
 
 // Schema for document content (with URL source)
@@ -22,8 +22,10 @@ const DocumentContent = z.object({
     type: z.literal("url"),
     url: z.string().url(),
   }),
-  name: z.string().optional(),
+  filename: z.string().optional(),
 });
+
+export type DocumentContentPayload = z.infer<typeof DocumentContent>;
 
 // Create a discriminated union based on the 'type' field
 const ContentItem = z.discriminatedUnion("type", [

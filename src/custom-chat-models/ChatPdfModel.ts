@@ -9,9 +9,18 @@ import {
 import { ChatGenerationChunk } from "@langchain/core/outputs";
 import axios from "axios";
 import { ChatModelConfig } from "../types";
-import { CoreAssistantMessage, CoreMessage, CoreSystemMessage, CoreUserMessage, streamText } from "ai";
+import {
+  CoreAssistantMessage,
+  CoreMessage,
+  CoreSystemMessage,
+  CoreUserMessage,
+  streamText,
+} from "ai";
 import { openai } from "@ai-sdk/openai";
-import { DocumentContentPayload, MessagePayload } from "@/schemas/common.schema";
+import {
+  DocumentContentPayload,
+  MessagePayload,
+} from "@/schemas/common.schema";
 
 /**
  * ChatPdf model for LangChain.
@@ -30,14 +39,14 @@ export class ChatPdfModel extends SimpleChatModel {
   _llmType(): string {
     return "perplexity";
   }
-  private validateMessages(messages: any[]): void {
+  private validateInputMessages(messages: any[]): void {
     if (!messages.length) {
       throw new Error("No messages provided.");
     }
     messages.forEach((message) => {
       if (Array.isArray(message.content)) {
         const documentCount = message.content.filter(
-          (item:any) => item.type === "document"
+          (item: any) => item.type === "document"
         ).length;
         if (documentCount > 1) {
           console.warn("Only the last PDF/document will be used for chat.");
@@ -45,17 +54,80 @@ export class ChatPdfModel extends SimpleChatModel {
       }
     });
   }
-  private formattoNormalMessages(originalMessages: any[]): MessagePayload[] {
+  private convertLangchainMessages(originalMessages: any[]): MessagePayload[] {
     return originalMessages.map((m) => {
       const type = m.getType();
       return {
-        role:
-          type === "human" ? "user" : type === "ai" ? "assistant" : type,
+        role: type === "human" ? "user" : type === "ai" ? "assistant" : type,
         content: m.content,
       };
     });
   }
-  private mapResponseToAIMessage(data: any): AIMessageFields {
+  private async transformMessagesForCompletions(
+    messages: BaseMessage[]
+  ): Promise<CoreMessage[]> {
+    // Convert LangChain message objects to normal message format
+    const formattedMessages = this.convertLangchainMessages(messages);
+
+    const previousMessages = formattedMessages.slice(0, -1);
+    const latestMessage = formattedMessages[messages.length - 1];
+
+    if (
+      !Array.isArray(latestMessage.content) ||
+      latestMessage.content.length === 0
+    ) {
+      throw new Error("Last message content is missing or invalid.");
+    }
+
+    // Extract document details from the last message
+    const pdfDocumentDetails = latestMessage.content[0] as DocumentContentPayload;
+
+    let pdfFileBuffer: ArrayBuffer | null = null;
+
+    try {
+      const pdfResponse = await axios.get(pdfDocumentDetails.source.url, {
+        responseType: "arraybuffer",
+      });
+      pdfFileBuffer = pdfResponse.data;
+    } catch (error) {
+      console.error("Failed to fetch PDF:", error);
+      throw new Error("Failed to fetch the document for processing.");
+    }
+
+    const finalMessageContent = [
+      {
+        type: "file",
+        data: pdfFileBuffer,
+        mimeType: "application/pdf",
+        filename: pdfDocumentDetails.filename || "document.pdf",
+      },
+      ...latestMessage.content.slice(1), // Append the rest of the content
+    ];
+
+    // Construct final messages
+    const processedMessages = [
+      ...previousMessages,
+      { ...latestMessage, content: finalMessageContent },
+    ];
+
+    return processedMessages.map((message) => {
+      if (message.role === "system") {
+        return {
+          role: "system",
+          content: message.content,
+        } as CoreSystemMessage;
+      } else if (message.role === "user") {
+        return { role: "user", content: message.content } as CoreUserMessage;
+      } else {
+        return {
+          role: "assistant",
+          content: message.content,
+        } as CoreAssistantMessage;
+      }
+    });
+  }
+
+  private parseLLMResponseToAIMessage(data: any): AIMessageFields {
     return {
       id: data?.id,
       usage_metadata: {
@@ -79,55 +151,9 @@ export class ChatPdfModel extends SimpleChatModel {
     _options: this["ParsedCallOptions"],
     runManager?: CallbackManagerForLLMRun
   ): AsyncGenerator<ChatGenerationChunk> {
-
-    this.validateMessages(messages);
+    this.validateInputMessages(messages);
     try {
-
-      // convert langchain message objects to normal messages like request body
-      const msgs = this.formattoNormalMessages(messages);
-
-
-      const initialMessages = msgs.slice(0, -1);
-      const lastMessage = msgs[messages.length - 1];
-
-
-      // Extract the document details from the last message
-      const documentDetails = lastMessage.content[0] as DocumentContentPayload;
-    
-      const pdfResponse = await axios.get(documentDetails.source.url, {
-        responseType: "arraybuffer",
-      });
-
-      const updatedContent = [
-        {
-          type: "file",
-          data: pdfResponse.data,
-          mimeType: "application/pdf",
-          filename: documentDetails.filename || "document.pdf",
-        },
-        ...lastMessage.content.slice(1), // Append the rest of the content as it is
-      ];
-
-      // Replace the last message with the updated content
-      const semiFinalMessages = [
-        ...initialMessages,
-        {
-          ...lastMessage,
-          content: updatedContent,
-        },
-      ];
-
-      // Construct the final messages array
-      const finalMessages: CoreMessage[] = semiFinalMessages.map((message) => {
-        if (message.role === "system") {
-          return { role: "system", content: message.content } as CoreSystemMessage;
-        } else if (message.role === "user") {
-          return { role: "user", content: message.content } as CoreUserMessage;
-        } else {
-          return { role: "assistant", content: message.content } as CoreAssistantMessage;
-        }
-      });
-      
+      const finalMessages: CoreMessage[] = await this.transformMessagesForCompletions(messages);
       //   const { textStream, usagePromise, responsePromise, finishReasonPromise } =
       try {
         const { textStream } = await streamText({
@@ -137,14 +163,13 @@ export class ChatPdfModel extends SimpleChatModel {
         //   const finishReason = await finishReasonPromise;
         //   const usage = await usagePromise;
         //   const response = await responsePromise;
-  
-        for await (const textPart of textStream) {
-          console.log(textPart);
+
+        for await (const streamedChunk of textStream) {
           try {
             yield new ChatGenerationChunk({
               message: new AIMessageChunk({
                 //   id: response?.id,
-                content: textPart,
+                content: streamedChunk,
                 //   usage_metadata: {
                 //     input_tokens: usage?.promptTokens,
                 //     output_tokens: usage?.completionTokens,
@@ -155,9 +180,9 @@ export class ChatPdfModel extends SimpleChatModel {
                 //     finishReason: finishReason?.status?.value,
                 //   },
               }),
-              text: textPart,
+              text: streamedChunk,
             });
-            await runManager?.handleLLMNewToken(textPart);
+            await runManager?.handleLLMNewToken(streamedChunk);
           } catch (error) {
             console.error(
               "Error in ChatPdf streaming generator:",
@@ -171,7 +196,6 @@ export class ChatPdfModel extends SimpleChatModel {
         console.error("Error in completions:", (error as Error).message);
         const message = (error as Error).message;
         throw new Error(message);
-        
       }
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {

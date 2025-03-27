@@ -18,8 +18,8 @@ import {
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 import { ChatPerplexity } from "../custom-chat-models/perplexity";
-import { MessagePayload } from "@/schemas/common.schema";
-import { Base } from "@/irona-router-client/base";
+import { MessagePayload } from "../schemas/common.schema";
+import { ChatPdfModel } from "../custom-chat-models/ChatPdfModel";
 
 export class IronaChatClient {
   constructor(
@@ -143,8 +143,8 @@ export class IronaChatClient {
         maxRetries: payload?.maxRetries,
         maxTokens: payload?.maxTokens,
       };
-
-      const chatModel = this.getChatModel(provider, chatModelConfig);
+      const isPdfInput = this.containsDocumentInMessages(payload.messages);
+      const chatModel = isPdfInput ? this.getChatPdfModel(provider, chatModelConfig) : this.getChatModel(provider, chatModelConfig);
       if (!chatModel) {
         throw new Error(
           `No chat model instance found for provider: ${provider}`
@@ -233,6 +233,9 @@ export class IronaChatClient {
     return apiKey;
   }
 
+  private getChatPdfModel(provider: string, chatModelConfig: ChatModelConfig) {
+    return new ChatPdfModel(chatModelConfig);
+  }
   private getChatModel(provider: string, chatModelConfig: ChatModelConfig) {
     switch (provider) {
       case "anthropic":
@@ -250,6 +253,13 @@ export class IronaChatClient {
       default:
         throw new Error(`No chat model found for provider: ${provider}`);
     }
+  }
+  private containsDocumentInMessages(messages: MessagePayload[]): boolean {
+    return messages.some(
+      (message) =>
+        Array.isArray(message.content) &&
+        message.content.some((item) => item.type === "document")
+    );
   }
 
   /**

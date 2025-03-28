@@ -41,3 +41,27 @@ export class UnsupportedModelError extends Error {
     }
   }
 }
+
+export class AIServiceError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AIServiceError";
+    Object.setPrototypeOf(this, AIServiceError.prototype);
+  }
+}
+
+export class ValidationError extends AIServiceError {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+    Object.setPrototypeOf(this, ValidationError.prototype);
+  }
+}
+
+export class FunctionCallError extends AIServiceError {
+  constructor(message: string) {
+    super(message);
+    this.name = "FunctionCallError";
+    Object.setPrototypeOf(this, FunctionCallError.prototype);
+  }
+}

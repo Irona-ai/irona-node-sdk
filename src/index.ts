@@ -5,6 +5,7 @@ import { ModelSelectPayload } from "./validators/modelSelect.validator";
 import { CompletionsPayload } from "./validators/completions.validator";
 import { MissingApiKeyError } from "./errors";
 import { updateProvidersFromGist } from "./supported_models";
+import { IronaAISDK } from "./ai-sdk-integration";
 require("dotenv").config();
 
 // Constants
@@ -14,8 +15,12 @@ const SUPPORTED_MODELS_DEFAULT_URL =
 const IRONAAI_API_KEY_PREFIX = "sk_";
 
 export class IronaAI {
+  static create(config: Config): IronaAI {
+      throw new Error("Method not implemented.");
+  }
   private ironaRouter: IronaRouterClient;
   private llmChatService: IronaChatClient;
+  public sdk: IronaAISDK;
   private constructor(config: Config = {}) {
     // Check for API key
     const apiKey = config.apiKey || process.env.IRONAAI_API_KEY;
@@ -36,6 +41,8 @@ export class IronaAI {
     config.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;
     this.ironaRouter = new IronaRouterClient(config);
     this.llmChatService = new IronaChatClient(config, this.ironaRouter);
+    // Initialize AI SDK
+    this.sdk = new IronaAISDK(config);
   }
   
   // Static factory method to handle async initialization
@@ -62,6 +69,39 @@ export class IronaAI {
               error: errorMessage
             }]
           })
+        },
+        // Add SDK error state
+        sdk: {
+          structured: {
+            generate: () => Promise.resolve({
+              error: errorMessage,
+              error_trace: [{
+                provider: null,
+                model: null,
+                error: errorMessage
+              }]
+            })
+          },
+          functions: {
+            execute: () => Promise.resolve({
+              error: errorMessage,
+              error_trace: [{
+                provider: null,
+                model: null,
+                error: errorMessage
+              }]
+            })
+          },
+          streaming: {
+            createStream: () => Promise.resolve({
+              error: errorMessage,
+              error_trace: [{
+                provider: null,
+                model: null,
+                error: errorMessage
+              }]
+            })
+          }
         }
       } as unknown as IronaAI;
       

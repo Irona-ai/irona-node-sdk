@@ -14,7 +14,10 @@ import {
   CoreMessage,
   CoreSystemMessage,
   CoreUserMessage,
+  FilePart,
+  ImagePart,
   streamText,
+  TextPart,
 } from "ai";
 import { openai } from "@ai-sdk/openai";
 import {
@@ -43,16 +46,6 @@ export class ChatPdfModel extends SimpleChatModel {
     if (!messages.length) {
       throw new Error("No messages provided.");
     }
-    messages.forEach((message) => {
-      if (Array.isArray(message.content)) {
-        const documentCount = message.content.filter(
-          (item: any) => item.type === "document"
-        ).length;
-        if (documentCount > 1) {
-          console.warn("Only the last PDF/document will be used for chat.");
-        }
-      }
-    });
   }
   private convertLangchainMessages(originalMessages: any[]): MessagePayload[] {
     return originalMessages.map((m) => {
@@ -63,68 +56,57 @@ export class ChatPdfModel extends SimpleChatModel {
       };
     });
   }
-  private async transformMessagesForCompletions(
-    messages: BaseMessage[]
-  ): Promise<CoreMessage[]> {
-    // Convert LangChain message objects to normal message format
-    const formattedMessages = this.convertLangchainMessages(messages);
-
-    const previousMessages = formattedMessages.slice(0, -1);
-    const latestMessage = formattedMessages[messages.length - 1];
-
-    if (
-      !Array.isArray(latestMessage.content) ||
-      latestMessage.content.length === 0
-    ) {
-      throw new Error("Last message content is missing or invalid.");
-    }
-
-    // Extract document details from the last message
-    const pdfDocumentDetails = latestMessage.content[0] as DocumentContentPayload;
-
-    let pdfFileBuffer: ArrayBuffer | null = null;
-
+  private async fetchDocumentContent(
+    contentItem: DocumentContentPayload
+  ): Promise<FilePart> {
     try {
-      const pdfResponse = await axios.get(pdfDocumentDetails.source.url, {
-        responseType: "arraybuffer",
-      });
-      pdfFileBuffer = pdfResponse.data;
+      // const pdfBuffer = await axios.get(contentItem.source.url, {
+      //   responseType: "arraybuffer",
+      // });
+      // const pdfBuffer = { data: Buffer.from("fake pdf data") };
+      return {
+        type: "file",
+        // data: pdfBuffer.data,
+        data: contentItem.source.url, // since it accepts url too
+        mimeType: "application/pdf",
+        filename: contentItem.filename || "document.pdf",
+      };
     } catch (error) {
       console.error("Failed to fetch PDF:", error);
       throw new Error("Failed to fetch the document for processing.");
     }
+  }
 
-    const finalMessageContent = [
-      {
-        type: "file",
-        data: pdfFileBuffer,
-        mimeType: "application/pdf",
-        filename: pdfDocumentDetails.filename || "document.pdf",
-      },
-      ...latestMessage.content.slice(1), // Append the rest of the content
-    ];
+  private async transformMessagesForCompletions(
+    messages: BaseMessage[]
+  ): Promise<CoreMessage[]> {
+    const formattedMessages = this.convertLangchainMessages(messages);
 
-    // Construct final messages
-    const processedMessages = [
-      ...previousMessages,
-      { ...latestMessage, content: finalMessageContent },
-    ];
+    return Promise.all(
+      formattedMessages.map(async (message) => {
+        let transformedContent: (TextPart | ImagePart | FilePart)[] = [];
 
-    return processedMessages.map((message) => {
-      if (message.role === "system") {
+        if (Array.isArray(message.content)) {
+          transformedContent = await Promise.all(
+            message.content.map(async (contentItem) => {
+              if (contentItem.type === "document")
+                return this.fetchDocumentContent(contentItem);
+              if (contentItem.type === "image_url")
+                return { type: "image", image: contentItem.image_url.url };
+              return { type: "text", text: contentItem.text };
+            })
+          );
+        }
+
         return {
-          role: "system",
-          content: message.content,
-        } as CoreSystemMessage;
-      } else if (message.role === "user") {
-        return { role: "user", content: message.content } as CoreUserMessage;
-      } else {
-        return {
-          role: "assistant",
-          content: message.content,
-        } as CoreAssistantMessage;
-      }
-    });
+          role: message.role,
+          content:
+            message.role === "system"
+              ? JSON.stringify(transformedContent)
+              : transformedContent,
+        } as CoreMessage;
+      })
+    );
   }
 
   private parseLLMResponseToAIMessage(data: any): AIMessageFields {
@@ -153,8 +135,11 @@ export class ChatPdfModel extends SimpleChatModel {
   ): AsyncGenerator<ChatGenerationChunk> {
     this.validateInputMessages(messages);
     try {
-      const finalMessages: CoreMessage[] = await this.transformMessagesForCompletions(messages);
+      const finalMessages: CoreMessage[] =
+        await this.transformMessagesForCompletions(messages);
       //   const { textStream, usagePromise, responsePromise, finishReasonPromise } =
+      // console.log("finalMessages", JSON.stringify(finalMessages, null, 2));
+
       try {
         const { textStream } = await streamText({
           model: openai("gpt-4o"),

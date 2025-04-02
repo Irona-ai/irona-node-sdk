@@ -101,6 +101,7 @@ export class IronaStructuredOutput {
    * @param requests Array of generation requests with prompts and schemas
    * @returns Array of results in the same order as the requests
    */
+  
   async batchGenerate<T extends z.ZodSchema>(
     requests: Array<{
       prompt: string;

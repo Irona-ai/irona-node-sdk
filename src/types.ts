@@ -32,10 +32,7 @@ export interface AIServiceConfig {
   defaultModel?: string;
 }
 
-export interface ErrorResponse {
-  error: string;
-  details?: any;
-}
+
 
 export const WeatherSchema = z.object({
   temperature: z.number().describe("Temperature in Celsius"),

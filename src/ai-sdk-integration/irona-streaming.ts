@@ -1,6 +1,15 @@
-import { createStreamableUI } from 'ai/rsc';
 import { IronaAI } from "../index";
 import { Config, ErrorResponse } from "../types";
+
+interface StreamUI {
+  update: (text: string) => void;
+  done: (text: string) => void;
+}
+
+const createStreamableUI = (): StreamUI => ({
+  update: (_text: string) => {},
+  done: (_text: string) => {}
+});
 
 /**
  * IronaStreaming provides enhanced streaming functionality using Vercel's AI SDK

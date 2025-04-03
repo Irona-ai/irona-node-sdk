@@ -9,21 +9,12 @@ import {
 import { ChatGenerationChunk } from "@langchain/core/outputs";
 import axios from "axios";
 import { ChatModelConfig } from "../types";
-import {
-  CoreAssistantMessage,
-  CoreMessage,
-  CoreSystemMessage,
-  CoreUserMessage,
-  FilePart,
-  ImagePart,
-  streamText,
-  TextPart,
-} from "ai";
+import { CoreMessage, FilePart, ImagePart, streamText, TextPart } from "ai";
 import { openai } from "@ai-sdk/openai";
 import {
   DocumentContentPayload,
   MessagePayload,
-} from "@/schemas/common.schema";
+} from "../schemas/common.schema";
 
 /**
  * ChatPdf model for LangChain.
@@ -40,7 +31,7 @@ export class ChatPdfModel extends SimpleChatModel {
   }
 
   _llmType(): string {
-    return "perplexity";
+    return "chatpdf";
   }
   private validateInputMessages(messages: any[]): void {
     if (!messages.length) {
@@ -60,14 +51,9 @@ export class ChatPdfModel extends SimpleChatModel {
     contentItem: DocumentContentPayload
   ): Promise<FilePart> {
     try {
-      // const pdfBuffer = await axios.get(contentItem.source.url, {
-      //   responseType: "arraybuffer",
-      // });
-      // const pdfBuffer = { data: Buffer.from("fake pdf data") };
       return {
         type: "file",
-        // data: pdfBuffer.data,
-        data: contentItem.source.url, // since it accepts url too
+        data: contentItem.source.url,
         mimeType: "application/pdf",
         filename: contentItem.filename || "document.pdf",
       };

@@ -1,8 +1,7 @@
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { ChatAnthropic } from "@langchain/anthropic";
-import { ChatMistralAI } from "@langchain/mistralai";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { OpenAI } from "openai";
+import Anthropic from "@anthropic-ai/sdk";
+import MistralClient from "@mistralai/mistralai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ChatModelConfig, Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
 import { providerApiKeyName } from "../supported_models";
@@ -17,11 +16,13 @@ import {
 } from "../validators/modelSelect.validator";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
-import { ChatPerplexity } from "../custom-chat-models/perplexity";
 import { MessagePayload } from "@/validators/common.validators";
 import { Base } from "@/irona-router-client/base";
+import { createParser } from 'eventsource-parser';
 
 export class IronaChatClient {
+  private modelInstances: Record<string, any> = {};
+
   constructor(
     private readonly config: Config,
     private readonly ironaRouter: IronaRouterClient
@@ -135,37 +136,245 @@ export class IronaChatClient {
   ) {
     try {
       const apiKey = this.loadApiKeyForProvider(provider, model);
-
-      const chatModelConfig: ChatModelConfig = {
-        apiKey,
-        modelName: model,
+      const formattedMessages = this.formatInputMessages(payload.messages, model);
+      
+      // Common options for all providers
+      const options = {
         temperature: payload?.temperature,
-        maxRetries: payload?.maxRetries,
         maxTokens: payload?.maxTokens,
+        maxRetries: payload?.maxRetries || 2,
       };
 
-      const chatModel = this.getChatModel(provider, chatModelConfig);
-      if (!chatModel) {
-        throw new Error(
-          `No chat model instance found for provider: ${provider}`
-        );
+      let response: { content: string; role: string };
+      switch (provider) {
+        case "anthropic": {
+          const client = this.getAnthropicClient(apiKey);
+          if (payload.stream) {
+            const stream = await client.messages.create({
+              model,
+              messages: this.formatMessagesForAnthropic(formattedMessages),
+              max_tokens: options.maxTokens,
+              temperature: options.temperature,
+              stream: true,
+            });
+            return {
+              response: stream,
+              provider,
+              model,
+            };
+          } else {
+            const result = await client.messages.create({
+              model,
+              messages: this.formatMessagesForAnthropic(formattedMessages),
+              max_tokens: options.maxTokens,
+              temperature: options.temperature,
+            });
+            response = {
+              content: result.content[0].text,
+              role: "assistant"
+            };
+          }
+          break;
+        }
+        case "openai": {
+          const client = this.getOpenAIClient(apiKey);
+          if (payload.stream) {
+            const stream = await client.chat.completions.create({
+              model,
+              messages: this.formatMessagesForOpenAI(formattedMessages),
+              max_tokens: options.maxTokens,
+              temperature: options.temperature,
+              stream: true,
+            });
+            return {
+              response: stream,
+              provider,
+              model,
+            };
+          } else {
+            const result = await client.chat.completions.create({
+              model,
+              messages: this.formatMessagesForOpenAI(formattedMessages),
+              max_tokens: options.maxTokens,
+              temperature: options.temperature,
+            });
+            response = {
+              content: result.choices[0].message.content,
+              role: "assistant"
+            };
+          }
+          break;
+        }
+        case "mistral": {
+          const client = this.getMistralClient(apiKey);
+          if (payload.stream) {
+            const stream = await client.chatStream({
+              model,
+              messages: this.formatMessagesForMistral(formattedMessages),
+              maxTokens: options.maxTokens,
+              temperature: options.temperature,
+            });
+            return {
+              response: stream,
+              provider,
+              model,
+            };
+          } else {
+            const result = await client.chat({
+              model,
+              messages: this.formatMessagesForMistral(formattedMessages),
+              maxTokens: options.maxTokens,
+              temperature: options.temperature,
+            });
+            response = {
+              content: result.choices[0].message.content,
+              role: "assistant"
+            };
+          }
+          break;
+        }
+        case "google": {
+          const client = this.getGoogleAIClient(apiKey);
+          const modelInstance = client.getGenerativeModel({ model: model });
+          if (payload.stream) {
+            const stream = await modelInstance.generateContentStream({
+              contents: this.formatMessagesForGoogle(formattedMessages),
+              generationConfig: {
+                maxOutputTokens: options.maxTokens,
+                temperature: options.temperature,
+              },
+            });
+            return {
+              response: stream,
+              provider,
+              model,
+            };
+          } else {
+            const result = await modelInstance.generateContent({
+              contents: this.formatMessagesForGoogle(formattedMessages),
+              generationConfig: {
+                maxOutputTokens: options.maxTokens,
+                temperature: options.temperature,
+              },
+            });
+            response = {
+              content: result.response.text(),
+              role: "assistant"
+            };
+          }
+          break;
+        }
+        case "togetherai": {
+          // Using fetch directly for Together AI as they don't have an official SDK
+          const url = 'https://api.together.xyz/v1/completions';
+          const headers = {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          };
+          
+          const body = {
+            model,
+            prompt: this.formatMessagesForTogether(formattedMessages),
+            max_tokens: options.maxTokens,
+            temperature: options.temperature,
+            stream: payload.stream
+          };
+          
+          if (payload.stream) {
+            const response = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body)
+            });
+            
+            if (!response.ok) {
+              throw new Error(`TogetherAI API error: ${response.statusText}`);
+            }
+            
+            return {
+              response: response.body,
+              provider,
+              model,
+            };
+          } else {
+            const fetchResponse = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body)
+            });
+            
+            if (!fetchResponse.ok) {
+              throw new Error(`TogetherAI API error: ${fetchResponse.statusText}`);
+            }
+            
+            const result = await fetchResponse.json();
+            response = {
+              content: result.choices[0].text || result.choices[0].message?.content || '',
+              role: "assistant"
+            };
+          }
+          break;
+        }
+        case "perplexity": {
+          // Using fetch directly for Perplexity as they don't have an official SDK
+          const url = 'https://api.perplexity.ai/chat/completions';
+          const headers = {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          };
+          
+          const body = {
+            model,
+            messages: this.formatMessagesForPerplexity(formattedMessages),
+            max_tokens: options.maxTokens,
+            temperature: options.temperature,
+            stream: payload.stream
+          };
+          
+          if (payload.stream) {
+            const response = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body)
+            });
+            
+            if (!response.ok) {
+              throw new Error(`Perplexity API error: ${response.statusText}`);
+            }
+            
+            return {
+              response: response.body,
+              provider,
+              model,
+            };
+          } else {
+            let fetchResponse = await fetch(url, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(body)
+            });
+            
+            if (!fetchResponse.ok) {
+              throw new Error(`Perplexity API error: ${fetchResponse.statusText}`);
+            }
+            
+            const result = await fetchResponse.json();
+            response = {
+              content: result.choices[0].message.content,
+              role: "assistant"
+            };
+          }
+          break;
+        }
+        default:
+          throw new Error(`No implementation found for provider: ${provider}`);
       }
 
-      const messages = this.formatInputMessages(payload.messages, model);
-
-      if (payload.stream) {
-        return {
-          response: await chatModel.stream(messages),
-          provider,
-          model,
-        };
-      } else {
-        return {
-          response: await chatModel.invoke(messages),
-          provider,
-          model,
-        };
-      }
+      return {
+        response,
+        provider,
+        model,
+      };
     } catch (error) {
       throw new Error(
         `Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${
@@ -233,23 +442,79 @@ export class IronaChatClient {
     return apiKey;
   }
 
-  private getChatModel(provider: string, chatModelConfig: ChatModelConfig) {
-    switch (provider) {
-      case "anthropic":
-        return new ChatAnthropic(chatModelConfig);
-      case "google":
-        return new ChatGoogleGenerativeAI(chatModelConfig);
-      case "mistral":
-        return new ChatMistralAI(chatModelConfig);
-      case "openai":
-        return new ChatOpenAI(chatModelConfig);
-      case "togetherai":
-        return new ChatTogetherAI(chatModelConfig);
-      case "perplexity":
-        return new ChatPerplexity(chatModelConfig);
-      default:
-        throw new Error(`No chat model found for provider: ${provider}`);
+  private getOpenAIClient(apiKey: string) {
+    if (!this.modelInstances["openai"]) {
+      this.modelInstances["openai"] = new OpenAI({ apiKey });
     }
+    return this.modelInstances["openai"];
+  }
+
+  private getAnthropicClient(apiKey: string) {
+    if (!this.modelInstances["anthropic"]) {
+      this.modelInstances["anthropic"] = new Anthropic({ apiKey });
+    }
+    return this.modelInstances["anthropic"];
+  }
+
+  private getMistralClient(apiKey: string) {
+    if (!this.modelInstances["mistral"]) {
+      this.modelInstances["mistral"] = new MistralClient(apiKey);
+    }
+    return this.modelInstances["mistral"];
+  }
+
+  private getGoogleAIClient(apiKey: string) {
+    if (!this.modelInstances["google"]) {
+      this.modelInstances["google"] = new GoogleGenerativeAI(apiKey);
+    }
+    return this.modelInstances["google"];
+  }
+
+  // Format message for each provider
+  private formatMessagesForOpenAI(messages: MessagePayload[]) {
+    return messages.map(message => ({
+      role: message.role,
+      content: message.content
+    }));
+  }
+
+  private formatMessagesForAnthropic(messages: MessagePayload[]) {
+    // Extract system message if present
+    const systemMessage = messages.find(m => m.role === "system");
+    const userMessages = messages.filter(m => m.role !== "system");
+    
+    return userMessages.map(message => ({
+      role: message.role,
+      content: message.content
+    }));
+  }
+
+  private formatMessagesForMistral(messages: MessagePayload[]) {
+    return messages.map(message => ({
+      role: message.role,
+      content: message.content
+    }));
+  }
+
+  private formatMessagesForGoogle(messages: MessagePayload[]) {
+    return messages.map(message => ({
+      role: message.role,
+      parts: [{ text: message.content }]
+    }));
+  }
+
+  private formatMessagesForTogether(messages: MessagePayload[]) {
+    // Simple implementation - would need to be improved for production
+    return messages.map(m => 
+      `${m.role}: ${m.content}`
+    ).join('\n');
+  }
+
+  private formatMessagesForPerplexity(messages: MessagePayload[]) {
+    return messages.map(message => ({
+      role: message.role,
+      content: message.content
+    }));
   }
 
   /**

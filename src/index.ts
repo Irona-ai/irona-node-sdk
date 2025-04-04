@@ -5,6 +5,17 @@ import { ModelSelectPayload } from "./validators/modelSelect.validator";
 import { CompletionsPayload } from "./validators/completions.validator";
 import { MissingApiKeyError } from "./errors";
 import { updateProvidersFromGist } from "./supported_models";
+import { 
+  handleStructuredOutput, 
+  StructuredOutputRequest, 
+  StructuredOutputResponse 
+} from "./structured-output/structuredOutput";
+import {
+  handleFunctionCalling,
+  FunctionCallingRequest,
+  FunctionCallingResponse
+} from "./function-calling/functionCalling";
+import { z } from "zod";
 require("dotenv").config();
 
 // Constants
@@ -16,6 +27,7 @@ const IRONAAI_API_KEY_PREFIX = "sk_";
 export class IronaAI {
   private ironaRouter: IronaRouterClient;
   private llmChatService: IronaChatClient;
+  
   private constructor(config: Config = {}) {
     // Check for API key
     const apiKey = config.apiKey || process.env.IRONAAI_API_KEY;
@@ -62,7 +74,15 @@ export class IronaAI {
               error: errorMessage
             }]
           })
-        }
+        },
+        create: () => Promise.resolve({
+          error: errorMessage,
+          error_trace: [{
+            provider: null,
+            model: null,
+            error: errorMessage
+          }]
+        })
       } as unknown as IronaAI;
       
       return errorInstance;
@@ -110,4 +130,44 @@ export class IronaAI {
       }
     },
   };
+
+  // New Vercel AI SDK compatible method for both structured output and function calling
+  public async create<T>(request: StructuredOutputRequest<T> | FunctionCallingRequest): Promise<StructuredOutputResponse<T> | FunctionCallingResponse> {
+    try {
+      // Determine if this is a structured output or function calling request
+      if ('responseModel' in request) {
+        return await handleStructuredOutput<T>(
+          {}, // Pass empty config as we already have the initialized clients
+          this.llmChatService,
+          this.ironaRouter,
+          request
+        );
+      } else if ('tools' in request) {
+        return await handleFunctionCalling(
+          {}, // Pass empty config as we already have the initialized clients
+          this.llmChatService,
+          this.ironaRouter,
+          request
+        );
+      } else {
+        return {
+          error: "Invalid request: must include either 'responseModel' or 'tools'",
+          error_trace: [{
+            provider: null,
+            model: null,
+            error: "Invalid request type"
+          }]
+        };
+      }
+    } catch (error) {
+      return {
+        error: (error instanceof Error) ? error.message : "Unknown error in create method",
+        error_trace: [{
+          provider: null,
+          model: null,
+          error: (error instanceof Error) ? error.message : "Unknown error"
+        }]
+      };
+    }
+  }
 }

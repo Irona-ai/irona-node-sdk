@@ -16,12 +16,13 @@ const body = {
         },
         {
           type: "text",
-          text: "What are the key findings in this document?",
+          text: "write short title for it",
         },
       ],
     },
   ],
   models: ["openai/gpt-4o"],
+  fallback_models: ["openai/gpt-4o-mini", "openai/chatgpt-4o-latest"],
   stream: true,
 };
 
@@ -43,7 +44,7 @@ async function CompletionsTest(body) {
     const { provider, model, response } = await sdkClient.completions.create(
       body
     );
-    console.log(`Selected provider: ${provider}, model: ${model}\n`);
+    console.log(`Current provider: ${provider}, model: ${model}\n`);
     let accumulated = "";
     if (body.stream) {
       for await (const chunk of response) {

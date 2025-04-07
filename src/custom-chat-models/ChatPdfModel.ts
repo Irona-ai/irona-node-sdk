@@ -128,7 +128,7 @@ export class ChatPdfModel extends SimpleChatModel {
 
       try {
         const { textStream } = await streamText({
-          model: openai("gpt-4o"),
+          model: openai(this.model),
           messages: finalMessages,
         });
         //   const finishReason = await finishReasonPromise;

@@ -1,8 +1,8 @@
 import { IronaChatClient } from "./irona-chat-client/IronaChatClient";
 import { IronaRouterClient } from "./irona-router-client/IronaRouterClient";
 import { Config } from "./types";
-import { ModelSelectPayload } from "./validators/modelSelect.validator";
-import { CompletionsPayload } from "./validators/completions.validator";
+import { ModelSelectPayload } from "./schemas/modelSelect.schema";
+import { CompletionsPayload } from "./schemas/completions.schema";
 import { MissingApiKeyError } from "./errors";
 import { updateProvidersFromGist } from "./supported_models";
 require("dotenv").config();

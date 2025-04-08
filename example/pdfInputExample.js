@@ -1,17 +1,28 @@
 const { IronaAI } = require("ironaai");
+const fs = require("fs");
 
 const body = {
-  messages: [{ role: "user", content: "short greeting message" }],
-  models: [
-    "openai/gpt-4-1106-preview",
-    "openai/gpt-4-turbo",
-    "perplexity/llama-3.1-sonar-large-128k-online",
-    "anthropic/claude-3-opus-20240229",
-    "anthropic/claude-2.1",
-    "mistral/open-mixtral-8x22b",
-    "google/gemini-1.0-pro-latest",
+  messages: [
+    {
+      role: "user",
+      content: [
+        {
+          type: "document",
+          source: {
+            type: "url",
+            url: "https://assets.anthropic.com/m/1cd9d098ac3e6467/original/Claude-3-Model-Card-October-Addendum.pdf",
+          },
+          filename: "document.pdf",
+        },
+        {
+          type: "text",
+          text: "write short title for it",
+        },
+      ],
+    },
   ],
-  fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
+  models: ["openai/gpt-4o"],
+  fallback_models: ["openai/gpt-4o-mini", "openai/chatgpt-4o-latest"],
   stream: true,
 };
 
@@ -26,15 +37,14 @@ async function modelSelectTest() {
     console.error(error);
   }
 }
-async function CompletionsTest() {
-  const sdkClient = await IronaAI.createInstance({
-    fallback_models: ["openai/gpt-4o-mini"],
-  });
+
+async function CompletionsTest(body) {
+  const sdkClient = await IronaAI.createInstance({});
   try {
     const { provider, model, response } = await sdkClient.completions.create(
       body
     );
-    console.log(`Selected provider: ${provider}, model: ${model}\n`);
+    console.log(`Current provider: ${provider}, model: ${model}\n`);
     let accumulated = "";
     if (body.stream) {
       for await (const chunk of response) {
@@ -51,5 +61,5 @@ async function CompletionsTest() {
     console.error(error);
   }
 }
-modelSelectTest();
-CompletionsTest();
+// modelSelectTest();
+CompletionsTest(body);

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MessageSchema, ModelSchema } from "./common.validators";
+import { MessageSchema, ModelSchema } from "./common.schema";
 
 export const ModelSelectSchema = z.object({
   topk_models: z.number().int().optional(),

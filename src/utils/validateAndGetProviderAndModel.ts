@@ -1,6 +1,6 @@
 import { isSupportedModel } from "../supported_models";
 import { UnsupportedModelError } from "../errors";
-import { ModelPayload } from "../validators/common.validators";
+import { ModelPayload } from "../schemas/common.schema";
 
 /**
  * Validates a model string in provider/model format and splits it into provider and model parts

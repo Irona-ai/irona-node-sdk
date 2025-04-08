@@ -5,10 +5,10 @@
   "module": "dist/index.m.js",
   "unpkg": "dist/index.umd.js",
   "types": "dist/index.d.ts",
+  "type": "commonjs",
   "scripts": {
-    "clean": "rimraf dist",
-    "build": "npm run clean && microbundle --tsconfig tsconfig.json --target node --no-sourcemap",
-    "build:watch": "microbundle watch --tsconfig tsconfig.json --target node --no-sourcemap",
+    "build": "microbundle --target node --format cjs --tsconfig tsconfig.json --no-sourcemap",
+    "devsdk": "microbundle --watch --tsconfig tsconfig.json --no-sourcemap",
     "dev": "ts-node-dev -r tsconfig-paths/register src/server.ts",
     "start": "node dist/app.js",
     "test": "vitest",

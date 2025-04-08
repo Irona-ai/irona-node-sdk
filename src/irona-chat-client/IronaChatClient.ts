@@ -10,16 +10,16 @@ import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
   CompletionsSchema,
-} from "../validators/completions.validator";
+} from "../schemas/completions.schema";
 import {
   ModelSelectPayload,
   ModelSelectSchema,
-} from "../validators/modelSelect.validator";
+} from "../schemas/modelSelect.schema";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 import { ChatPerplexity } from "../custom-chat-models/perplexity";
-import { MessagePayload } from "@/validators/common.validators";
-import { Base } from "@/irona-router-client/base";
+import { MessagePayload } from "../schemas/common.schema";
+import { ChatPdfModel } from "../custom-chat-models/ChatPdfModel";
 
 export class IronaChatClient {
   constructor(
@@ -34,46 +34,106 @@ export class IronaChatClient {
     // Validate input
     const validationResult = validateSchema(CompletionsSchema, payload);
     if (!validationResult.success) {
-      throw new BadRequestError(validationResult.errors);
+      return {
+        error: validationResult.errors,
+        error_trace: [
+          {
+            provider: null,
+            model: null,
+            error: validationResult.errors,
+          },
+        ],
+      };
     }
 
-    // Select the best model
-    const { provider, model } = await this.selectBestModel(payload);
+    // Error trace to keep track of all errors encountered
+    const errorTrace = [];
 
-    // Prepare the model priority queue
-    // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
-    const modelPriorityQueue = [
-      ...(provider && model ? [{ provider, model }] : []),
-      ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
-        (fallback) => validateAndGetProviderAndModel(fallback)
-      ),
-    ];
+    try {
+      // Select the best model
+      const modelSelectResult = await this.selectBestModel(payload);
 
-    // Attempt execution for each model in the priority queue
-    for (const { provider, model } of modelPriorityQueue) {
-      console.log(
-        `Invoking chat completions with provider: ${provider}, model: ${model}`
-      );
-      try {
-        const response = await this.invokeChatCompletions(
-          provider,
-          model,
-          payload
-        );
-        console.log(
-          `Successfully executed chat completions with provider: ${provider}, model: ${model}`
-        );
-        return response; // Return on first success
-      } catch (error) {
-        console.error(error);
-        // TODO: Fix Logging of Error Details
-        // console.error(`Error: ${JSON.stringify(error,null,2)}`);
+      if (modelSelectResult.error) {
+        errorTrace.push({
+          provider: null,
+          model: null,
+          error: `Model selection failed: ${modelSelectResult.error}`,
+        });
       }
+
+      const { provider, model } = modelSelectResult;
+
+      // This is a temporary fix for pdf support untill we made 1. pdfchatmodel generic and 2. model select works for pdf/document
+      const isPdfInput = this.containsDocumentInMessages(payload.messages);
+
+      // Prepare the model priority queue
+      // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
+      const modelPriorityQueue = [
+        ...(provider && model ? [{ provider, model }] : []),
+        ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
+          (fallback) => validateAndGetProviderAndModel(fallback)
+        ),
+      ];
+
+      // Attempt execution for each model in the priority queue
+      for (const { provider, model } of modelPriorityQueue) {
+        console.log(
+          `Invoking chat completions with provider: ${provider}, model: ${model}`
+        );
+        try {
+          const response = await this.invokeChatCompletions(
+            provider,
+            model,
+            payload
+          );
+          console.log(
+            `Successfully executed chat completions with provider: ${provider}, model: ${model}`
+          );
+
+          // If there were previous errors, include them in the response
+          if (errorTrace.length > 0) {
+            return {
+              ...response,
+              error_trace: errorTrace,
+              recovered: true,
+            };
+          }
+
+          return response; // Return on first success
+        } catch (error) {
+          // Add error to trace
+          errorTrace.push({
+            provider,
+            model,
+            error: (error as Error).message,
+          });
+
+          console.error(
+            `Error with ${provider}/${model}: ${(error as Error).message}`
+          );
+        }
+      }
+
+      // If all retries fail, return a structured error response
+      return {
+        error:
+          "All attempts to process the completions request failed. Please verify the providers and models in your configuration.",
+        error_trace: errorTrace,
+      };
+    } catch (error) {
+      // Catch any unexpected errors
+      return {
+        error: `Unexpected error: ${(error as Error).message}`,
+        error_trace: [
+          ...errorTrace,
+          {
+            provider: null,
+            model: null,
+            error: (error as Error).message,
+          },
+        ],
+      };
     }
-    // If all retries fail, throw an error
-    throw new Error(
-      `All attempts to process the completions request failed. Please verify the providers and models in your configuration.`
-    );
   }
 
   /**
@@ -94,8 +154,10 @@ export class IronaChatClient {
         maxRetries: payload?.maxRetries,
         maxTokens: payload?.maxTokens,
       };
-
-      const chatModel = this.getChatModel(provider, chatModelConfig);
+      const isPdfInput = this.containsDocumentInMessages(payload.messages);
+      const chatModel = isPdfInput
+        ? this.getChatPdfModel(provider, chatModelConfig)
+        : this.getChatModel(provider, chatModelConfig);
       if (!chatModel) {
         throw new Error(
           `No chat model instance found for provider: ${provider}`
@@ -147,23 +209,29 @@ export class IronaChatClient {
   }
 
   private async selectBestModel(body: CompletionsPayload) {
-    if (body.models.length != 1) {
-      try {
-        const response = await this.ironaRouter.modelSelect(
-          this.extractModelSelectPayloadFromCompletionsPayload(body)
-        );
-        const providers =
-          response && response.error
-            ? response.fallback_providers
-            : response.providers;
-
-        return providers[0];
-      } catch (error) {
-        console.error(error);
-        return { provider: null, model: null };
-      }
-    } else {
+    if (body.models && body.models.length === 1) {
       return validateAndGetProviderAndModel(body.models[0]);
+    }
+
+    try {
+      const response = await this.ironaRouter.modelSelect(
+        this.extractModelSelectPayloadFromCompletionsPayload(body)
+      );
+
+      // Handle errors from the model selection
+      if (response && response.error) {
+        // Still provide fallback providers for error recovery
+        const providers = response.fallback_providers || [];
+        if (providers.length > 0) {
+          return providers[0];
+        }
+        return { provider: null, model: null, error: response.error };
+      }
+
+      return response.providers[0];
+    } catch (error) {
+      console.error(`Model selection error: ${(error as Error).message}`);
+      return { provider: null, model: null, error: (error as Error).message };
     }
   }
 
@@ -178,6 +246,14 @@ export class IronaChatClient {
     return apiKey;
   }
 
+  private getChatPdfModel(provider: string, chatModelConfig: ChatModelConfig) {
+    if (provider !== "openai") {
+      throw new BadRequestError(
+        `PDF chat model is only supported for OpenAI provider.`
+      );
+    }
+    return new ChatPdfModel(chatModelConfig);
+  }
   private getChatModel(provider: string, chatModelConfig: ChatModelConfig) {
     switch (provider) {
       case "anthropic":
@@ -195,6 +271,13 @@ export class IronaChatClient {
       default:
         throw new Error(`No chat model found for provider: ${provider}`);
     }
+  }
+  private containsDocumentInMessages(messages: MessagePayload[]): boolean {
+    return messages.some(
+      (message) =>
+        Array.isArray(message.content) &&
+        message.content.some((item) => item.type === "document")
+    );
   }
 
   /**

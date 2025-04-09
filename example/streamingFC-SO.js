@@ -1,97 +1,216 @@
 import { IronaAI } from 'ironaai';
 import { z } from 'zod';
-import dotenv from 'dotenv';
-import { createParser } from 'eventsource-parser';
+import * as dotenv from 'dotenv';
+import chalk from 'chalk';
+
 dotenv.config();
 
-// Note: This is a more complex example that shows how we might handle streaming
-// For the Irona AI integration, we'd need to implement proper streaming support in the handleFunctionCalling
-// and handleStructuredOutput functions
+async function testStreaming() {
+  const ironaai = await IronaAI.createInstance({
+    apiKey: process.env.IRONAAI_API_KEY,
+  });
 
-async function streamingCombinedExample() {
-  console.log("=== Streaming Combined Structured Output & Function Calling Example ===");
+  // Test Function Calling Stream
+  console.log(chalk.blue('\n=== Testing Function Calling Stream ==='));
   
-  try {
-    // Initialize the IronaAI client
-    const ironaai = await IronaAI.createInstance({
-      apiKey: process.env.IRONAAI_API_KEY,
-    });
-
-    // This example demonstrates how streaming might be implemented
-    // However, it needs additional infrastructure in the actual IronaAI class
-    
-    // 1. Create a simple example for the sake of demonstration
-    console.log("This is a placeholder for streaming functionality.");
-    console.log("Actual implementation would require modifications to the core IronaAI class.");
-    
-    // Example of how streaming implementation might look
-    console.log("\nSimulated streaming function calling:");
-    
-    // The tools definition would be the same as in non-streaming examples
-    const tools = [
-      {
-        'type': 'function',
-        'function': {
-          'name': 'generateStory',
-          'description': 'Generate a story with given parameters',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'genre': {'type': 'string'},
-              'characters': {'type': 'array', 'items': {'type': 'string'}},
-              'setting': {'type': 'string'},
-              'length': {'type': 'string', 'enum': ['short', 'medium', 'long']}
-            },
-            'required': ['genre', 'characters', 'setting']
-          }
+  const calculateResult = await ironaai.create({
+    messages: [
+      { 
+        role: 'system',
+        content: `You are a calculation assistant. Follow these rules strictly:
+1. Use only the calculate function to perform calculations
+2. Return only valid JSON in this exact format:
+{
+  "function_call": {
+    "name": "calculate",
+    "arguments": {
+      "operation": "multiply",
+      "a": 27,
+      "b": 35
+    }
+  }
+}`
+      },
+      { 
+        role: 'user', 
+        content: 'Calculate 27 multiplied by 35' 
+      }
+    ],
+    tools: [{
+      type: 'function',
+      function: {
+        name: 'calculate',
+        description: 'Calculate mathematical operations',
+        parameters: {
+          type: 'object',
+          properties: {
+            operation: { type: 'string', enum: ['multiply'] },
+            a: { type: 'number' },
+            b: { type: 'number' }
+          },
+          required: ['operation', 'a', 'b']
         }
       }
-    ];
+    }],
+    stream: true,
+    llmProviders: [
+      { provider: 'openai', model: 'gpt-4-0613' }
+    ],
+    temperature: 0.1
+  });
 
-    // Simulate streaming function calling completion
-    console.log("Streaming function call chunks:");
+  // Handle function calling stream
+  if (calculateResult instanceof ReadableStream) {
+    const reader = calculateResult.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
     
-    // This is what the actual implementation might output
-    const simulatedChunks = [
-      '{"type":"thinking","content":"Analyzing the request for a story generation..."}',
-      '{"type":"thinking","content":"Identifying required parameters..."}',
-      '{"type":"tool_call_start","tool":"generateStory"}',
-      '{"type":"tool_call_part","content":"{\\"genre\\":\\"fantasy\\","}',
-      '{"type":"tool_call_part","content":"\\"characters\\":[\\"wizard\\",\\"dragon\\"],"}',
-      '{"type":"tool_call_part","content":"\\"setting\\":\\"medieval kingdom\\","}',
-      '{"type":"tool_call_part","content":"\\"length\\":\\"medium\\"}"}',
-      '{"type":"tool_call_end"}'
-    ];
-    
-    // Simulate streaming
-    for (const chunk of simulatedChunks) {
-      console.log(chunk);
-      await new Promise(r => setTimeout(r, 300)); // Simulate delay
-    }
-    
-    console.log("\nSimulated function call completed.");
-    
-    // The result would be:
-    const parsedFunctionCall = {
-      name: 'generateStory',
-      args: {
-        genre: 'fantasy',
-        characters: ['wizard', 'dragon'],
-        setting: 'medieval kingdom',
-        length: 'medium'
+    try {
+      console.log(chalk.yellow('Streaming function calls...'));
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log(chalk.green('\nFunction calling stream completed'));
+          break;
+        }
+
+        // Decode chunk and add to buffer
+        const chunk = decoder.decode(value, { stream: true });
+        console.debug('Received raw chunk:', chunk);
+        buffer += chunk;
+
+        try {
+          // Try to parse accumulated buffer
+          const parsed = JSON.parse(buffer);
+          if (parsed.function_call) {
+            console.log(chalk.yellow('\nFunction Call:'));
+            console.log(chalk.cyan('Name:'), parsed.function_call.name);
+            console.log(chalk.cyan('Arguments:'), parsed.function_call.arguments);
+            buffer = ''; // Clear buffer after successful parse
+          }
+        } catch (e) {
+          // Continue accumulating if not valid JSON yet
+          console.debug('Accumulating chunks...');
+        }
       }
-    };
+    } catch (error) {
+      console.error(chalk.red('Stream error:'), error);
+    } finally {
+      reader.releaseLock();
+    }
+  } else {
+    console.error(chalk.red('Error:'), calculateResult.error);
+  }
+
+  // Test Structured Output Stream
+  console.log(chalk.blue('\n=== Testing Structured Output Stream ==='));
+
+  const MovieSchema = z.object({
+    title: z.string(),
+    year: z.number(),
+    director: z.string(),
+    rating: z.number().min(0).max(10),
+    review: z.string(),
+    pros: z.array(z.string()),
+    cons: z.array(z.string())
+  });
+
+  const movieResult = await ironaai.create({
+    messages: [
+      { 
+        role: 'system',
+        content: `You are a movie reviewer. Return only valid JSON in this exact format:
+{
+  "title": "Movie Title",
+  "year": 2024,
+  "director": "Director Name",
+  "rating": 8.5,
+  "review": "Detailed movie review text...",
+  "pros": ["Pro 1", "Pro 2"],
+  "cons": ["Con 1", "Con 2"]
+}
+Do not include any other text or formatting.`
+      },
+      { 
+        role: 'user', 
+        content: 'Review the movie Inception' 
+      }
+    ],
+    responseModel: MovieSchema,
+    stream: true,
+    llmProviders: [
+      { provider: 'openai', model: 'gpt-4-0613' }
+    ],
+    temperature: 0.1
+  });
+
+  // Handle structured output stream
+  if (movieResult instanceof ReadableStream) {
+    const reader = movieResult.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
     
-    console.log("\nParsed function call:", parsedFunctionCall);
-    
-    // Then you would proceed with calling your actual function with these args
-    console.log("\nThis would then trigger a real function execution or another LLM call");
-    
-    console.log("\nNote: Actual implementation would handle event streams from the LLM providers");
-    console.log("and parse them appropriately for both function calls and structured outputs.");
-  } catch (error) {
-    console.error('Unexpected error:', error);
+    try {
+      console.log(chalk.yellow('Streaming movie review...'));
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log(chalk.green('\nStructured output stream completed'));
+          break;
+        }
+
+        // Decode chunk and add to buffer
+        const chunk = decoder.decode(value, { stream: true });
+        console.debug('Received raw chunk:', chunk);
+        buffer += chunk;
+
+        try {
+          // Try to parse accumulated buffer
+          const parsed = JSON.parse(buffer);
+          console.log(chalk.yellow('\nMovie Review Update:'));
+          
+          if (parsed.title) console.log(chalk.cyan('Title:'), parsed.title);
+          if (parsed.year) console.log(chalk.cyan('Year:'), parsed.year);
+          if (parsed.director) console.log(chalk.cyan('Director:'), parsed.director);
+          if (parsed.rating) console.log(chalk.cyan('Rating:'), `${parsed.rating}/10`);
+          
+          if (parsed.pros?.length) {
+            console.log(chalk.cyan('\nPros:'));
+            parsed.pros.forEach(pro => console.log(chalk.green(`- ${pro}`)));
+          }
+          
+          if (parsed.cons?.length) {
+            console.log(chalk.cyan('\nCons:'));
+            parsed.cons.forEach(con => console.log(chalk.red(`- ${con}`)));
+          }
+          
+          if (parsed.review) {
+            console.log(chalk.cyan('\nReview:'));
+            console.log(parsed.review);
+          }
+          
+          buffer = ''; // Clear buffer after successful parse
+        } catch (e) {
+          // Continue accumulating if not valid JSON yet
+          console.debug('Accumulating chunks...');
+        }
+      }
+    } catch (error) {
+      console.error(chalk.red('Stream error:'), error);
+    } finally {
+      reader.releaseLock();
+    }
+  } else {
+    console.error(chalk.red('Error:'), movieResult.error);
   }
 }
 
-streamingCombinedExample();
+// Add error handling
+testStreaming().catch(error => {
+  console.error(chalk.red('Error in streaming test:'), error);
+  process.exit(1);
+});

@@ -1,72 +1,74 @@
 import { IronaAI } from 'ironaai';
 import { z } from 'zod';
+import chalk from 'chalk';
 import dotenv from 'dotenv';
 dotenv.config();
 
 async function nonStreamingCombinedExample() {
-  console.log("=== Non-streaming Combined Structured Output & Function Calling Example ===");
+  console.log(chalk.blue("=== Non-streaming Combined Example ==="));
   
   try {
-    // Initialize the IronaAI client
     const ironaai = await IronaAI.createInstance({
       apiKey: process.env.IRONAAI_API_KEY,
     });
 
-    // Step 1: Use function calling to extract a recipe from a query
-    const tools = [
-      {
-        'type': 'function',
-        'function': {
-          'name': 'extractRecipeDetails',
-          'description': 'Extract recipe details from user query',
-          'parameters': {
-            'type': 'object',
-            'properties': {
-              'recipeName': {'type': 'string'},
-              'cuisine': {'type': 'string'},
-              'dietaryRestrictions': {
-                'type': 'array',
-                'items': {'type': 'string'}
-              }
-            },
-            'required': ['recipeName']
-          }
+    // Step 1: Function Calling
+    const tools = [{
+      type: 'function',
+      function: {
+        name: 'extractRecipeDetails',
+        description: 'Extract recipe details from user query',
+        parameters: {
+          type: 'object',
+          properties: {
+            recipeName: { type: 'string' },
+            cuisine: { type: 'string' },
+            dietaryRestrictions: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          },
+          required: ['recipeName']
         }
       }
-    ];
+    }];
 
-    // Define the LLMs we'd like to route between
+    // Use a single reliable model for testing
     const llmProviders = [
-      { provider: 'openai', model: 'gpt-4o-mini' },
-      { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
-      { provider: 'openai', model: 'gpt-4o-2024-05-13' },
+      { provider: 'openai', model: 'gpt-4-0613' }
     ];
 
-    // Make the function calling request
-    console.log("First step: Function calling to extract recipe details");
+    console.log(chalk.yellow("\nStep 1: Function Calling"));
     const fcResult = await ironaai.create({
       messages: [
-        { content: 'You are a helpful cooking assistant.', role: 'system' },
-        { content: 'I need a recipe for vegetarian pizza margherita.', role: 'user' }
+        { 
+          role: 'system',
+          content: 'You are a cooking assistant. Extract recipe details using the provided function.'
+        },
+        { 
+          role: 'user',
+          content: 'I need a recipe for vegetarian pizza margherita.'
+        }
       ],
-      llmProviders: llmProviders,
-      tools: tools
+      llmProviders,
+      tools,
+      temperature: 0.1
     });
 
     if ('error' in fcResult) {
-      console.error('Error in function calling:', fcResult.error);
+      console.error(chalk.red('Function calling error:'), fcResult.error);
       return;
     }
 
-    console.log('Function call result:', fcResult.tool_calls[0]);
+    console.log(chalk.green('Function call successful:'), 
+      JSON.stringify(fcResult.tool_calls[0], null, 2));
     
-    // Step 2: Use structured output to generate a detailed recipe
-    // Define our structured output schema
+    // Step 2: Structured Output
     const recipeSchema = z.object({
       name: z.string(),
       cuisine: z.string(),
-      prepTime: z.number().int(),
-      cookTime: z.number().int(),
+      prepTime: z.number(),
+      cookTime: z.number(),
       ingredients: z.array(z.object({
         name: z.string(),
         amount: z.string(),
@@ -76,52 +78,67 @@ async function nonStreamingCombinedExample() {
       tips: z.array(z.string()).optional()
     });
 
-    // Extract recipe details from function call
     const recipeDetails = fcResult.tool_calls[0].args;
     
-    // Make the structured output request
-    console.log("\nSecond step: Structured output to generate full recipe");
+    console.log(chalk.yellow("\nStep 2: Structured Output"));
     const soResult = await ironaai.create({
       messages: [
-        { content: 'You are a professional chef.', role: 'system' },
-        { content: `Generate a detailed recipe for ${recipeDetails.recipeName}. ` +
-                 `Cuisine: ${recipeDetails.cuisine || 'Any'}. ` +
-                 `Dietary restrictions: ${(recipeDetails.dietaryRestrictions || ['None']).join(', ')}.`, 
-          role: 'user' }
+        { 
+          role: 'system',
+          content: `You are a professional chef. Provide recipes in exact JSON format matching this schema:
+{
+  "name": "Recipe Name",
+  "cuisine": "Cuisine Type",
+  "prepTime": 15,
+  "cookTime": 30,
+  "ingredients": [
+    { "name": "Ingredient", "amount": "1 cup", "optional": false }
+  ],
+  "instructions": ["Step 1", "Step 2"],
+  "tips": ["Tip 1", "Tip 2"]
+}`
+        },
+        { 
+          role: 'user',
+          content: `Generate a detailed recipe for ${recipeDetails.recipeName}. ` +
+                  `Cuisine: ${recipeDetails.cuisine || 'Italian'}. ` +
+                  `Dietary restrictions: ${(recipeDetails.dietaryRestrictions || ['vegetarian']).join(', ')}.`
+        }
       ],
-      llmProviders: llmProviders,
-      responseModel: recipeSchema
+      llmProviders,
+      responseModel: recipeSchema,
+      temperature: 0.1
     });
 
     if ('error' in soResult) {
-      console.error('Error in structured output:', soResult.error);
+      console.error(chalk.red('Structured output error:'), soResult.error);
       return;
     }
 
-    // Display the results
+    // Display results
     const recipe = soResult.value;
-    console.log(`\n${recipe.name} (${recipe.cuisine})`);
-    console.log(`Prep time: ${recipe.prepTime} minutes | Cook time: ${recipe.cookTime} minutes`);
+    console.log(chalk.green('\nRecipe Generated Successfully:'));
+    console.log(chalk.cyan(`\n${recipe.name} (${recipe.cuisine})`));
+    console.log(chalk.cyan(`Prep: ${recipe.prepTime}min | Cook: ${recipe.cookTime}min`));
     
-    console.log('\nIngredients:');
+    console.log(chalk.cyan('\nIngredients:'));
     recipe.ingredients.forEach(ing => {
       console.log(`- ${ing.amount} ${ing.name}${ing.optional ? ' (optional)' : ''}`);
     });
     
-    console.log('\nInstructions:');
+    console.log(chalk.cyan('\nInstructions:'));
     recipe.instructions.forEach((step, i) => {
       console.log(`${i+1}. ${step}`);
     });
     
-    if (recipe.tips && recipe.tips.length > 0) {
-      console.log('\nChef\'s Tips:');
-      recipe.tips.forEach(tip => {
-        console.log(`- ${tip}`);
-      });
+    if (recipe.tips?.length) {
+      console.log(chalk.cyan('\nChef\'s Tips:'));
+      recipe.tips.forEach(tip => console.log(`- ${tip}`));
     }
+
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error(chalk.red('Unexpected error:'), error);
   }
 }
 
-nonStreamingCombinedExample();
+nonStreamingCombinedExample().catch(console.error);

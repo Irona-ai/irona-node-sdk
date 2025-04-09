@@ -132,16 +132,17 @@ export class IronaAI {
   };
 
   // New Vercel AI SDK compatible method for both structured output and function calling
-  public async create<T>(request: StructuredOutputRequest<T> | FunctionCallingRequest): Promise<StructuredOutputResponse<T> | FunctionCallingResponse> {
+  public async create<T>(request: StructuredOutputRequest<T> | FunctionCallingRequest): Promise<StructuredOutputResponse<T> | FunctionCallingResponse | ReadableStream<FunctionCallingResponse>> {
     try {
       // Determine if this is a structured output or function calling request
       if ('responseModel' in request) {
-        return await handleStructuredOutput<T>(
+        const response = await handleStructuredOutput<T>(
           {}, // Pass empty config as we already have the initialized clients
           this.llmChatService,
           this.ironaRouter,
           request
         );
+        return response as StructuredOutputResponse<T>;
       } else if ('tools' in request) {
         return await handleFunctionCalling(
           {}, // Pass empty config as we already have the initialized clients

@@ -19,67 +19,234 @@ export type StructuredOutputResponse<T> = {
   providers: { provider: string; model: string }[];
   session_id: string;
   value: T;
+  partial?: boolean;
 } | ErrorResponse;
+
+// Helper function to parse structured responses
+function parseStructuredResponse(content: string): any {
+  console.debug('Attempting to parse content:', content);
+
+  if (!content || content.trim().length === 0) {
+    throw new Error('Empty content received');
+  }
+
+  const parseStrategies = [
+    // Strategy 1: Handle streaming chunks
+    (content: string) => {
+      let jsonContent = content.trim();
+      // Handle partial chunks by completing them
+      if (!jsonContent.startsWith('{')) {
+        jsonContent = '{' + jsonContent;
+      }
+      if (!jsonContent.endsWith('}')) {
+        jsonContent = jsonContent + '}';
+      }
+      return JSON.parse(jsonContent);
+    },
+
+    // Strategy 2: Direct JSON parse with cleanup
+    (content: string) => {
+      const cleaned = content
+        .trim()
+        .replace(/[\u200B-\u200D\uFEFF]/g, '') // Remove zero-width characters
+        .replace(/^[^{]*?(\{.*\})[^}]*?$/, '$1'); // Extract JSON object
+      return JSON.parse(cleaned);
+    },
+
+    // Strategy 3: Handle partial JSON accumulation
+    (content: string) => {
+      const matches = content.match(/\{(?:[^{}]|(?:\{[^{}]*\}))*\}/g);
+      if (!matches) throw new Error('No complete JSON objects found');
+      
+      // Try parsing each potential JSON object
+      for (const match of matches) {
+        try {
+          return JSON.parse(match);
+        } catch {
+          continue;
+        }
+      }
+      throw new Error('No valid JSON found in matches');
+    }
+  ];
+
+  // Try each strategy and collect errors
+  const errors: string[] = [];
+  for (const strategy of parseStrategies) {
+    try {
+      const result = strategy(content);
+      if (result && typeof result === 'object') {
+        console.debug('Successfully parsed JSON:', result);
+        return result;
+      }
+    } catch (error) {
+      errors.push(`${error instanceof Error ? error.message : 'Unknown error'}`);
+      continue;
+    }
+  }
+
+  throw new Error(`All parsing strategies failed:\n${errors.join('\n')}`);
+}
 
 export async function handleStructuredOutput<T>(
   config: Config,
   ironaChatClient: IronaChatClient,
   ironaRouter: IronaRouterClient,
   request: StructuredOutputRequest<T>
-): Promise<StructuredOutputResponse<T>> {
+): Promise<StructuredOutputResponse<T> | ReadableStream<StructuredOutputResponse<T>>> {
   try {
-    // Convert Vercel-style request to Irona-style request
-    const completionsPayload = {
-      messages: request.messages,
-      models: [...(request.llmProviders?.map(p => `${p.provider}/${p.model}`) || ['openai/gpt-3.5-turbo'])] as [string, ...string[]],
-      temperature: request.temperature,
-      maxTokens: request.maxTokens,
-      stream: request.stream,
-      maxRetries: request.maxRetries,
-      kwargs: {
-        tradeoff: request.tradeoff || 'quality',
-        responseModel: request.responseModel.describe('Response model'),
-      }
-    };
+    // Add schema information to system message
+    const messages: [{ role: "system" | "assistant" | "user"; content: string }, ...{ role: "system" | "assistant" | "user"; content: string }[]] = [
+      {
+        role: 'system' as const,
+        content: `Respond with valid JSON matching this schema: ${JSON.stringify(request.responseModel.describe('Response schema'))}`
+      },
+      ...request.messages
+    ];
 
-    // Call the completion endpoint
+// Update the completionsPayload section
+const completionsPayload = {
+  messages: [{
+    role: 'system' as const,
+    content: `You are a structured data assistant. Follow these rules strictly:
+1. Return valid JSON only
+2. Stream the response as complete JSON objects
+3. Each chunk must be valid JSON
+4. Match this exact schema:
+{
+  "title": "string (movie title)",
+  "year": "number (release year)",
+  "director": "string (director's name)",
+  "rating": "number (between 0-10)",
+  "review": "string (detailed review text)",
+  "pros": "string[] (array of positive points)",
+  "cons": "string[] (array of negative points)"
+}
+
+Example:
+{
+  "title": "Movie Title",
+  "year": 2024,
+  "director": "Director Name",
+  "rating": 8.5,
+  "review": "A detailed review...",
+  "pros": ["Pro 1", "Pro 2"],
+  "cons": ["Con 1", "Con 2"]
+}`
+    } as const,
+    ...request.messages
+  ] as [{ role: "system" | "assistant" | "user"; content: string }, ...{ role: "system" | "assistant" | "user"; content: string }[]],
+  models: [...(request.llmProviders?.map(p => `${p.provider}/${p.model}`) || ['openai/gpt-3.5-turbo'])] as [string, ...string[]],
+  temperature: request.temperature ?? 0.1,
+  maxTokens: request.maxTokens ?? 4096,
+  stream: request.stream,
+  maxRetries: request.maxRetries ?? 2,
+  kwargs: {
+    tradeoff: request.tradeoff || 'quality',
+    responseModel: request.responseModel.describe('Response model'),
+    anthropic: request.llmProviders?.some(p => p.provider === 'anthropic') ? {
+      max_tokens: request.maxTokens ?? 4096,
+      model_params: {
+        temperature: request.temperature ?? 0.1
+      },
+      response_format: { type: "json" }
+    } : undefined
+  }
+};
+
     const response = await ironaChatClient.completions(completionsPayload);
     
-    // Check for errors
     if ('error' in response) {
       return {
-        error: (response as { error: string }).error,
-        error_trace: (response as { error_trace?: any[] }).error_trace || []
+        error: response.error,
+        error_trace: response.error_trace || []
       };
     }
 
-    // For streamed responses
-    if (completionsPayload.stream && response.response) {
-      // This would require custom handling for streaming structured outputs
-      throw new Error("Streaming not yet implemented for structured outputs");
+     // Handle streaming responses
+     if (request.stream && response.response instanceof ReadableStream) {
+      const reader = response.response.getReader();
+      let buffer = '';
+      let lastValidResponse: T | null = null;
+      const decoder = new TextDecoder();
+    
+      return new ReadableStream({
+        async start(controller) {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              
+              if (done) {
+                if (buffer.trim()) {
+                  try {
+                    const finalParsed = parseStructuredResponse(buffer);
+                    const finalValidation = request.responseModel.safeParse(finalParsed);
+                    if (finalValidation.success) {
+                      controller.enqueue({
+                        providers: [{ provider: response.provider, model: response.model }],
+                        session_id: `structured-output-stream-${Date.now()}`,
+                        value: finalValidation.data as T,
+                        partial: false
+                      });
+                    }
+                  } catch (error) {
+                    console.debug('Final chunk parse failed:', error);
+                  }
+                }
+                break;
+              }
+    
+              // Decode and accumulate content
+              const chunk = decoder.decode(value, { stream: true });
+              console.debug('Received chunk:', chunk);
+              
+              if (!chunk) continue;
+              
+              buffer += chunk;
+    
+              // Try to find complete JSON objects
+              try {
+                const parsed = parseStructuredResponse(buffer);
+                const validationResult = request.responseModel.safeParse(parsed);
+                
+                if (validationResult.success) {
+                  lastValidResponse = validationResult.data as T;
+                  controller.enqueue({
+                    providers: [{ provider: response.provider, model: response.model }],
+                    session_id: `structured-output-stream-${Date.now()}`,
+                    value: lastValidResponse,
+                    partial: true
+                  });
+                  // Keep accumulating but remove parsed content
+                  buffer = '';
+                }
+              } catch (error) {
+                console.debug('Chunk parsing or validation failed:', error);
+                // Continue accumulating if parse fails
+              }
+            }
+            controller.close();
+          } catch (error) {
+            console.error('Stream processing error:', error);
+            controller.error(error);
+          } finally {
+            reader.releaseLock();
+          }
+        },
+        cancel() {
+          reader.cancel();
+        }
+      });
     }
 
-    // Parse the response content using the schema
-    try {
-      const responseContent = response.response?.content || '';
-      
-      // Try to parse as JSON first
-      let parsedContent;
-      try {
-        parsedContent = JSON.parse(responseContent);
-      } catch (e) {
-        // Extract JSON from markdown code blocks if needed
-        const jsonMatch = responseContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-        if (jsonMatch) {
-          parsedContent = JSON.parse(jsonMatch[1]);
-        } else {
-          throw new Error("Could not parse JSON from response");
-        }
-      }
+    // Handle non-streaming responses
+    const responseContent = response.response?.content || '';
+    console.debug('Raw response:', responseContent);
 
-      // Validate against the schema
+    try {
+      const parsedContent = parseStructuredResponse(responseContent);
       const validationResult = request.responseModel.safeParse(parsedContent);
-      
+
       if (!validationResult.success) {
         return {
           error: "Response validation failed",
@@ -102,7 +269,7 @@ export async function handleStructuredOutput<T>(
         error_trace: [{
           provider: response.provider,
           model: response.model,
-          error: (error as Error).message
+          error: `${(error as Error).message}\nRaw response: ${responseContent}`
         }]
       };
     }

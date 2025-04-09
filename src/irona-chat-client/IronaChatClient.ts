@@ -142,7 +142,7 @@ export class IronaChatClient {
       const options = {
         temperature: payload?.temperature,
         maxTokens: payload?.maxTokens,
-        maxRetries: payload?.maxRetries || 2,
+        maxRetries: payload?.maxRetries ?? 2,
       };
 
       let response: { content: string; role: string };

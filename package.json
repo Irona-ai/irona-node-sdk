@@ -48,6 +48,7 @@
     "ai": "^4.2.5",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",
+    "ironaai": "file:",
     "tsconfig-paths": "^4.2.0",
     "zod": "^3.23.8"
   },

@@ -35,6 +35,11 @@ async function testFunctionCalling() {
       { provider: 'openai', model: 'gpt-4-0613' }
     ]
   });
+  if('error' in result) {
+      console.error('Error:', result.error_trace);
+      console.error('Error:', result.error);
+      return;
+  }
 
   console.log('Result:', JSON.stringify(result, null, 2));
 }

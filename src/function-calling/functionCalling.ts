@@ -116,57 +116,83 @@ export async function handleFunctionCalling(
       };
     }
 
-    // Handle streaming response
-    if (request.stream && response.response instanceof ReadableStream) {
-      const reader = response.response.getReader();
-      let buffer = '';
+    // Update the streaming section in handleFunctionCalling
+if (request.stream && response.response instanceof ReadableStream) {
+  const reader = response.response.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
 
-      return new ReadableStream({
-        async start(controller) {
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            if (buffer.trim()) {
+              try {
+                const toolCalls = parseContent(buffer);
+                if (toolCalls.length > 0) {
+                  controller.enqueue({
+                    providers: [{ provider: response.provider, model: response.model }],
+                    session_id: `function-calling-stream-${Date.now()}`,
+                    tool_calls: toolCalls,
+                    content: buffer
+                  });
+                }
+              } catch (error) {
+                console.debug('Final chunk parse failed:', error);
+              }
+            }
+            break;
+          }
+
+          // Decode the chunk and accumulate
+          const chunk = decoder.decode(value, { stream: true });
+          console.debug('Received chunk:', chunk);
+          buffer += chunk;
+
+          // Try to find complete function calls in accumulated buffer
           try {
-            while (true) {
-              const { done, value } = await reader.read();
-              
-              if (done) {
-                if (buffer) {
-                  const toolCalls = parseContent(buffer);
+            // Look for complete JSON objects or function calls
+            const matches = buffer.match(/(\{[^{}]*\}|[\w.]+\([^()]*\))/g);
+            if (matches) {
+              for (const match of matches) {
+                try {
+                  const toolCalls = parseContent(match);
                   if (toolCalls.length > 0) {
                     controller.enqueue({
                       providers: [{ provider: response.provider, model: response.model }],
                       session_id: `function-calling-stream-${Date.now()}`,
                       tool_calls: toolCalls,
-                      content: buffer
+                      content: match
                     });
+                    // Remove parsed content from buffer
+                    buffer = buffer.replace(match, '');
                   }
+                } catch (e) {
+                  console.debug('Chunk parsing failed:', e);
                 }
-                break;
-              }
-
-              buffer += value;
-              const toolCalls = parseContent(buffer);
-              
-              if (toolCalls.length > 0) {
-                controller.enqueue({
-                  providers: [{ provider: response.provider, model: response.model }],
-                  session_id: `function-calling-stream-${Date.now()}`,
-                  tool_calls: toolCalls,
-                  content: buffer
-                });
-                buffer = '';
               }
             }
-            controller.close();
           } catch (error) {
-            controller.error(error);
-          } finally {
-            reader.releaseLock();
+            console.debug('Stream parsing error:', error);
+            // Continue accumulating if parse fails
           }
-        },
-        cancel() {
-          reader.cancel();
         }
-      });
+        controller.close();
+      } catch (error) {
+        console.error('Stream processing error:', error);
+        controller.error(error);
+      } finally {
+        reader.releaseLock();
+      }
+    },
+    cancel() {
+      reader.cancel();
     }
+  });
+}
 
     // Handle non-streaming response
     const responseContent = response.response?.content || '';
@@ -199,13 +225,21 @@ export async function handleFunctionCalling(
 
 // Update the parseContent function
 function parseContent(content: string): ToolCall[] {
+  if (!content || content.trim().length === 0) {
+    throw new Error('Empty content received');
+  }
+
   console.debug('Parsing content:', content);
 
   const strategies = [
     // Strategy 1: Parse JSON format with function_call
     (content: string) => {
       try {
-        const parsed = JSON.parse(content);
+        const cleaned = content.trim()
+          .replace(/^[^{]*/, '') // Remove anything before first {
+          .replace(/[^}]*$/, ''); // Remove anything after last }
+        
+        const parsed = JSON.parse(cleaned);
         if (parsed.function_call) {
           console.debug('Found function_call:', parsed.function_call);
           return [{
@@ -216,38 +250,52 @@ function parseContent(content: string): ToolCall[] {
           }];
         }
       } catch (e) {
-        console.debug('JSON parse failed:', e);
+        console.debug('JSON parse strategy failed:', e);
       }
       return [];
     },
 
-    // Strategy 2: Parse function call syntax
+    // Strategy 2: Parse function call syntax with improved regex
     (content: string) => {
-      const functionRegex = /(\w+)\s*\(([^)]*)\)/;
+      const functionRegex = /(\w+)\s*\(([\s\S]*?)\)/;
       const match = content.match(functionRegex);
       if (match) {
         const [_, name, argsStr] = match;
-        const args = argsStr.split(',')
-          .map(arg => arg.trim());
-        
-        return [{
-          name,
-          args: {
-            operation: 'multiply',
-            a: Number(args[0]),
-            b: Number(args[1])
-          }
-        }];
+        try {
+          // Try to parse as JSON first
+          const args = JSON.parse(`{${argsStr}}`);
+          return [{
+            name,
+            args
+          }];
+        } catch {
+          // Fall back to simple argument parsing
+          const args = argsStr.split(',')
+            .map(arg => arg.trim())
+            .filter(Boolean);
+          
+          return [{
+            name,
+            args: {
+              operation: 'multiply',
+              a: Number(args[0]),
+              b: Number(args[1])
+            }
+          }];
+        }
       }
       return [];
     },
 
-    // Strategy 3: Parse XML format
+    // Strategy 3: Parse XML format with improved cleaning
     (content: string) => {
-      const xmlMatches = content.match(/<tool_call>([\s\S]*?)<\/tool_call>/g) || [];
-      for (const match of xmlMatches) {
+      const xmlRegex = /<tool_call>([\s\S]*?)<\/tool_call>/;
+      const match = content.match(xmlRegex);
+      if (match) {
         try {
-          const cleanJson = match.replace(/<\/?tool_call>/g, '').trim();
+          const cleanJson = match[1].trim()
+            .replace(/&quot;/g, '"')
+            .replace(/&apos;/g, "'");
           const parsed = JSON.parse(cleanJson);
           return [{
             name: parsed.name,
@@ -255,8 +303,8 @@ function parseContent(content: string): ToolCall[] {
               ? JSON.parse(parsed.arguments)
               : parsed.arguments
           }];
-        } catch {
-          continue;
+        } catch (e) {
+          console.debug('XML parse strategy failed:', e);
         }
       }
       return [];

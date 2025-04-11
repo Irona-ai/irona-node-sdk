@@ -57,6 +57,8 @@ async function nonStreamingCombinedExample() {
 
     if ('error' in fcResult) {
       console.error(chalk.red('Function calling error:'), fcResult.error);
+      console.error('Error:', fcResult.error_trace);
+      console.error('Error:', fcResult.error);
       return;
     }
 

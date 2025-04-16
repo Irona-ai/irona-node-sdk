@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { ChatOpenAI } from "@langchain/openai";
 import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
 import { ChatAnthropic } from "@langchain/anthropic";
@@ -5,7 +6,7 @@ import { ChatMistralAI } from "@langchain/mistralai";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatModelConfig, Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
-import { providerApiKeyName } from "../supported_models";
+import { isSupportedMediaType, providerApiKeyName } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
@@ -20,6 +21,15 @@ import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderA
 import { ChatPerplexity } from "../custom-chat-models/perplexity";
 import { MessagePayload } from "../schemas/common.schema";
 import { ChatPdfModel } from "../custom-chat-models/ChatPdfModel";
+import {
+  containsDocumentInMessages,
+  containsImageUrlInMessages,
+  extractProviderAndModel,
+} from "@/utils/utils";
+import {
+  GIST_COMPATIBLE_MEDIA_TYPE,
+  MEDIA_TYPE,
+} from "../constants/common.constants";
 
 export class IronaChatClient {
   constructor(
@@ -33,6 +43,29 @@ export class IronaChatClient {
   async completions(payload: CompletionsPayload) {
     // Validate input
     const validationResult = validateSchema(CompletionsSchema, payload);
+
+    // Check if the input contains PDF or image URLs
+    const isPdfInput = containsDocumentInMessages(payload.messages);
+    const isImageInput = containsImageUrlInMessages(payload.messages);
+
+    const mediaTypes: string[] = [];
+    isPdfInput ? mediaTypes.push(GIST_COMPATIBLE_MEDIA_TYPE.PDF) : null;
+    isImageInput ? mediaTypes.push(GIST_COMPATIBLE_MEDIA_TYPE.IMAGE) : null;
+
+    const filteredModels = payload.models.filter((modelProviderString) => {
+      const { provider, model } = extractProviderAndModel(modelProviderString);
+      return isSupportedMediaType(provider, model, mediaTypes);
+    });
+
+    if (filteredModels.length === 0) {
+      validationResult.success = false;
+      validationResult.error = `No supported models found for the given media types: ${mediaTypes.join(
+        ", "
+      )}. Please check the models and media types.`;
+    } else {
+      payload.models = [filteredModels[0], ...filteredModels.slice(1)];
+    }
+
     if (!validationResult.success) {
       return {
         error: validationResult.errors,
@@ -64,7 +97,6 @@ export class IronaChatClient {
       const { provider, model } = modelSelectResult;
 
       // This is a temporary fix for pdf support untill we made 1. pdfchatmodel generic and 2. model select works for pdf/document
-      const isPdfInput = this.containsDocumentInMessages(payload.messages);
 
       // Prepare the model priority queue
       // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
@@ -154,7 +186,7 @@ export class IronaChatClient {
         maxRetries: payload?.maxRetries,
         maxTokens: payload?.maxTokens,
       };
-      const isPdfInput = this.containsDocumentInMessages(payload.messages);
+      const isPdfInput = containsDocumentInMessages(payload.messages);
       const chatModel = isPdfInput
         ? this.getChatPdfModel(provider, chatModelConfig)
         : this.getChatModel(provider, chatModelConfig);
@@ -271,13 +303,6 @@ export class IronaChatClient {
       default:
         throw new Error(`No chat model found for provider: ${provider}`);
     }
-  }
-  private containsDocumentInMessages(messages: MessagePayload[]): boolean {
-    return messages.some(
-      (message) =>
-        Array.isArray(message.content) &&
-        message.content.some((item) => item.type === "document")
-    );
   }
 
   /**

@@ -3,6 +3,7 @@ import axios from "axios";
 interface ProviderInfo {
   models: string[];
   api_key: string;
+  support_media_inputs: Record<string, string[]>;
   support_tools?: string[];
   support_response_model?: string[];
   openrouter_identifier?: Record<string, string>;
@@ -31,4 +32,22 @@ export function isSupportedModel(provider: string, model: string) {
 }
 export function providerApiKeyName(provider: string) {
   return PROVIDERS[provider]?.api_key;
+}
+
+export function filterModelsForMediaTypes(provider: string) {
+  return PROVIDERS[provider]?.api_key;
+}
+
+export function isSupportedMediaType(
+  provider: string,
+  model: string,
+  mediaTypes: string[]
+): boolean {
+  let ans = true;
+  mediaTypes.forEach((mediaType) => {
+    PROVIDERS[provider]?.support_media_inputs?.[model].includes(mediaType)
+      ? (ans = true)
+      : (ans = false);
+  });
+  return ans;
 }

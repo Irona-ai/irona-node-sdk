@@ -5,13 +5,8 @@ import { ModelSelectPayload } from "./schemas/modelSelect.schema";
 import { CompletionsPayload } from "./schemas/completions.schema";
 import { MissingApiKeyError } from "./errors";
 import { updateProvidersFromGist } from "./supported_models";
+import { DEFAULT_BASE_URL, IRONAAI_API_KEY_PREFIX, SUPPORTED_MODELS_DEFAULT_URL } from "./constants/common.constants";
 require("dotenv").config();
-
-// Constants
-const DEFAULT_BASE_URL = "https://irona-ai--model-select.modal.run";
-const SUPPORTED_MODELS_DEFAULT_URL =
-  "https://gist.githubusercontent.com/tshrjn/f55b3ebd90eda8a0e65bf8435419edff/raw/supported_models_pricing.json";
-const IRONAAI_API_KEY_PREFIX = "sk_";
 
 export class IronaAI {
   private ironaRouter: IronaRouterClient;

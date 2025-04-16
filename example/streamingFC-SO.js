@@ -13,23 +13,11 @@ async function testStreaming() {
   // Test Function Calling Stream
   console.log(chalk.blue('\n=== Testing Function Calling Stream ==='));
   
-  const calculateResult = await ironaai.create({
+  const calculateStream = await ironaai.create({
     messages: [
       { 
         role: 'system',
-        content: `You are a calculation assistant. Follow these rules strictly:
-1. Use only the calculate function to perform calculations
-2. Return only valid JSON in this exact format:
-{
-  "function_call": {
-    "name": "calculate",
-    "arguments": {
-      "operation": "multiply",
-      "a": 27,
-      "b": 35
-    }
-  }
-}`
+        content: 'You are a calculation assistant. Use the calculate function to perform calculations.'
       },
       { 
         role: 'user', 
@@ -59,40 +47,37 @@ async function testStreaming() {
     temperature: 0.1
   });
 
-  // Handle function calling stream
-  if (calculateResult instanceof ReadableStream) {
-    const reader = calculateResult.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+  // Handle function calling stream with robust error handling
+  if (calculateStream instanceof ReadableStream) {
+    const reader = calculateStream.getReader();
     
     try {
       console.log(chalk.yellow('Streaming function calls...'));
+      let hasReceivedData = false;
       
       while (true) {
         const { done, value } = await reader.read();
         
         if (done) {
-          console.log(chalk.green('\nFunction calling stream completed'));
+          if (!hasReceivedData) {
+            console.log(chalk.yellow('No function calls were streamed'));
+          } else {
+            console.log(chalk.green('\nFunction calling stream completed'));
+          }
           break;
         }
 
-        // Decode chunk and add to buffer
-        const chunk = decoder.decode(value, { stream: true });
-        console.debug('Received raw chunk:', chunk);
-        buffer += chunk;
-
-        try {
-          // Try to parse accumulated buffer
-          const parsed = JSON.parse(buffer);
-          if (parsed.function_call) {
+        hasReceivedData = true;
+        
+        if (value) {
+          if (value.tool_calls && value.tool_calls.length > 0) {
             console.log(chalk.yellow('\nFunction Call:'));
-            console.log(chalk.cyan('Name:'), parsed.function_call.name);
-            console.log(chalk.cyan('Arguments:'), parsed.function_call.arguments);
-            buffer = ''; // Clear buffer after successful parse
+            console.log(chalk.cyan('Name:'), value.tool_calls[0].name);
+            console.log(chalk.cyan('Arguments:'), JSON.stringify(value.tool_calls[0].args, null, 2));
+          } else if (value.error) {
+            console.error(chalk.red('Stream error:'), value.error);
+            break;
           }
-        } catch (e) {
-          // Continue accumulating if not valid JSON yet
-          console.debug('Accumulating chunks...');
         }
       }
     } catch (error) {
@@ -100,8 +85,8 @@ async function testStreaming() {
     } finally {
       reader.releaseLock();
     }
-  } else {
-    console.error(chalk.red('Error:'), calculateResult.error);
+  } else if ('error' in calculateStream) {
+    console.error(chalk.red('Error:'), calculateStream.error);
   }
 
   // Test Structured Output Stream
@@ -117,21 +102,11 @@ async function testStreaming() {
     cons: z.array(z.string())
   });
 
-  const movieResult = await ironaai.create({
+  const movieStream = await ironaai.create({
     messages: [
       { 
         role: 'system',
-        content: `You are a movie reviewer. Return only valid JSON in this exact format:
-{
-  "title": "Movie Title",
-  "year": 2024,
-  "director": "Director Name",
-  "rating": 8.5,
-  "review": "Detailed movie review text...",
-  "pros": ["Pro 1", "Pro 2"],
-  "cons": ["Con 1", "Con 2"]
-}
-Do not include any other text or formatting.`
+        content: 'You are a movie reviewer. Provide a detailed review of the specified movie in JSON format. Include title, year, director, rating, review, pros, and cons.'
       },
       { 
         role: 'user', 
@@ -139,18 +114,17 @@ Do not include any other text or formatting.`
       }
     ],
     responseModel: MovieSchema,
-    stream: true,
+    stream: false,
     llmProviders: [
       { provider: 'openai', model: 'gpt-4-0613' }
     ],
     temperature: 0.1
   });
 
-  // Handle structured output stream
-  if (movieResult instanceof ReadableStream) {
-    const reader = movieResult.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
+  // Handle structured output stream with improved error handling
+  if (movieStream instanceof ReadableStream) {
+    const reader = movieStream.getReader();
+    let hasReceivedData = false;
     
     try {
       console.log(chalk.yellow('Streaming movie review...'));
@@ -159,20 +133,20 @@ Do not include any other text or formatting.`
         const { done, value } = await reader.read();
         
         if (done) {
-          console.log(chalk.green('\nStructured output stream completed'));
+          if (!hasReceivedData) {
+            console.log(chalk.yellow('No structured data was streamed'));
+          } else {
+            console.log(chalk.green('\nStructured output stream completed'));
+          }
           break;
         }
 
-        // Decode chunk and add to buffer
-        const chunk = decoder.decode(value, { stream: true });
-        console.debug('Received raw chunk:', chunk);
-        buffer += chunk;
-
-        try {
-          // Try to parse accumulated buffer
-          const parsed = JSON.parse(buffer);
+        hasReceivedData = true;
+        
+        if (value && value.value) {
           console.log(chalk.yellow('\nMovie Review Update:'));
           
+          const parsed = value.value;
           if (parsed.title) console.log(chalk.cyan('Title:'), parsed.title);
           if (parsed.year) console.log(chalk.cyan('Year:'), parsed.year);
           if (parsed.director) console.log(chalk.cyan('Director:'), parsed.director);
@@ -192,11 +166,9 @@ Do not include any other text or formatting.`
             console.log(chalk.cyan('\nReview:'));
             console.log(parsed.review);
           }
-          
-          buffer = ''; // Clear buffer after successful parse
-        } catch (e) {
-          // Continue accumulating if not valid JSON yet
-          console.debug('Accumulating chunks...');
+        } else if (value && value.error) {
+          console.error(chalk.red('Stream error:'), value.error);
+          break;
         }
       }
     } catch (error) {
@@ -204,8 +176,8 @@ Do not include any other text or formatting.`
     } finally {
       reader.releaseLock();
     }
-  } else {
-    console.error(chalk.red('Error:'), movieResult.error);
+  } else if ('error' in movieStream) {
+    console.error(chalk.red('Error:'), movieStream.error);
   }
 }
 

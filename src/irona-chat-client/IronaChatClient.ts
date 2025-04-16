@@ -126,6 +126,55 @@ export class IronaChatClient {
     }
   }
 
+// Add this helper function to the IronaChatClient class to normalize streaming responses
+private transformProviderStream(
+  responseStream: any,
+  provider: string,
+  model: string
+): ReadableStream {
+  // Different providers have different stream formats
+  if (provider === 'openai') {
+    // For OpenAI, we need to extract content from the chunks
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of responseStream) {
+            const content = chunk.choices[0]?.delta?.content || '';
+            if (content) {
+              controller.enqueue(new TextEncoder().encode(content));
+            }
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      }
+    });
+  } else if (provider === 'anthropic') {
+    // For Anthropic, transform their events to text chunks
+    return new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of responseStream) {
+            const content = chunk.content?.[0]?.text || '';
+            if (content) {
+              controller.enqueue(new TextEncoder().encode(content));
+            }
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      }
+    });
+  } else {
+    // For other providers that might return a fetch Response
+    return responseStream;
+  }
+}
+// In your invokeChatCompletions method, when returning streaming responses:
+
+
   /**
    * Handles the invocation of chat completions to a specific provider and model.
    */
@@ -146,6 +195,7 @@ export class IronaChatClient {
       };
 
       let response: { content: string; role: string };
+      let streamResponse: ReadableStream;
       switch (provider) {
         case "anthropic": {
           const client = this.getAnthropicClient(apiKey);
@@ -157,6 +207,7 @@ export class IronaChatClient {
               temperature: options.temperature,
               stream: true,
             });
+            streamResponse = this.transformProviderStream(stream, provider, model);
             return {
               response: stream,
               provider,
@@ -186,8 +237,9 @@ export class IronaChatClient {
               temperature: options.temperature,
               stream: true,
             });
+            streamResponse = this.transformProviderStream(stream, provider, model);
             return {
-              response: stream,
+              response: streamResponse,
               provider,
               model,
             };

@@ -3,6 +3,9 @@ export type Config = {
   baseUrl?: string;
   apiKey?: string;
   fallback_models?: ModelPayload[];
+  tradeoff?: 'cost' | 'quality' | 'latency';
+  router_id?: string;
+  gatewayUrl?: string;
 };
 export type ChatModelConfig = {
   apiKey: string;

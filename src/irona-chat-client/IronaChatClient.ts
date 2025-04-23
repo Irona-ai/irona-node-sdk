@@ -19,14 +19,64 @@ import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderA
 import { MessagePayload } from "@/validators/common.validators";
 import { Base } from "@/irona-router-client/base";
 import { createParser } from 'eventsource-parser';
+//import OpenAI from 'openai';
+import { GatewayConfig, GatewayResponse } from '../model-gateway/gatewayInterface';
 
 export class IronaChatClient {
   private modelInstances: Record<string, any> = {};
+  private openaiClient: OpenAI;
+  private gatewayConfig?: GatewayConfig;
 
   constructor(
     private readonly config: Config,
     private readonly ironaRouter: IronaRouterClient
-  ) {}
+  ) {
+    // Initialize OpenAI client with gateway URL
+    this.openaiClient = new OpenAI({
+      baseURL: config.gatewayUrl || 'https://proxy.irona.ai/v1/gateway',
+      apiKey: config.apiKey || process.env.IRONAAI_API_KEY
+    });
+
+    // Store gateway config
+    this.gatewayConfig = {
+      extraBody: {
+        models: config.fallback_models || [],
+        tradeoff: config.tradeoff || 'quality',
+        router_id: config.router_id
+      }
+    };
+  }
+  // Add gateway method
+  public async gateway(payload: CompletionsPayload): Promise<GatewayResponse> {
+    try {
+      const response = await this.openaiClient.chat.completions.create({
+        model: 'irona',
+        messages: payload.messages,
+        temperature: payload.temperature,
+        max_tokens: payload.maxTokens,
+        stream: payload.stream,
+        ...this.gatewayConfig?.extraBody
+      });
+
+      return {
+        id: typeof response === 'object' && 'id' in response ? response.id : '',
+        choices: 'choices' in response ? response.choices.map(choice => ({
+          index: choice.index,
+          message: {
+            role: choice.message.role,
+            content: choice.message.content || ''
+          },
+          finish_reason: choice.finish_reason
+        })) : [],
+        created: 'created' in response ? response.created : Date.now(),
+        model: 'model' in response ? response.model : 'unknown',
+        usage: (!('_events' in response) && 'usage' in response) ? response.usage as { prompt_tokens: number, completion_tokens: number, total_tokens: number } : { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+      };
+    } catch (error) {
+      console.error('Gateway error:', error);
+      throw new Error(`Gateway request failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 
   /**
    * Processes a completions request and retries with fallback models if necessary.

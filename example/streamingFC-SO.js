@@ -114,7 +114,7 @@ async function testStreaming() {
       }
     ],
     responseModel: MovieSchema,
-    stream: false,
+    stream: true,
     llmProviders: [
       { provider: 'openai', model: 'gpt-4-0613' }
     ],

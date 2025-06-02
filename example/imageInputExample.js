@@ -16,7 +16,7 @@ const body = {
       ],
     },
   ],
-  models: ["anthropic/claude-3-5-sonnet-20240620"],
+  models: ["google/gemini-1.5-flash-latest", "openai/gpt-4o-mini"],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
   stream: true,
 };
@@ -51,7 +51,7 @@ async function CompletionsTest(body) {
     fallback_models: ["openai/gpt-4o-mini"],
   });
   try {
-    const { provider, model, response } = await sdkClient.completions.create(
+    const { provider, model, response, error } = await sdkClient.completions.create(
       body
     );
     console.log(`Selected provider: ${provider}, model: ${model}\n`);
@@ -66,6 +66,7 @@ async function CompletionsTest(body) {
       accumulated += response.content;
     }
     console.log(accumulated);
+    console.log(error);
   } catch (error) {
     console.log("Error in SDK Completion usage:\n");
     console.error(error);
@@ -99,4 +100,4 @@ const body2 = {
   stream: true,
 };
 
-CompletionsTest(body2);
+// CompletionsTest(body2);

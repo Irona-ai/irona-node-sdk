@@ -21,7 +21,7 @@ const body = {
       ],
     },
   ],
-  models: ["openai/gpt-4o"],
+  models: ["google/gemini-1.5-flash-latest", "openai/gpt-4o","anthropic/claude-3-5-sonnet-20240620", 'openai/gpt-4o-mini', "openai/gpt-4o", "google/gemini-1.5-flash-latest"],
   fallback_models: ["openai/gpt-4o-mini", "openai/chatgpt-4o-latest"],
   stream: true,
 };

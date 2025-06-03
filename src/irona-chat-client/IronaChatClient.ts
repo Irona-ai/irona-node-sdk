@@ -307,11 +307,13 @@ export class IronaChatClient {
 
     if (provider === "mistral") {
       // For Mistral, flatten all "text" type content into a single string per message.
+      // Extract and concatenate only "text" type content items into a single string.
+      // Other content types (like images or documents) are ignored for Mistral since only plain text is supported.
       return messages.map((m) => ({
         role: m.role,
         content: Array.isArray(m.content)
           ? m.content
-              .filter((c: { type: string; text: string }) => c.type === "text" && typeof c.text === "string")
+              .filter((c) => c.type === "text" && typeof c.text === "string")
               .map((c: any) => c.text)
               .join(" ")
           : m.content, // If already a string, use as is.

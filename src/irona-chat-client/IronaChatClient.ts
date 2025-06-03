@@ -164,7 +164,11 @@ export class IronaChatClient {
         );
       }
 
-      const messages = this.formatInputMessages(payload.messages, model);
+      const messages = this.formatInputMessages(
+        payload.messages,
+        model,
+        provider
+      );
 
       if (payload.stream) {
         return {
@@ -281,15 +285,40 @@ export class IronaChatClient {
   }
 
   /**
-   * Formats messages for "o1" models by remapping the "system" role to "user".
-   * This is a workaround to handle limitations in "o1" models ("o1", "o1-mini", "o1-preview") that do not support the "system" role directly.
-   * @param {MessagePayload[]} messages - List of input messages containing role and content.
-   * @param {string} model - Target model name. If the model belongs to the "o1" family, roles are remapped.
-   * @returns {MessagePayload[]} - Messages with "system" roles remapped to "user" for "o1" models.
+   * Formats input messages for specific providers and models.
+   *
+   * - For Mistral models, it flattens message content to a single string by joining all "text" type content,
+   *   as Mistral expects plain text content per message.
+   * - For "o1" family models ("o1", "o1-mini", "o1-preview"), which do not support the "system" role,
+   *   it remaps any "system" role to "user" to ensure compatibility.
+   * - For all other models/providers, messages are returned unchanged.
+   *
+   * @param {MessagePayload[]} messages - The list of input messages, each with a role and content.
+   * @param {string} model - The target model name, used to determine if special formatting is needed.
+   * @param {string} provider - The provider name, used to apply provider-specific formatting.
+   * @returns {MessagePayload[]} - The formatted messages, ready for the target provider/model.
    */
-  private formatInputMessages = (messages: MessagePayload[], model: string) => {
+  private formatInputMessages = (
+    messages: MessagePayload[],
+    model: string,
+    provider: string
+  ) => {
     const o1Models = ["o1", "o1-mini", "o1-preview"];
 
+    if (provider === "mistral") {
+      // For Mistral, flatten all "text" type content into a single string per message.
+      return messages.map((m) => ({
+        role: m.role,
+        content: Array.isArray(m.content)
+          ? m.content
+              .filter((c: { type: string; text: string }) => c.type === "text" && typeof c.text === "string")
+              .map((c: any) => c.text)
+              .join(" ")
+          : m.content, // If already a string, use as is.
+      }));
+    }
+
+    // For "o1" models, remap "system" role to "user".
     return o1Models.includes(model)
       ? messages.map((m) => ({
           role: m.role === "system" ? "user" : m.role,

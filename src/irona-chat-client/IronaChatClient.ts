@@ -311,7 +311,7 @@ export class IronaChatClient {
         role: m.role,
         content: Array.isArray(m.content)
           ? m.content
-              .filter((c) => c.type === "text" && typeof c.text === "string")
+              .filter((c: { type: string; text: string }) => c.type === "text" && typeof c.text === "string")
               .map((c: any) => c.text)
               .join(" ")
           : m.content, // If already a string, use as is.

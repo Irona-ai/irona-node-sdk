@@ -59,6 +59,8 @@ basicExample();
 * **Error Handling**
 IronaAI uses typed responses. If there's an error, the response will have a `error` property with the error message. Always check for this property when handling responses. 
 
+Picks up pricing from env variable if available from `SUPPORTED_MODELS_URL`
+
 ## Support
 If you encounter any issues or have questions, please open an issue on our GitHub repository or email us at support@irona.ai.
 

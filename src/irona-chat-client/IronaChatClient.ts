@@ -1,8 +1,9 @@
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { ChatAnthropic } from "@langchain/anthropic";
-import { ChatMistralAI } from "@langchain/mistralai";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import { generateText, streamText } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
+import { mistral } from "@ai-sdk/mistral";
+import { perplexity } from "@ai-sdk/perplexity";
 import { ChatModelConfig, Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
 import { providerApiKeyName } from "../supported_models";
@@ -17,7 +18,6 @@ import {
 } from "../schemas/modelSelect.schema";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
-import { ChatPerplexity } from "../custom-chat-models/perplexity";
 import { MessagePayload } from "../schemas/common.schema";
 import { ChatPdfModel } from "../custom-chat-models/ChatPdfModel";
 
@@ -259,22 +259,54 @@ export class IronaChatClient {
     return new ChatPdfModel(chatModelConfig);
   }
   private getChatModel(provider: string, chatModelConfig: ChatModelConfig) {
-    switch (provider) {
-      case "anthropic":
-        return new ChatAnthropic(chatModelConfig);
-      case "google":
-        return new ChatGoogleGenerativeAI(chatModelConfig);
-      case "mistral":
-        return new ChatMistralAI(chatModelConfig);
-      case "openai":
-        return new ChatOpenAI(chatModelConfig);
-      case "togetherai":
-        return new ChatTogetherAI(chatModelConfig);
-      case "perplexity":
-        return new ChatPerplexity(chatModelConfig);
-      default:
-        throw new Error(`No chat model found for provider: ${provider}`);
-    }
+    const getModelInstance = (provider: string, modelName: string) => {
+      switch (provider) {
+        case "openai":
+          return openai(modelName);
+        case "google":
+          return google(modelName);
+        case "anthropic":
+          return anthropic(modelName);
+        case "mistral":
+          return mistral(modelName);
+        case "perplexity":
+          return perplexity(modelName);
+        default:
+          throw new Error(`No chat model found for provider: ${provider}`);
+      }
+    };
+
+    const modelInstance = getModelInstance(provider, chatModelConfig.modelName);
+
+    return {
+      invoke: async (messages: any[]) => {
+        const response = await generateText({
+          model: modelInstance,
+          messages: messages.map(m => ({
+            role: m.role,
+            content: m.content
+          })),
+          temperature: chatModelConfig.temperature,
+          maxTokens: chatModelConfig.maxTokens
+        });
+        return {
+          content: response,
+          role: 'assistant'
+        };
+      },
+      stream: async (messages: any[]) => {
+        const { textStream } = await streamText({
+          model: modelInstance,
+          messages: messages.map(m => ({
+            role: m.role,
+            content: m.content
+          })),
+          temperature: chatModelConfig.temperature,
+          maxTokens: chatModelConfig.maxTokens
+        });
+        return textStream;
+      }
+    };
   }
   private containsDocumentInMessages(messages: MessagePayload[]): boolean {
     return messages.some(

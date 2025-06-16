@@ -5,7 +5,7 @@ const body = {
   models: [
     "openai/gpt-4-1106-preview",
     "openai/gpt-4-turbo",
-    "perplexity/llama-3.1-sonar-large-128k-online",
+    "perplexity/sonar",
     "anthropic/claude-3-opus-20240229",
     "anthropic/claude-2.1",
     "mistral/open-mixtral-8x22b",
@@ -52,4 +52,4 @@ async function CompletionsTest() {
   }
 }
 modelSelectTest();
-// CompletionsTest();
+CompletionsTest();

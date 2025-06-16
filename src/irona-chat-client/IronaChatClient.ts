@@ -4,6 +4,7 @@ import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { mistral } from "@ai-sdk/mistral";
 import { perplexity } from "@ai-sdk/perplexity";
+import { togetherai } from '@ai-sdk/togetherai';
 import { ChatModelConfig, Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
 import { providerApiKeyName } from "../supported_models";
@@ -19,6 +20,8 @@ import {
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 import { MessagePayload } from "../schemas/common.schema";
+import { z } from 'zod';
+import { Message } from 'ai';
 import { ChatPdfModel } from "../custom-chat-models/ChatPdfModel";
 
 export class IronaChatClient {
@@ -146,39 +149,54 @@ export class IronaChatClient {
   ) {
     try {
       const apiKey = this.loadApiKeyForProvider(provider, model);
+      const messages = this.formatInputMessages(payload.messages, model, provider);
 
-      const chatModelConfig: ChatModelConfig = {
-        apiKey,
-        modelName: model,
-        temperature: payload?.temperature,
-        maxRetries: payload?.maxRetries,
-        maxTokens: payload?.maxTokens,
-      };
-      const isPdfInput = this.containsDocumentInMessages(payload.messages);
-      const chatModel = isPdfInput
-        ? this.getChatPdfModel(provider, chatModelConfig)
-        : this.getChatModel(provider, chatModelConfig);
-      if (!chatModel) {
-        throw new Error(
-          `No chat model instance found for provider: ${provider}`
-        );
+      // Get the appropriate model instance
+      const modelInstance = this.getModelInstance(provider, model, apiKey);
+      if (!modelInstance) {
+        throw new Error(`No model instance found for provider: ${provider}`);
       }
 
-      const messages = this.formatInputMessages(
-        payload.messages,
-        model,
-        provider
-      );
+      // Convert messages to Vercel AI SDK format
+      const vercelMessages = this.convertToVercelMessages(messages);
 
+      // Handle function calling if functions are provided
+      if (payload.functions) {
+        return this.handleFunctionCalling(modelInstance, vercelMessages, payload);
+      }
+
+      // Handle structured output if schema is provided
+      if (payload.outputSchema) {
+        return this.handleStructuredOutput(modelInstance, vercelMessages, payload);
+      }
+
+      // Regular completion
       if (payload.stream) {
+        const stream = await streamText({
+          model: modelInstance,
+          messages: vercelMessages,
+          temperature: payload.temperature,
+          maxTokens: payload.maxTokens,
+        });
+
         return {
-          response: await chatModel.stream(messages),
+          response: stream,
           provider,
           model,
         };
       } else {
+        const response = await generateText({
+          model: modelInstance,
+          messages: vercelMessages,
+          temperature: payload.temperature,
+          maxTokens: payload.maxTokens,
+        });
+
         return {
-          response: await chatModel.invoke(messages),
+          response: {
+            content: { text: response.text },
+            role: 'assistant'
+          },
           provider,
           model,
         };
@@ -190,6 +208,124 @@ export class IronaChatClient {
         }`
       );
     }
+  }
+
+  /**
+   * Converts messages to Vercel AI SDK format
+   */
+  private convertToVercelMessages(messages: MessagePayload[]): Message[] {
+    return messages.map((msg, index) => ({
+      id: `msg-${index}`,
+      role: msg.role,
+      content: typeof msg.content === 'string' 
+        ? msg.content 
+        : msg.content.map(content => {
+            if (content.type === 'text') return content.text;
+            if (content.type === 'image_url') return content.image_url.url;
+            if (content.type === 'document') return content.source.url;
+            return '';
+          }).join(' ')
+    }));
+  }
+
+  /**
+   * Handles function calling with Vercel AI SDK
+   */
+  private async handleFunctionCalling(
+    modelInstance: any,
+    messages: Message[],
+    payload: CompletionsPayload
+  ) {
+    const response = await generateText({
+      model: modelInstance,
+      messages,
+      temperature: payload.temperature,
+      maxTokens: payload.maxTokens,
+      tools: payload.functions?.reduce((acc, func) => ({
+        ...acc,
+        [func.name]: {
+          type: 'function',
+          function: {
+            name: func.name,
+            description: func.description,
+            parameters: func.parameters
+          }
+        }
+      }), {})
+    });
+
+    return {
+      response: {
+        content: { text: response.text },
+        role: 'assistant'
+      }
+    };
+  }
+
+  /**
+   * Handles structured output with Vercel AI SDK
+   */
+  private async handleStructuredOutput(
+    modelInstance: any,
+    messages: Message[],
+    payload: CompletionsPayload
+  ) {
+    const response = await generateText({
+      model: modelInstance,
+      messages: [
+        ...messages,
+        { role: 'system', content: 'You must respond with valid JSON that matches the provided schema.' }
+      ],
+      temperature: payload.temperature,
+      maxTokens: payload.maxTokens
+    });
+
+    try {
+      const parsed = z.object(payload.outputSchema || {}).parse(
+        JSON.parse(response.text)
+      );
+      return {
+        response: {
+          content: parsed,
+          role: 'assistant'
+        }
+      };
+    } catch (error) {
+      console.error('Failed to parse structured output:', error);
+      return {
+        response: {
+          content: { text: response.text },
+          role: 'assistant'
+        }
+      };
+    }
+  }
+
+  /**
+   * Gets the appropriate model instance
+   */
+  private getModelInstance(provider: string, model: string, apiKey: string) {
+    const config = {
+      apiKey,
+      modelName: model,
+    };
+
+    // Map of provider to their respective model functions
+    const providerModels = {
+      openai: openai,
+      anthropic: anthropic,
+      google: google,
+      mistral: mistral,
+      perplexity: perplexity,
+      togetherai: togetherai,
+    };
+
+    const modelFunction = providerModels[provider as keyof typeof providerModels];
+    if (!modelFunction) {
+      return null;
+    }
+
+    return modelFunction(model);
   }
 
   private extractModelSelectPayloadFromCompletionsPayload(
@@ -259,26 +395,14 @@ export class IronaChatClient {
     return new ChatPdfModel(chatModelConfig);
   }
   private getChatModel(provider: string, chatModelConfig: ChatModelConfig) {
-    const getModelInstance = (provider: string, modelName: string) => {
-      switch (provider) {
-        case "openai":
-          return openai(modelName);
-        case "google":
-          return google(modelName);
-        case "anthropic":
-          return anthropic(modelName);
-        case "mistral":
-          return mistral(modelName);
-        case "perplexity":
-          return perplexity(modelName);
-        default:
-          throw new Error(`No chat model found for provider: ${provider}`);
-      }
-    };
-
-    const modelInstance = getModelInstance(provider, chatModelConfig.modelName);
+    // Get the model instance using the shared getModelInstance function
+    const modelInstance = this.getModelInstance(provider, chatModelConfig.modelName, chatModelConfig.apiKey);
+    if (!modelInstance) {
+      throw new Error(`No chat model found for provider: ${provider}`);
+    }
 
     return {
+      // 'invoke' method for non-streaming completions
       invoke: async (messages: any[]) => {
         const response = await generateText({
           model: modelInstance,
@@ -294,6 +418,7 @@ export class IronaChatClient {
           role: 'assistant'
         };
       },
+      // 'stream' method for streaming completions
       stream: async (messages: any[]) => {
         const { textStream } = await streamText({
           model: modelInstance,

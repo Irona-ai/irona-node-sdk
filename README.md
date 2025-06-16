@@ -84,8 +84,20 @@ Navigate to the `example` folder and run:
 ```bash
 node basicExample.js
 ```
+## Running Tests
 
+### Unit Tests
+We use Vitest for our testing framework. To run tests:
+
+```bash
+# Run specific test file
+npx vitest src/tests/unit/FucntionCallingStrucuredOutput.test.ts
+npx vitest src/tests/unit/getChatModel.test.ts
+npx vitest src/tests/E2E/FCSOgetchatModel.test.ts
+# Run all tests
+npx vitest
 ---
+```
 
 ## 📘 Key Concepts
 

@@ -20,7 +20,6 @@ import {
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
 import { MessagePayload } from "../schemas/common.schema";
-// import { ChatPdfModel } from "../custom-chat-models/ChatPdfModel";
 
 export class IronaChatClient {
   constructor(
@@ -51,73 +50,73 @@ export class IronaChatClient {
     const errorTrace = [];
 
     try {
-      // Select the best model
-      const modelSelectResult = await this.selectBestModel(payload);
+    // Select the best model
+    const modelSelectResult = await this.selectBestModel(payload);
 
-      if (modelSelectResult.error) {
-        errorTrace.push({
-          provider: null,
-          model: null,
-          error: `Model selection failed: ${modelSelectResult.error}`,
-        });
-      }
+    if (modelSelectResult.error) {
+      errorTrace.push({
+        provider: null,
+        model: null,
+        error: `Model selection failed: ${modelSelectResult.error}`,
+      });
+    }
 
-      const { provider, model } = modelSelectResult;
+    const { provider, model } = modelSelectResult;
 
-      // Prepare the model priority queue
-      // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
-      const modelPriorityQueue = [
-        ...(provider && model ? [{ provider, model }] : []),
-        ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
-          (fallback) => validateAndGetProviderAndModel(fallback)
-        ),
-      ];
+    // Prepare the model priority queue
+    // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
+    const modelPriorityQueue = [
+      ...(provider && model ? [{ provider, model }] : []),
+      ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
+        (fallback) => validateAndGetProviderAndModel(fallback)
+      ),
+    ];
 
-      // Attempt execution for each model in the priority queue
-      for (const { provider, model } of modelPriorityQueue) {
-        console.log(
-          `Invoking chat completions with provider: ${provider}, model: ${model}`
+    // Attempt execution for each model in the priority queue
+    for (const { provider, model } of modelPriorityQueue) {
+      console.log(
+        `Invoking chat completions with provider: ${provider}, model: ${model}`
+      );
+      try {
+        const response = await this.invokeChatCompletions(
+          provider,
+          model,
+          payload
         );
-        try {
-          const response = await this.invokeChatCompletions(
-            provider,
-            model,
-            payload
-          );
-          console.log(
-            `Successfully executed chat completions with provider: ${provider}, model: ${model}`
-          );
+        console.log(
+          `Successfully executed chat completions with provider: ${provider}, model: ${model}`
+        );
 
-          // If there were previous errors, include them in the response
-          if (errorTrace.length > 0) {
-            return {
-              ...response,
-              error_trace: errorTrace,
-              recovered: true,
-            };
-          }
-
-          return response; // Return on first success
-        } catch (error) {
-          // Add error to trace
-          errorTrace.push({
-            provider,
-            model,
-            error: (error as Error).message,
-          });
-
-          console.error(
-            `Error with ${provider}/${model}: ${(error as Error).message}`
-          );
+        // If there were previous errors, include them in the response
+        if (errorTrace.length > 0) {
+          return {
+            ...response,
+            error_trace: errorTrace,
+            recovered: true,
+          };
         }
-      }
 
-      // If all retries fail, return a structured error response
-      return {
-        error:
-          "All attempts to process the completions request failed. Please verify the providers and models in your configuration.",
-        error_trace: errorTrace,
-      };
+        return response; // Return on first success
+      } catch (error) {
+        // Add error to trace
+        errorTrace.push({
+          provider,
+          model,
+          error: (error as Error).message,
+        });
+
+        console.error(
+          `Error with ${provider}/${model}: ${(error as Error).message}`
+        );
+      }
+    }
+
+    // If all retries fail, return a structured error response
+    return {
+      error:
+        "All attempts to process the completions request failed. Please verify the providers and models in your configuration.",
+      error_trace: errorTrace,
+    };
     } catch (error) {
       // Catch any unexpected errors
       return {
@@ -148,9 +147,6 @@ export class IronaChatClient {
       // Convert messages to Vercel AI SDK format
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
-      console.log(
-        `Vercel messages: ${JSON.stringify(vercelMessages, null, 2)}`
-      );
       // Get the appropriate model instance
       const modelInstance = this.getModelInstance(provider);
       if (!modelInstance) {
@@ -185,7 +181,7 @@ export class IronaChatClient {
 
         return {
           response: {
-            content: { text: response.text },
+            content: response.text,
             role: "assistant",
           },
           provider,
@@ -229,7 +225,7 @@ export class IronaChatClient {
           return {
             type: "file",
             data: new URL(part.source.url),
-            mimeType: "application/pdf",
+            mimeType: "application/pdf"
           } as const;
         } else {
           throw new Error(
@@ -259,7 +255,6 @@ export class IronaChatClient {
       perplexity: perplexity,
       togetherai: togetherai,
     };
-    console.log(`Using provider: ${provider}`);
 
     return providerModels[provider as keyof typeof providerModels];
   }

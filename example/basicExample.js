@@ -26,7 +26,7 @@ const body = {
   ],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
   stream: true,
-  temprature: 0.8,
+  temperature: 0.8,
 };
 
 async function modelSelectTest() {
@@ -73,4 +73,4 @@ async function CompletionsTest() {
   }
 }
 modelSelectTest();
-// CompletionsTest();
+CompletionsTest();

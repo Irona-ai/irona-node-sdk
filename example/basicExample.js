@@ -51,13 +51,13 @@ async function CompletionsTest() {
     let accumulated = "";
     let usage = {};
     if (body.stream) {
-      for await (const textPart of response.textStream) {
-        console.log("textPart: " + JSON.stringify(textPart, null, 2));
-        if (textPart.type === "text-delta") {
-          accumulated += textPart.textDelta;
+      for await (const textStreamPart of response.fullStream) {
+        console.log("textStreamPart: " + JSON.stringify(textStreamPart, null, 2));
+        if (textStreamPart.type === "text-delta") {
+          accumulated += textStreamPart.textDelta;
         }
-        if (textPart.type === "finish") {
-          usage = textPart.usage;
+        if (textStreamPart.type === "finish") {
+          usage = textStreamPart.usage;
         }
       }
     } else {

@@ -162,11 +162,11 @@ export class IronaChatClient {
           maxTokens: payload.maxTokens,
         });
 
-        const textStream = stream.fullStream; // this is the method that gives you streamable parts
+        const fullStream = stream.fullStream; // this is the method that gives you streamable parts
 
         return {
           response: {
-            textStream,
+            fullStream,
           },
           provider,
           model,

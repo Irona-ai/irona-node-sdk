@@ -1,10 +1,12 @@
-import { ChatOpenAI } from "@langchain/openai";
-import { ChatTogetherAI } from "@langchain/community/chat_models/togetherai";
-import { ChatAnthropic } from "@langchain/anthropic";
-import { ChatMistralAI } from "@langchain/mistralai";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatModelConfig, Config } from "../types";
-import { MissingApiKeyError, BadRequestError } from "../errors";
+import { generateText, streamText } from "ai";
+import { openai } from "@ai-sdk/openai";
+import { anthropic } from "@ai-sdk/anthropic";
+import { google } from "@ai-sdk/google";
+import { mistral } from "@ai-sdk/mistral";
+import { perplexity } from "@ai-sdk/perplexity";
+import { togetherai } from "@ai-sdk/togetherai";
+import { Config } from "../types";
+import { MissingApiKeyError } from "../errors";
 import { providerApiKeyName } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
@@ -17,9 +19,7 @@ import {
 } from "../schemas/modelSelect.schema";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
-import { ChatPerplexity } from "../custom-chat-models/perplexity";
 import { MessagePayload } from "../schemas/common.schema";
-import { ChatPdfModel } from "../custom-chat-models/ChatPdfModel";
 
 export class IronaChatClient {
   constructor(
@@ -50,76 +50,73 @@ export class IronaChatClient {
     const errorTrace = [];
 
     try {
-      // Select the best model
-      const modelSelectResult = await this.selectBestModel(payload);
+    // Select the best model
+    const modelSelectResult = await this.selectBestModel(payload);
 
-      if (modelSelectResult.error) {
-        errorTrace.push({
-          provider: null,
-          model: null,
-          error: `Model selection failed: ${modelSelectResult.error}`,
-        });
-      }
+    if (modelSelectResult.error) {
+      errorTrace.push({
+        provider: null,
+        model: null,
+        error: `Model selection failed: ${modelSelectResult.error}`,
+      });
+    }
 
-      const { provider, model } = modelSelectResult;
+    const { provider, model } = modelSelectResult;
 
-      // This is a temporary fix for pdf support untill we made 1. pdfchatmodel generic and 2. model select works for pdf/document
-      const isPdfInput = this.containsDocumentInMessages(payload.messages);
+    // Prepare the model priority queue
+    // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
+    const modelPriorityQueue = [
+      ...(provider && model ? [{ provider, model }] : []),
+      ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
+        (fallback) => validateAndGetProviderAndModel(fallback)
+      ),
+    ];
 
-      // Prepare the model priority queue
-      // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
-      const modelPriorityQueue = [
-        ...(provider && model ? [{ provider, model }] : []),
-        ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
-          (fallback) => validateAndGetProviderAndModel(fallback)
-        ),
-      ];
-
-      // Attempt execution for each model in the priority queue
-      for (const { provider, model } of modelPriorityQueue) {
-        console.log(
-          `Invoking chat completions with provider: ${provider}, model: ${model}`
+    // Attempt execution for each model in the priority queue
+    for (const { provider, model } of modelPriorityQueue) {
+      console.log(
+        `Invoking chat completions with provider: ${provider}, model: ${model}`
+      );
+      try {
+        const response = await this.invokeChatCompletions(
+          provider,
+          model,
+          payload
         );
-        try {
-          const response = await this.invokeChatCompletions(
-            provider,
-            model,
-            payload
-          );
-          console.log(
-            `Successfully executed chat completions with provider: ${provider}, model: ${model}`
-          );
+        console.log(
+          `Successfully executed chat completions with provider: ${provider}, model: ${model}`
+        );
 
-          // If there were previous errors, include them in the response
-          if (errorTrace.length > 0) {
-            return {
-              ...response,
-              error_trace: errorTrace,
-              recovered: true,
-            };
-          }
-
-          return response; // Return on first success
-        } catch (error) {
-          // Add error to trace
-          errorTrace.push({
-            provider,
-            model,
-            error: (error as Error).message,
-          });
-
-          console.error(
-            `Error with ${provider}/${model}: ${(error as Error).message}`
-          );
+        // If there were previous errors, include them in the response
+        if (errorTrace.length > 0) {
+          return {
+            ...response,
+            error_trace: errorTrace,
+            recovered: true,
+          };
         }
-      }
 
-      // If all retries fail, return a structured error response
-      return {
-        error:
-          "All attempts to process the completions request failed. Please verify the providers and models in your configuration.",
-        error_trace: errorTrace,
-      };
+        return response; // Return on first success
+      } catch (error) {
+        // Add error to trace
+        errorTrace.push({
+          provider,
+          model,
+          error: (error as Error).message,
+        });
+
+        console.error(
+          `Error with ${provider}/${model}: ${(error as Error).message}`
+        );
+      }
+    }
+
+    // If all retries fail, return a structured error response
+    return {
+      error:
+        "All attempts to process the completions request failed. Please verify the providers and models in your configuration.",
+      error_trace: errorTrace,
+    };
     } catch (error) {
       // Catch any unexpected errors
       return {
@@ -147,38 +144,46 @@ export class IronaChatClient {
     try {
       const apiKey = this.loadApiKeyForProvider(provider, model);
 
-      const chatModelConfig: ChatModelConfig = {
-        apiKey,
-        modelName: model,
-        temperature: payload?.temperature,
-        maxRetries: payload?.maxRetries,
-        maxTokens: payload?.maxTokens,
-      };
-      const isPdfInput = this.containsDocumentInMessages(payload.messages);
-      const chatModel = isPdfInput
-        ? this.getChatPdfModel(provider, chatModelConfig)
-        : this.getChatModel(provider, chatModelConfig);
-      if (!chatModel) {
-        throw new Error(
-          `No chat model instance found for provider: ${provider}`
-        );
+      // Convert messages to Vercel AI SDK format
+      const vercelMessages = this.convertToVercelMessages(payload.messages);
+
+      // Get the appropriate model instance
+      const modelInstance = this.getModelInstance(provider);
+      if (!modelInstance) {
+        throw new Error(`No model instance found for provider: ${provider}`);
       }
 
-      const messages = this.formatInputMessages(
-        payload.messages,
-        model,
-        provider
-      );
-
+      // Regular completion
       if (payload.stream) {
+        const stream = await streamText({
+          model: modelInstance(model),
+          messages: vercelMessages,
+          temperature: payload.temperature,
+          maxTokens: payload.maxTokens,
+        });
+
+        const textStream = stream.fullStream; // this is the method that gives you streamable parts
+
         return {
-          response: await chatModel.stream(messages),
+          response: {
+            textStream,
+          },
           provider,
           model,
         };
       } else {
+        const response = await generateText({
+          model: modelInstance(model),
+          messages: vercelMessages,
+          temperature: payload.temperature,
+          maxTokens: payload.maxTokens,
+        });
+
         return {
-          response: await chatModel.invoke(messages),
+          response: {
+            content: response.text,
+            role: "assistant",
+          },
           provider,
           model,
         };
@@ -190,6 +195,68 @@ export class IronaChatClient {
         }`
       );
     }
+  }
+
+  /**
+   * Converts messages to Vercel AI SDK format
+   */
+  private convertToVercelMessages(messages: MessagePayload[]): any[] {
+    return messages.map((msg, index) => {
+      if (typeof msg.content === "string") {
+        return {
+          id: `msg-${index}`,
+          role: msg.role,
+          content: msg.content,
+        };
+      }
+
+      const parts = msg.content.map((part) => {
+        if (part.type === "text") {
+          return {
+            type: "text",
+            text: part.text,
+          } as const;
+        } else if (part.type === "image_url") {
+          return {
+            type: "image",
+            image: new URL(part.image_url.url),
+          } as const;
+        } else if (part.type === "document") {
+          return {
+            type: "file",
+            data: new URL(part.source.url),
+            mimeType: "application/pdf"
+          } as const;
+        } else {
+          throw new Error(
+            `Unsupported message part type: ${(part as any).type}`
+          );
+        }
+      });
+
+      return {
+        id: `msg-${index}`,
+        role: msg.role,
+        content: parts,
+      };
+    });
+  }
+
+  /**
+   * Gets the appropriate model instance
+   */
+  private getModelInstance(provider: string) {
+    // Map of provider to their respective model functions
+    const providerModels = {
+      openai: openai,
+      anthropic: anthropic,
+      google: google,
+      mistral: mistral,
+      perplexity: perplexity,
+      togetherai: togetherai,
+    };
+
+    return providerModels[provider as keyof typeof providerModels];
   }
 
   private extractModelSelectPayloadFromCompletionsPayload(
@@ -249,83 +316,4 @@ export class IronaChatClient {
     }
     return apiKey;
   }
-
-  private getChatPdfModel(provider: string, chatModelConfig: ChatModelConfig) {
-    if (provider !== "openai") {
-      throw new BadRequestError(
-        `PDF chat model is only supported for OpenAI provider.`
-      );
-    }
-    return new ChatPdfModel(chatModelConfig);
-  }
-  private getChatModel(provider: string, chatModelConfig: ChatModelConfig) {
-    switch (provider) {
-      case "anthropic":
-        return new ChatAnthropic(chatModelConfig);
-      case "google":
-        return new ChatGoogleGenerativeAI(chatModelConfig);
-      case "mistral":
-        return new ChatMistralAI(chatModelConfig);
-      case "openai":
-        return new ChatOpenAI(chatModelConfig);
-      case "togetherai":
-        return new ChatTogetherAI(chatModelConfig);
-      case "perplexity":
-        return new ChatPerplexity(chatModelConfig);
-      default:
-        throw new Error(`No chat model found for provider: ${provider}`);
-    }
-  }
-  private containsDocumentInMessages(messages: MessagePayload[]): boolean {
-    return messages.some(
-      (message) =>
-        Array.isArray(message.content) &&
-        message.content.some((item) => item.type === "document")
-    );
-  }
-
-  /**
-   * Formats input messages for specific providers and models.
-   *
-   * - For Mistral models, it flattens message content to a single string by joining all "text" type content,
-   *   as Mistral expects plain text content per message.
-   * - For "o1" family models ("o1", "o1-mini", "o1-preview"), which do not support the "system" role,
-   *   it remaps any "system" role to "user" to ensure compatibility.
-   * - For all other models/providers, messages are returned unchanged.
-   *
-   * @param {MessagePayload[]} messages - The list of input messages, each with a role and content.
-   * @param {string} model - The target model name, used to determine if special formatting is needed.
-   * @param {string} provider - The provider name, used to apply provider-specific formatting.
-   * @returns {MessagePayload[]} - The formatted messages, ready for the target provider/model.
-   */
-  private formatInputMessages = (
-    messages: MessagePayload[],
-    model: string,
-    provider: string
-  ) => {
-    const o1Models = ["o1", "o1-mini", "o1-preview"];
-
-    if (provider === "mistral") {
-      // For Mistral, flatten all "text" type content into a single string per message.
-      // Extract and concatenate only "text" type content items into a single string.
-      // Other content types (like images or documents) are ignored for Mistral since only plain text is supported.
-      return messages.map((m) => ({
-        role: m.role,
-        content: Array.isArray(m.content)
-          ? m.content
-              .filter((c) => c.type === "text" && typeof c.text === "string")
-              .map((c: any) => c.text)
-              .join(" ")
-          : m.content, // If already a string, use as is.
-      }));
-    }
-
-    // For "o1" models, remap "system" role to "user".
-    return o1Models.includes(model)
-      ? messages.map((m) => ({
-          role: m.role === "system" ? "user" : m.role,
-          content: m.content,
-        }))
-      : messages;
-  };
 }

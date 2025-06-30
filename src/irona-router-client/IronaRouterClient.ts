@@ -7,6 +7,7 @@ import {
 import { Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
 import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
+import { SUPPORTED_MODELS_DEFAULT_URL } from "@/utils/constants";
 
 const resources = "";
 
@@ -18,41 +19,40 @@ export class IronaRouterClient extends Base {
   async modelSelect(body: ModelSelectPayload): Promise<any> {
     const apiKey = process.env.IRONAAI_API_KEY;
     if (!apiKey) {
-      return {
-        error: "The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables.",
-        fallback_providers: this.getFallbackProviders(body),
-      };
+      throw new MissingApiKeyError(
+        "The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables."
+      );
     }
 
     const validationResult = validateSchema(ModelSelectSchema, body);
     if (!validationResult.success) {
-      return {
-        error: validationResult.errors,
-        fallback_providers: this.getFallbackProviders(body),
-      };
+      throw new BadRequestError(validationResult.errors);
     }
 
     const formattedPayload = {
       topk_models: body?.topk_models,
       messages: body.messages,
-      llm_providers: body.models.map((model) => {
-        try {
-          return validateAndGetProviderAndModel(model);
-        } catch (error) {
-          // If validation fails for some models, still continue with valid ones
-          console.error(`Error validating model ${model}: ${(error as Error).message}`);
-          return null;
-        }
-      }).filter(provider => provider !== null), // Filter out null providers
+      llm_providers: body.models
+        .map((model) => {
+          try {
+            return validateAndGetProviderAndModel(model);
+          } catch (error) {
+            // If validation fails for some models, still continue with valid ones
+            console.error(
+              `Error validating model ${model}: ${(error as Error).message}`
+            );
+            return null;
+          }
+        })
+        .filter((provider) => provider !== null), // Filter out null providers
       kwargs: body?.kwargs,
     };
 
     // Check if we have any valid providers after filtering
     if (formattedPayload.llm_providers.length === 0) {
-      return {
-        error: "No valid LLM providers found after validation",
-        fallback_providers: this.getFallbackProviders(body),
-      };
+      throw new BadRequestError(
+        `No valid providers found in the request. Please ensure that the models are correctly formatted. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+      );
     }
 
     try {
@@ -80,10 +80,7 @@ export class IronaRouterClient extends Base {
 
       return result;
     } catch (error) {
-      return {
-        error: (error instanceof Error) ? error.message : "Unknown error occurred during model selection",
-        fallback_providers: this.getFallbackProviders(body),
-      };
+      throw error;
     }
   }
 

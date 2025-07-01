@@ -38,7 +38,7 @@ export class IronaChatClient {
     }
 
     // Select the best model
- const { provider, model } = await this.selectBestModel(payload);
+    const { provider, model } = await this.selectBestModel(payload);
 
     // Prepare the model priority queue
     // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
@@ -52,7 +52,7 @@ export class IronaChatClient {
     // Attempt execution for each model in the priority queue
     for (const { provider, model } of modelPriorityQueue) {
       console.log(
-        `Invoking chat completions with provider: ${provider}, model: ${model}`
+        `[IronaChatClient][completions] Invoking chat completions with provider: ${provider}, model: ${model}`
       );
       try {
         const response = await this.invokeChatCompletions(
@@ -60,19 +60,15 @@ export class IronaChatClient {
           model,
           payload
         );
-        console.log(
-          `Successfully executed chat completions with provider: ${provider}, model: ${model}`
-        );
+        console.log(`[IronaChatClient][completions] Successfully executed chat completions with provider: ${provider}, model: ${model}`);
         return response; // Return on first success
       } catch (error) {
-        console.error(
-          `Error with ${provider}/${model}: ${(error as Error).message}`
-        );
+        console.error(`\n[IronaChatClient][completions] Error with ${provider}/${model}: ${(error as Error).message}`);
       }
     }
     // If all retries fail, throw an error
     throw new Error(
-      `All attempts to process the completions request failed. Please verify the providers and models in your configuration.`
+      `[IronaChatClient][completions] All attempts to process the completions request failed. Please verify the providers and models in your configuration.`
     );
   }
 
@@ -105,12 +101,50 @@ export class IronaChatClient {
           maxTokens: payload.maxTokens,
         });
 
-        const fullStream = stream.fullStream; // this is the method that gives you streamable parts
+        // Eagerly check the first token to catch early errors (e.g., auth failure)
+        const iterator = stream.fullStream[Symbol.asyncIterator]();
+        const firstResult = await iterator.next();
+
+        if (firstResult.value?.type === "error") {
+          const err = firstResult.value.error;
+          // console.error("[streamText]: "+err);
+          throw new Error(err);
+        }
+
+        const fullStream = {
+          [Symbol.asyncIterator]: async function* () {
+            try {
+              // Yield the first valid result
+              if (!firstResult.done) {
+                yield firstResult.value;
+              }
+              for await (const part of stream.fullStream) {
+                if (part.type === "error") {
+                  // console.error(`Stream yielded error for ${provider}/${model}:`, part.error);
+                  const err = part.error as {
+                    name?: string;
+                    statusCode?: number;
+                  };
+                  throw new Error(`${err.name} (status ${err.statusCode})`);
+                }
+                yield part;
+              }
+            } catch (err) {
+              console.error(
+                `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}:`,
+                err
+              );
+              throw new Error(
+                `Streaming failed for provider: ${provider}, model: ${model}.\n${
+                  (err as Error).message
+                }`
+              );
+            }
+          },
+        };
 
         return {
-          response: {
-            fullStream,
-          },
+          response: { fullStream },
           provider,
           model,
         };
@@ -135,7 +169,7 @@ export class IronaChatClient {
       throw new Error(
         `Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${
           (error as Error).message
-        }`
+        }\n`
       );
     }
   }
@@ -168,7 +202,7 @@ export class IronaChatClient {
           return {
             type: "file",
             data: new URL(part.source.url),
-            mimeType: "application/pdf"
+            mimeType: "application/pdf",
           } as const;
         } else {
           throw new Error(
@@ -239,13 +273,13 @@ export class IronaChatClient {
       // Not using fallbacks here to remove duplicacy as they are added in model priority queue
       if (response && response.error) {
         console.warn(`[IronaChatClient][selectBestModel][IronaML] Model selection error: ${JSON.stringify(response.error, null, 2)}`);
-        return { provider: null, model: null};
+        return { provider: null, model: null };
       }
 
       return response.providers[0];
     } catch (error) {
       console.error(`[IronaChatClient][selectBestModel] Model selection error: ${(error as Error).message}`);
-      return { provider: null, model: null};
+      return { provider: null, model: null };
     }
   }
 

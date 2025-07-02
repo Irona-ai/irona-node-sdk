@@ -11,6 +11,6 @@
   "description": "",
   "dependencies": {
     "dotenv": "^16.4.5",
-     "ironaai": "^0.0.10"
+     "ironaai": "^0.0.13"
   }
 }

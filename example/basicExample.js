@@ -1,6 +1,6 @@
 const { IronaAI } = require("ironaai");
 
-const body = {
+const commonBody = {
   messages: [
     {
       role: "user",
@@ -20,34 +20,42 @@ const body = {
     "google/gemini-2.0-flash",
   ],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
-  stream: true,
-  temperature: 0.8,
 };
 
 async function modelSelectTest() {
+  let body = {
+    ...commonBody,
+    topk_models: 2
+  }
   const sdkClient = await IronaAI.createInstance();
   try {
     // Select a model
-    const modelResponse = await sdkClient.modelSelect(body);
-    console.info("Model selected:" + JSON.stringify(modelResponse));
+    const modelResponse = await sdkClient.modelSelect({...body, topk_models: 2});
+    console.info("[basicExample] Model selected:" + JSON.stringify(modelResponse));
   } catch (error) {
-    console.log("Error in SDK selectModel usage:\n");
-    console.error(error);
+    console.log("[basicExample] Error in SDK selectModel usage:\n");
+    // console.error(Object.keys(error), error.message, error.name, error.code, error.request, error.response, error.status);
+    console.error("[basicExample]", error);
   }
 }
 async function CompletionsTest() {
+  let body = {
+    ...commonBody,
+    stream: true,
+    temperature: 0.2,
+  };
   const sdkClient = await IronaAI.createInstance({
     fallback_models: ["openai/gpt-4o-mini"],
   });
   try {
-    const { provider, model, response, error } =
-      await sdkClient.completions.create(body);
-    // console.log(`Selected provider: ${provider}, model: ${model}, response: ${JSON.stringify(response, null, 2)}\n`);
+    const { provider, model, response, error } = await sdkClient.completions.create(body);
+    console.log(`[basicExample] Selected provider: ${provider}, model: ${model}, response: ${JSON.stringify(response, null, 2)}\n`);
     let accumulated = "";
     let usage = {};
+
     if (body.stream) {
       for await (const textStreamPart of response.fullStream) {
-        console.log("textStreamPart: " + JSON.stringify(textStreamPart, null, 2));
+        // console.log("textStreamPart: " + JSON.stringify(textStreamPart, null, 2));
         if (textStreamPart.type === "text-delta") {
           accumulated += textStreamPart.textDelta;
         }
@@ -56,15 +64,15 @@ async function CompletionsTest() {
         }
       }
     } else {
-      console.log(response);
+      console.log("[basicExample]", response);
       accumulated += response.content;
     }
-    console.log(accumulated);
-    console.log(usage);
-    console.log(error);
+    console.log("[basicExample] " + accumulated);
+    console.log("[basicExample] " + JSON.stringify(usage));
+    console.log("[basicExample] error: " + error);
   } catch (error) {
-    console.log("Error in SDK Completion usage:\n");
-    console.error(error);
+    console.log("[basicExample] Error in SDK Completion usage:\n");
+    console.error("[basicExample]", error);
   }
 }
 modelSelectTest();

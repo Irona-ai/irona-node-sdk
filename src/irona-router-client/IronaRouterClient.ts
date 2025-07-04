@@ -6,11 +6,11 @@ import {
 } from "../schemas/modelSelect.schema";
 import { Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
-import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
-import { SUPPORTED_MODELS_DEFAULT_URL } from "@/utils/constants";
+import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
+import { doesModelSupportMediaTypes } from "../supported_models";
+import { extractMediaTypeArrayFromMessages, getSupportedProviderAndModelArray } from "../utils/providerAndModelUtils";
 
 const resources = "";
-
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
     super(config);
@@ -23,28 +23,27 @@ export class IronaRouterClient extends Base {
         "The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables."
       );
     }
-
     const validationResult = validateSchema(ModelSelectSchema, body);
     if (!validationResult.success) {
       throw new BadRequestError(validationResult.errors);
     }
+    
+    const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
+    const supportedProviderAndModelArray = getSupportedProviderAndModelArray(body.models);
+    const mediaSupportedProviderAndModelArray = supportedProviderAndModelArray.filter(({ provider, model }) => doesModelSupportMediaTypes(provider, model, mediaInputsArray));
+    console.log(`[modelSelect] Media Inputs: ${JSON.stringify(mediaInputsArray, null, 2)}`);
+    console.log(`[modelSelect] Supported Providers and Models: ${JSON.stringify(supportedProviderAndModelArray, null, 2)}`);
+    console.log(`[modelSelect] Media Supported Providers and Models: ${JSON.stringify(mediaSupportedProviderAndModelArray, null, 2)}`);
 
+    if(mediaSupportedProviderAndModelArray.length === 0) {
+      throw new BadRequestError(
+        `No valid providers found that support the media types ${mediaInputsArray.join(", ")}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+      );
+    }
     const formattedPayload = {
       topk_models: body?.topk_models,
       messages: body.messages,
-      llm_providers: body.models
-        .map((model) => {
-          try {
-            return validateAndGetProviderAndModel(model);
-          } catch (error) {
-            // If validation fails for some models, still continue with valid ones
-            console.error(
-              `Error validating model ${model}: ${(error as Error).message}`
-            );
-            return null;
-          }
-        })
-        .filter((provider) => provider !== null), // Filter out null providers
+      llm_providers: mediaSupportedProviderAndModelArray,
       kwargs: body?.kwargs,
     };
 

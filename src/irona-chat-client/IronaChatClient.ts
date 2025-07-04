@@ -7,7 +7,7 @@ import { perplexity } from "@ai-sdk/perplexity";
 import { togetherai } from "@ai-sdk/togetherai";
 import { Config } from "../types";
 import { BadRequestError, MissingApiKeyError } from "../errors";
-import { providerApiKeyName } from "../supported_models";
+import { doesModelSupportMediaTypes, providerApiKeyName } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
@@ -18,8 +18,9 @@ import {
   ModelSelectSchema,
 } from "../schemas/modelSelect.schema";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
-import { validateAndGetProviderAndModel } from "../utils/validateAndGetProviderAndModel";
+import { extractMediaTypeArrayFromMessages, getSupportedProviderAndModelArray, validateAndGetProviderAndModel } from "../utils/providerAndModelUtils";
 import { MessagePayload } from "../schemas/common.schema";
+import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 
 export class IronaChatClient {
   constructor(
@@ -261,7 +262,15 @@ export class IronaChatClient {
 
   private async selectBestModel(body: CompletionsPayload) {
     if (body.models && body.models.length === 1) {
-      return validateAndGetProviderAndModel(body.models[0]);
+      const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
+      const supportedProviderAndModelArray = getSupportedProviderAndModelArray(body.models);
+      const mediaSupportedProviderAndModelArray = supportedProviderAndModelArray.filter(({ provider, model }) => doesModelSupportMediaTypes(provider, model, mediaInputsArray));
+      if(mediaSupportedProviderAndModelArray.length === 0) {
+        throw new BadRequestError(
+          `No valid providers found that support the media types ${mediaInputsArray.join(", ")}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+        );
+      }
+      return mediaSupportedProviderAndModelArray[0]; // Return the first supported provider/model
     }
 
     try {

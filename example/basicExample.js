@@ -5,13 +5,7 @@ const body = {
     {
       role: "user",
       content: [
-        {
-          type: "image_url",
-          image_url: {
-            url: "https://p04hwoo4fs.ufs.sh/f/3KAzoBLiFf9AT0RYSRrtvrf27PFzlgNymsQSUB4kiuqKwbZd",
-          },
-        },
-        { type: "text", text: "describe image" },
+        { type: "text", text: "Top 10 headlines of India News"},
       ],
     },
   ],
@@ -23,6 +17,7 @@ const body = {
     "anthropic/claude-2.1",
     "mistral/open-mixtral-8x22b",
     "google/gemini-1.0-pro-latest",
+    "google/gemini-2.0-flash",
   ],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
   stream: true,

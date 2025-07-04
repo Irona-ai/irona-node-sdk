@@ -50,73 +50,73 @@ export class IronaChatClient {
     const errorTrace = [];
 
     try {
-    // Select the best model
-    const modelSelectResult = await this.selectBestModel(payload);
+      // Select the best model
+      const modelSelectResult = await this.selectBestModel(payload);
 
-    if (modelSelectResult.error) {
-      errorTrace.push({
-        provider: null,
-        model: null,
-        error: `Model selection failed: ${modelSelectResult.error}`,
-      });
-    }
-
-    const { provider, model } = modelSelectResult;
-
-    // Prepare the model priority queue
-    // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
-    const modelPriorityQueue = [
-      ...(provider && model ? [{ provider, model }] : []),
-      ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
-        (fallback) => validateAndGetProviderAndModel(fallback)
-      ),
-    ];
-
-    // Attempt execution for each model in the priority queue
-    for (const { provider, model } of modelPriorityQueue) {
-      console.log(
-        `Invoking chat completions with provider: ${provider}, model: ${model}`
-      );
-      try {
-        const response = await this.invokeChatCompletions(
-          provider,
-          model,
-          payload
-        );
-        console.log(
-          `Successfully executed chat completions with provider: ${provider}, model: ${model}`
-        );
-
-        // If there were previous errors, include them in the response
-        if (errorTrace.length > 0) {
-          return {
-            ...response,
-            error_trace: errorTrace,
-            recovered: true,
-          };
-        }
-
-        return response; // Return on first success
-      } catch (error) {
-        // Add error to trace
+      if (modelSelectResult.error) {
         errorTrace.push({
-          provider,
-          model,
-          error: (error as Error).message,
+          provider: null,
+          model: null,
+          error: `Model selection failed: ${modelSelectResult.error}`,
         });
-
-        console.error(
-          `Error with ${provider}/${model}: ${(error as Error).message}`
-        );
       }
-    }
 
-    // If all retries fail, return a structured error response
-    return {
-      error:
-        "All attempts to process the completions request failed. Please verify the providers and models in your configuration.",
-      error_trace: errorTrace,
-    };
+      const { provider, model } = modelSelectResult;
+
+      // Prepare the model priority queue
+      // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
+      const modelPriorityQueue = [
+        ...(provider && model ? [{ provider, model }] : []),
+        ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
+          (fallback) => validateAndGetProviderAndModel(fallback)
+        ),
+      ];
+
+      // Attempt execution for each model in the priority queue
+      for (const { provider, model } of modelPriorityQueue) {
+        console.log(
+          `Invoking chat completions with provider: ${provider}, model: ${model}`
+        );
+        try {
+          const response = await this.invokeChatCompletions(
+            provider,
+            model,
+            payload
+          );
+          console.log(
+            `Successfully executed chat completions with provider: ${provider}, model: ${model}`
+          );
+
+          // If there were previous errors, include them in the response
+          if (errorTrace.length > 0) {
+            return {
+              ...response,
+              error_trace: errorTrace,
+              recovered: true,
+            };
+          }
+
+          return response; // Return on first success
+        } catch (error) {
+          // Add error to trace
+          errorTrace.push({
+            provider,
+            model,
+            error: (error as Error).message,
+          });
+
+          console.error(
+            `Error with ${provider}/${model}: ${(error as Error).message}`
+          );
+        }
+      }
+
+      // If all retries fail, return a structured error response
+      return {
+        error:
+          "All attempts to process the completions request failed. Please verify the providers and models in your configuration.",
+        error_trace: errorTrace,
+      };
     } catch (error) {
       // Catch any unexpected errors
       return {
@@ -148,12 +148,12 @@ export class IronaChatClient {
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
       // Get the appropriate model instance
-      const modelInstance = this.getModelInstance(provider);
+      const modelInstance = this.getModelInstance(provider,model);
       if (!modelInstance) {
         throw new Error(`No model instance found for provider: ${provider}`);
       }
 
-      // Regular completion
+      // Regular completion        
       if (payload.stream) {
         const stream = await streamText({
           model: modelInstance(model),
@@ -245,7 +245,7 @@ export class IronaChatClient {
   /**
    * Gets the appropriate model instance
    */
-  private getModelInstance(provider: string) {
+  private getModelInstance(provider: string, model: string) {
     // Map of provider to their respective model functions
     const providerModels = {
       openai: openai,
@@ -255,7 +255,12 @@ export class IronaChatClient {
       perplexity: perplexity,
       togetherai: togetherai,
     };
-
+    // Add logic for search grounding or web search
+    if (provider === "google" && model.startsWith("gemini-")) {
+      // Enable search grounding for Gemini models that support it
+      return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: true });
+    }
+    // Default
     return providerModels[provider as keyof typeof providerModels];
   }
 

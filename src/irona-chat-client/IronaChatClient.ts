@@ -245,7 +245,7 @@ export class IronaChatClient {
   /**
    * Gets the appropriate model instance
    */
-  private getModelInstance(provider: string,model: string) {
+  private getModelInstance(provider: string, model: string) {
     // Map of provider to their respective model functions
     const providerModels = {
       openai: openai,

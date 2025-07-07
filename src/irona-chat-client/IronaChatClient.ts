@@ -255,9 +255,8 @@ export class IronaChatClient {
       perplexity: perplexity,
       togetherai: togetherai,
     };
-// Add logic for search grounding or web search
+    // Enable search grounding for Gemini models that support it
     if (provider === "google" && model.startsWith("gemini-")) {
-      // Enable search grounding for Gemini models that support it
       return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: true });
     }
     return providerModels[provider as keyof typeof providerModels];

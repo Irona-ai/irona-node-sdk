@@ -148,7 +148,7 @@ export class IronaChatClient {
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
       // Get the appropriate model instance
-      const modelInstance = this.getModelInstance(provider,model);
+      const modelInstance = this.getModelInstance(provider, model);
       if (!modelInstance) {
         throw new Error(`No model instance found for provider: ${provider}`);
       }

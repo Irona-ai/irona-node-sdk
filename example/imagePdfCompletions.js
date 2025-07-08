@@ -1,6 +1,4 @@
-const { error } = require("console");
 const { IronaAI } = require("ironaai");
-const { type } = require("os");
 
 const commonBody = {
   messages: [

@@ -4,7 +4,7 @@ import { MessagePayload, ModelPayload } from "../schemas/common.schema";
 
 /**
  * Validates a model string in provider/model format and splits it into provider and model parts
- * @param modelPayload - The model string in format "provider/model" 
+ * @param modelPayload - The model string in format "provider/model"
  * @returns Object containing separated provider and model strings
  * @throws {UnsupportedModelError} If the provider/model combination is not supported
  */
@@ -17,16 +17,18 @@ export function validateAndGetProviderAndModel(modelPayload: ModelPayload) {
   return { provider, model };
 }
 
-export function extractMediaTypeArrayFromMessages(messages: MessagePayload[]): string[] {
+export function extractMediaTypeArrayFromMessages(
+  messages: MessagePayload[]
+): string[] {
   const mediaTypes: Set<string> = new Set();
 
   for (const message of messages) {
     if (Array.isArray(message.content)) {
       for (const item of message.content) {
-        if (item.type === "image_url"){
-           mediaTypes.add("image");
+        if (item.type === "image_url") {
+          mediaTypes.add("image");
         }
-        if(item.type === "document") {
+        if (item.type === "document") {
           mediaTypes.add("pdf");
         }
       }
@@ -36,8 +38,11 @@ export function extractMediaTypeArrayFromMessages(messages: MessagePayload[]): s
   return Array.from(mediaTypes);
 }
 
-export function getSupportedProviderAndModelArray( models: ModelPayload[] ): { provider: string; model: string }[] {
-   return models.map((model) => {
+export function getSupportedProviderAndModelArray(
+  models: ModelPayload[]
+): { provider: string; model: string }[] {
+  return models
+    .map((model) => {
       try {
         return validateAndGetProviderAndModel(model);
       } catch (error) {
@@ -47,6 +52,6 @@ export function getSupportedProviderAndModelArray( models: ModelPayload[] ): { p
         );
         return null;
       }
-    }).filter((provider) => provider !== null);
-
+    })
+    .filter((provider) => provider !== null);
 }

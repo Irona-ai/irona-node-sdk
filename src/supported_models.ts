@@ -38,7 +38,7 @@ export function doesModelSupportMediaTypes(
   model: string,
   medias: string[]
 ) {
-  if(!medias || medias.length === 0) return true;
+  if (!medias || medias.length === 0) return true;
   const supportedInputs = PROVIDERS[provider]?.support_media_inputs?.[model];
   if (!supportedInputs) return false;
   return medias.every((media) => supportedInputs.includes(media));

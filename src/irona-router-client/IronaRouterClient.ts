@@ -39,23 +39,6 @@ export class IronaRouterClient extends Base {
       supportedProviderAndModelArray.filter(({ provider, model }) =>
         doesModelSupportMediaTypes(provider, model, mediaInputsArray)
       );
-    console.log(
-      `[modelSelect] Media Inputs: ${JSON.stringify(mediaInputsArray, null, 2)}`
-    );
-    console.log(
-      `[modelSelect] Supported Providers and Models: ${JSON.stringify(
-        supportedProviderAndModelArray,
-        null,
-        2
-      )}`
-    );
-    console.log(
-      `[modelSelect] Media Supported Providers and Models: ${JSON.stringify(
-        mediaSupportedProviderAndModelArray,
-        null,
-        2
-      )}`
-    );
 
     if (mediaSupportedProviderAndModelArray.length === 0) {
       throw new BadRequestError(

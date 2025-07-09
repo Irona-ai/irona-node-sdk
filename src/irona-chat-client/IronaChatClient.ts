@@ -188,7 +188,7 @@ export class IronaChatClient {
         const response = await generateText(requestOptions);
         return {
           response: {
-            content: response.text || response.reasoning,
+            content: response.text,
             role: "assistant",
           },
           provider,

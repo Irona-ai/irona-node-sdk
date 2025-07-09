@@ -5,7 +5,6 @@ import { google } from "@ai-sdk/google";
 import { mistral } from "@ai-sdk/mistral";
 import { perplexity } from "@ai-sdk/perplexity";
 import { togetherai } from "@ai-sdk/togetherai";
-import { bedrock } from "@ai-sdk/amazon-bedrock";
 import { Config } from "../types";
 import { MissingApiKeyError } from "../errors";
 import { providerApiKeyName, doesModelSupportWebSearch } from "../supported_models";
@@ -157,13 +156,13 @@ export class IronaChatClient {
         throw new Error(`No model instance found for provider: ${provider}`);
       }
 
-      // Prepare request options
-      const requestOptions: any = {
+       // Prepare request options
+      const requestOptions = {
         model: modelInstance(model),
         messages: vercelMessages,
         temperature: payload.temperature,
         maxTokens: payload.maxTokens,
-      };
+      } as Parameters<typeof streamText>[0];
       // Only add tools for OpenAI if search is true
       if (provider === "openai" && payload.search) {
         requestOptions.tools = { web_search_preview: openai.tools.webSearchPreview() };
@@ -184,7 +183,7 @@ export class IronaChatClient {
         const response = await generateText(requestOptions);
         return {
           response: {
-            content: response.text || response.reasoning,
+            content: response.text,
             role: "assistant",
           },
           provider,
@@ -262,7 +261,6 @@ export class IronaChatClient {
       mistral: mistral,
       perplexity: perplexity,
       togetherai: togetherai,
-      bedrock: bedrock,
     };
 
     // Use supportsWebSearch for Google Gemini models
@@ -272,14 +270,6 @@ export class IronaChatClient {
         providerModels[provider](modelName, { useSearchGrounding: enableSearchGrounding });
     }
 
-    // Special handling for Bedrock
-    if (provider === "bedrock") {
-      return (modelName: string) => {
-        // For Bedrock, AWS credentials are handled via environment variables
-        // The AI SDK will automatically pick up AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION
-        return providerModels[provider](modelName)
-      }
-    }
     // OpenAI with web search tool
     if (provider === "openai") {
       const enableWebSearch = !!search && !!supportsWebSearch;
@@ -341,9 +331,6 @@ export class IronaChatClient {
   }
 
   private loadApiKeyForProvider(provider: string, model: string) {
-    if (provider === "bedrock") {
-      return this.loadBedrockCredentials(provider, model);
-    } 
     const apiKeyName = providerApiKeyName(provider);
   
     if (!apiKeyName || typeof apiKeyName !== "string") {
@@ -360,32 +347,5 @@ export class IronaChatClient {
     return apiKey;
   }
   
-  private loadBedrockCredentials(provider: string, model: string) {
-    const config = providerApiKeyName(provider);
-  
-    if (
-      !config ||
-      typeof config !== "object" ||
-      !("aws_access_key_id" in config) ||
-      !("aws_secret_access_key" in config) ||
-      !("aws_region" in config)
-    ) {
-      throw new MissingApiKeyError(
-        `Invalid AWS credentials configuration for bedrock/${model}`
-      );
-    }
-  
-    const awsAccessKey = process.env[config.aws_access_key_id];
-    const awsSecretKey = process.env[config.aws_secret_access_key];
-    const awsRegion = process.env[config.aws_region] || "us-east-1";
-  
-    if (!awsAccessKey || !awsSecretKey) {
-      throw new MissingApiKeyError(
-        `Missing AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY for bedrock/${model}`
-      );
-    }
-  
-    return "bedrock-configured";
-  }
   
 }

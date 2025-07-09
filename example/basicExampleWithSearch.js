@@ -1,5 +1,4 @@
 const { IronaAI } = require("ironaai");
-const { serialize } = require("v8");
 
 const body = {
   messages: [
@@ -12,12 +11,12 @@ const body = {
   ],
   models: [
     // You can use any supported model here
-    // "google/gemini-2.0-flash",
-    "openai/gpt-4o-mini"
+    "google/gemini-2.0-flash",
+    "openai/gpt-4o-mini",
     
   ],
   fallback_models: ["openai/gpt-4o-mini",],
-  stream: false,
+  stream: true,
     search:true,// <-- This enables useSearchGrounding in the SDK logic
 };
 

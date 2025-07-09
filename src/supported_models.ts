@@ -3,7 +3,6 @@ import axios from "axios";
 interface ProviderInfo {
   models: string[];
   api_key: string;
-  bedrock_api_keys?: Record<string, string>;// Add this for Bedrock
   support_tools?: string[];
   support_response_model?: string[];
   openrouter_identifier?: Record<string, string>;
@@ -32,10 +31,6 @@ export function isSupportedModel(provider: string, model: string) {
   return PROVIDERS[provider]?.models.includes(model) ?? false;
 }
 export function providerApiKeyName(provider: string) {
-  // Special handling for Bedrock which has multiple API keys
-  if (provider === "bedrock") {
-    return PROVIDERS[provider]?.bedrock_api_keys || null
-  }
   return PROVIDERS[provider]?.api_key;
 }
 

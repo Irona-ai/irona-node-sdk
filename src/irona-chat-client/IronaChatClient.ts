@@ -379,7 +379,7 @@ export class IronaChatClient {
     const awsSecretKey = process.env[config.aws_secret_access_key];
     const awsRegion = process.env[config.aws_region] || "us-east-1";
   
-    if (!awsAccessKey || !awsSecretKey ||awsRegion) {
+    if (!awsAccessKey || !awsSecretKey) {
       throw new MissingApiKeyError(
         `Missing AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY for bedrock/${model}`
       );

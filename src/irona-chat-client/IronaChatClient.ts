@@ -170,7 +170,7 @@ export class IronaChatClient {
       };
       // Only add tools for OpenAI if search is true
       if (provider === "openai" && payload.search) {
-        requestOptions.tools = { web_search_preview: openai.tools.webSearchPreview() };
+        requestOptions.tools = { web_search_preview: openai.tools.webSearchPreview };
       }
 
       // Regular completion

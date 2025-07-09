@@ -152,7 +152,11 @@ export class IronaChatClient {
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
       // Get the appropriate model instance
+
       const modelInstance = this.getModelInstance(provider, model, payload.search, supportsWebSearch);
+
+      const modelInstance = this.getModelInstance(provider, model);
+
       if (!modelInstance) {
         throw new Error(`No model instance found for provider: ${provider}`);
       }
@@ -248,12 +252,16 @@ export class IronaChatClient {
   /**
    * Gets the appropriate model instance
    */
+
   private getModelInstance(
     provider: string,
     model: string,
     search?: boolean,
     supportsWebSearch?: boolean
   ) {
+
+  private getModelInstance(provider: string, model: string) {
+
     // Map of provider to their respective model functions
     const providerModels = {
       openai: openai,
@@ -264,6 +272,7 @@ export class IronaChatClient {
       togetherai: togetherai,
       bedrock: bedrock,
     };
+
 
     // Use supportsWebSearch for Google Gemini models
     if (provider === "google") {
@@ -290,6 +299,12 @@ export class IronaChatClient {
       }
     }
     // Default
+
+    // Enable search grounding for Gemini models that support it
+    if (provider === "google" && model.startsWith("gemini-")) {
+      return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: true });
+    }
+
     return providerModels[provider as keyof typeof providerModels];
   }
 

@@ -7,6 +7,7 @@ export const ModelSelectSchema = z.object({
   models: z.array(ModelSchema).nonempty("Models array cannot be empty"),
   fallback_models: z.array(ModelSchema).optional(),
   kwargs: z.record(z.any()).optional(),
+  search: z.boolean().optional(),
 });
 
 export type ModelSelectPayload = z.infer<typeof ModelSelectSchema>;

@@ -3,12 +3,14 @@ import axios from "axios";
 interface ProviderInfo {
   models: string[];
   api_key: string;
+  bedrock_api_keys?: Record<string, string>;// Add this for Bedrock
   support_tools?: string[];
   support_response_model?: string[];
   openrouter_identifier?: Record<string, string>;
   model_prefix?: Record<string, string>;
   price: Record<string, Record<string, number>>;
   name?: Record<string, string>;
+  support_web_search?: string[];
 }
 
 let PROVIDERS: Record<string, ProviderInfo> = {};
@@ -30,5 +32,18 @@ export function isSupportedModel(provider: string, model: string) {
   return PROVIDERS[provider]?.models.includes(model) ?? false;
 }
 export function providerApiKeyName(provider: string) {
+  // Special handling for Bedrock which has multiple API keys
+  if (provider === "bedrock") {
+    return PROVIDERS[provider]?.bedrock_api_keys || null
+  }
   return PROVIDERS[provider]?.api_key;
+}
+
+export function doesModelSupportWebSearch(
+  provider: string,
+  model: string
+): boolean {
+  const supportedModels = PROVIDERS[provider]?.support_web_search;
+  if (!supportedModels) return false;
+  return supportedModels.includes(model);
 }

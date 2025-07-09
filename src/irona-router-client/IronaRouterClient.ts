@@ -54,7 +54,12 @@ export class IronaRouterClient extends Base {
         fallback_providers: this.getFallbackProviders(body),
       };
     }
-
+    if (formattedPayload.llm_providers.length === 1){
+      return {
+          "providers":[formattedPayload.llm_providers[0]]
+      }
+    }
+    
     try {
       const result = await this.request<{
         providers: { provider: string; model: string }[];

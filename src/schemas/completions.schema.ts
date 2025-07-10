@@ -19,6 +19,7 @@ export const CompletionsSchema = ModelSelectSchema.extend({
     .positive("Max tokens must be a positive integer")
     .optional(),
   stream: z.boolean().optional(),
+  search: z.boolean().optional()
 });
 
 export type CompletionsPayload = z.infer<typeof CompletionsSchema>;

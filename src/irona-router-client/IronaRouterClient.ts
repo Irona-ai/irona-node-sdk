@@ -54,7 +54,7 @@ export class IronaRouterClient extends Base {
         fallback_providers: this.getFallbackProviders(body),
       };
     }
-
+    
     try {
       const result = await this.request<{
         providers: { provider: string; model: string }[];

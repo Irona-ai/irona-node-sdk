@@ -5,7 +5,11 @@ import { ModelSelectPayload } from "./schemas/modelSelect.schema";
 import { CompletionsPayload } from "./schemas/completions.schema";
 import { MissingApiKeyError } from "./errors";
 import { updateProvidersFromGist } from "./supported_models";
-import { IRONAAI_API_KEY_PREFIX, DEFAULT_BASE_URL, SUPPORTED_MODELS_DEFAULT_URL } from "./utils/constants";
+import {
+  IRONAAI_API_KEY_PREFIX,
+  DEFAULT_BASE_URL,
+  SUPPORTED_MODELS_DEFAULT_URL,
+} from "./utils/constants";
 require("dotenv").config();
 
 export class IronaAI {
@@ -27,41 +31,16 @@ export class IronaAI {
         "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."
       );
     }
-    
+
     config.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;
     this.ironaRouter = new IronaRouterClient(config);
     this.llmChatService = new IronaChatClient(config, this.ironaRouter);
   }
-  
+
   // Static factory method to handle async initialization
   public static async createInstance(config: Config = {}): Promise<IronaAI> {
-    try {
-      await this.ensureProvidersLoaded();
-      return new IronaAI(config);
-    } catch (error) {
-      // Return an error response object instead of throwing
-      const errorMessage = `Failed to create IronaAI instance: ${(error as Error).message}`;
-      
-      // Create a minimal instance with error functions
-      const errorInstance = {
-        modelSelect: () => Promise.resolve({ 
-          error: errorMessage,
-          fallback_providers: [] 
-        }),
-        completions: {
-          create: () => Promise.resolve({ 
-            error: errorMessage,
-            error_trace: [{
-              provider: null,
-              model: null,
-              error: errorMessage
-            }]
-          })
-        }
-      } as unknown as IronaAI;
-      
-      return errorInstance;
-    }
+    await this.ensureProvidersLoaded();
+    return new IronaAI(config);
   }
 
   private static async ensureProvidersLoaded(
@@ -70,7 +49,7 @@ export class IronaAI {
   ): Promise<void> {
     const SUPPORTED_MODELS_GIST_URL =
       process.env.SUPPORTED_MODELS_URL ?? SUPPORTED_MODELS_DEFAULT_URL;
-    
+
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         await updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL);
@@ -83,26 +62,19 @@ export class IronaAI {
           await new Promise((res) => setTimeout(res, delay));
       }
     }
-    
+
     throw new Error(
       "Cannot instantiate IronaAI as it failed to load Supported Models details from Gist after multiple attempts. Please provide correct value of environment key SUPPORTED_MODELS_URL or leave it undefined."
     );
   }
-  
+
   public modelSelect(body: ModelSelectPayload): Promise<any> {
     return this.ironaRouter.modelSelect(body);
   }
 
   public completions = {
     create: (body: CompletionsPayload): Promise<any> => {
-      try{
-        return this.llmChatService.completions(body);
-      }catch(error){
-        return Promise.resolve({
-          error: (error instanceof Error) ? error.message : "Unknown error in completions",
-          error_trace: [] 
-        });
-      }
+      return this.llmChatService.completions(body);
     },
   };
 }

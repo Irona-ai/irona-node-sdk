@@ -5,39 +5,36 @@ const commonBody = {
     {
       role: "user",
       content: [
-        { type: "text", text: "Latest news July 04 2025 India" },
+        {
+          type: "image_url",
+          image_url: {
+            url: "https://p04hwoo4fs.ufs.sh/f/3KAzoBLiFf9AT0RYSRrtvrf27PFzlgNymsQSUB4kiuqKwbZd",
+          },
+        },
+        {
+          type: "document",
+          source: {
+            type: "url",
+            url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+          },
+        },
+        { type: "text", text: "describe files" },
       ],
-    },
+    }
   ],
   models: [
     "openai/gpt-4-1106-preview",
+    "openai/gpt-4o",
     "openai/gpt-4-turbo",
     "perplexity/sonar",
     "anthropic/claude-3-opus-20240229",
     "anthropic/claude-2.1",
     "mistral/open-mixtral-8x22b",
     "google/gemini-1.0-pro-latest",
-    "google/gemini-2.0-flash",
   ],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
 };
 
-async function modelSelectTest() {
-  let body = {
-    ...commonBody,
-    topk_models: 2
-  }
-  const sdkClient = await IronaAI.createInstance();
-  try {
-    // Select a model
-    const modelResponse = await sdkClient.modelSelect({...body, topk_models: 2});
-    console.info("[basicExample] Model selected:" + JSON.stringify(modelResponse));
-  } catch (error) {
-    console.log("[basicExample] Error in SDK selectModel usage:\n");
-    // console.error(Object.keys(error), error.message, error.name, error.code, error.request, error.response, error.status);
-    console.error("[basicExample]", error);
-  }
-}
 async function CompletionsTest() {
   let body = {
     ...commonBody,
@@ -48,8 +45,15 @@ async function CompletionsTest() {
     fallback_models: ["openai/gpt-4o-mini"],
   });
   try {
-    const { provider, model, response, error } = await sdkClient.completions.create(body);
-    console.log(`[basicExample] Selected provider: ${provider}, model: ${model}, response: ${JSON.stringify(response, null, 2)}\n`);
+    const { provider, model, response, error } =
+      await sdkClient.completions.create(body);
+    console.log(
+      `[basicExample] Selected provider: ${provider}, model: ${model}, response: ${JSON.stringify(
+        response,
+        null,
+        2
+      )}\n`
+    );
     let accumulated = "";
     let usage = {};
 
@@ -75,5 +79,4 @@ async function CompletionsTest() {
     console.error("[basicExample]", error);
   }
 }
-modelSelectTest();
 CompletionsTest();

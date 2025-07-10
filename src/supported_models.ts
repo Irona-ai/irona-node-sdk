@@ -13,6 +13,7 @@ interface ProviderInfo {
   availableForChatApp: Record<string, string>;
   descriptions: Record<string, string>;
   model_prefix?: Record<string, string>;
+  support_web_search?: string[];
 }
 
 let PROVIDERS: Record<string, ProviderInfo> = {};
@@ -42,6 +43,14 @@ export function doesModelSupportMediaTypes(
   const supportedInputs = PROVIDERS[provider]?.support_media_inputs?.[model];
   if (!supportedInputs) return false;
   return medias.every((media) => supportedInputs.includes(media));
+}
+export function doesModelSupportWebSearch(
+  provider: string,
+  model: string
+): boolean {
+  const supportedModels = PROVIDERS[provider]?.support_web_search;
+  if (!supportedModels) return false;
+  return supportedModels.includes(model);
 }
 export function providerApiKeyName(provider: string) {
   return PROVIDERS[provider]?.api_key;

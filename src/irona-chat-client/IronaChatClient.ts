@@ -239,7 +239,8 @@ export class IronaChatClient {
     // web search grounding is only supported for Google and OpenAI providers
     if (provider === "google") {
       const enableSearchGrounding = !!search && !!supportsWebSearch;
-      return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: enableSearchGrounding });}
+      return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: enableSearchGrounding });
+    }
     if (provider === "openai") {
       const enableWebSearch = !!search && !!supportsWebSearch;
       if (enableWebSearch) {

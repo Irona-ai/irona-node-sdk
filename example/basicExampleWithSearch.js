@@ -5,19 +5,19 @@ const body = {
     {
       role: "user",
       content: [
-        { type: "text", text: "Latest news of 2025 july 08 India" },
+        { type: "text", text: "What is the current weather like in Bengaluru Temperature ?" },
       ],
     },
   ],
   models: [
     // You can use any supported model here
     "google/gemini-2.0-flash",
-    "openai/gpt-4o-mini"
+    "openai/gpt-4o-mini",
     
   ],
   fallback_models: ["openai/gpt-4o-mini",],
   stream: false,
-    search:false,// <-- This enables useSearchGrounding in the SDK logic
+  search: true,// <-- This enables useSearchGrounding in the SDK logic
 };
 
 async function modelSelectTest() {
@@ -65,4 +65,4 @@ async function CompletionsTest() {
 }
 
 modelSelectTest();
-CompletionsTest(); 
+CompletionsTest();

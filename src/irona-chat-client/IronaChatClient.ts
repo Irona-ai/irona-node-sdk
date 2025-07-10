@@ -7,7 +7,7 @@ import { perplexity } from "@ai-sdk/perplexity";
 import { togetherai } from "@ai-sdk/togetherai";
 import { Config } from "../types";
 import { MissingApiKeyError } from "../errors";
-import { providerApiKeyName, doesModelSupportWebSearch } from "../supported_models";
+import { providerApiKeyName } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
@@ -62,7 +62,6 @@ export class IronaChatClient {
     }
 
     const { provider, model } = modelSelectResult;
-    const supportsWebSearch = doesModelSupportWebSearch(provider, model);
 
     // Prepare the model priority queue
     // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
@@ -82,8 +81,7 @@ export class IronaChatClient {
         const response = await this.invokeChatCompletions(
           provider,
           model,
-          payload,
-          supportsWebSearch
+          payload
         );
         console.log(
           `Successfully executed chat completions with provider: ${provider}, model: ${model}`
@@ -141,8 +139,7 @@ export class IronaChatClient {
   private async invokeChatCompletions(
     provider: string,
     model: string,
-    payload: CompletionsPayload,
-    supportsWebSearch?: boolean
+    payload: CompletionsPayload
   ) {
     try {
       const apiKey = this.loadApiKeyForProvider(provider, model);
@@ -151,26 +148,22 @@ export class IronaChatClient {
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
       // Get the appropriate model instance
-      const modelInstance = this.getModelInstance(provider, model, payload.search, supportsWebSearch);
+      const modelInstance = this.getModelInstance(provider, model);
       if (!modelInstance) {
         throw new Error(`No model instance found for provider: ${provider}`);
       }
 
-      // Prepare request options
-      const requestOptions = {
-        model: modelInstance(model),
-        messages: vercelMessages,
-        temperature: payload.temperature,
-        maxTokens: payload.maxTokens,
-      } as Parameters<typeof streamText>[0];
-      // Only add tools for OpenAI if search is true
-      if (provider === "openai" && payload.search) {
-        requestOptions.tools = { web_search_preview: openai.tools.webSearchPreview() };
-      }
       // Regular completion
       if (payload.stream) {
-        const stream = await streamText(requestOptions);
+        const stream = await streamText({
+          model: modelInstance(model),
+          messages: vercelMessages,
+          temperature: payload.temperature,
+          maxTokens: payload.maxTokens,
+        });
+
         const fullStream = stream.fullStream; // this is the method that gives you streamable parts
+
         return {
           response: {
             fullStream,
@@ -179,7 +172,13 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const response = await generateText(requestOptions);
+        const response = await generateText({
+          model: modelInstance(model),
+          messages: vercelMessages,
+          temperature: payload.temperature,
+          maxTokens: payload.maxTokens,
+        });
+
         return {
           response: {
             content: response.text,
@@ -245,14 +244,8 @@ export class IronaChatClient {
 
   /**
    * Gets the appropriate model instance
-   * Gets the appropriate model instance
    */
-  private getModelInstance(
-    provider: string,
-    model: string,
-    search?: boolean,
-    supportsWebSearch?: boolean
-  ) {
+  private getModelInstance(provider: string, model: string) {
     // Map of provider to their respective model functions
     const providerModels = {
       openai: openai,
@@ -262,27 +255,13 @@ export class IronaChatClient {
       perplexity: perplexity,
       togetherai: togetherai,
     };
-
-    // Use supportsWebSearch for Google Gemini models
-    if (provider === "google") {
-      const enableSearchGrounding = !!search && !!supportsWebSearch;
-      return (modelName: string) =>
-        providerModels[provider](modelName, { useSearchGrounding: enableSearchGrounding });
+    // Enable search grounding for Gemini models that support it
+    if (provider === "google" && model.startsWith("gemini-")) {
+      return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: true });
     }
-
-    // OpenAI with web search tool
-    if (provider === "openai") {
-      const enableWebSearch = !!search && !!supportsWebSearch;
-      if (enableWebSearch) {
-        return (modelName: string) => openai.responses(modelName);
-      } else {
-        return (modelName: string) => openai(modelName);
-      }
-    }
-
-    // Default
     return providerModels[provider as keyof typeof providerModels];
   }
+
   private extractModelSelectPayloadFromCompletionsPayload(
     body: CompletionsPayload
   ): ModelSelectPayload {
@@ -332,12 +311,6 @@ export class IronaChatClient {
 
   private loadApiKeyForProvider(provider: string, model: string) {
     const apiKeyName = providerApiKeyName(provider);
-  
-    if (!apiKeyName || typeof apiKeyName !== "string") {
-      throw new MissingApiKeyError(
-        `Missing or invalid API key name for ${provider}/${model}`
-      );
-    }
     const apiKey = process.env[apiKeyName];
     if (!apiKey) {
       throw new MissingApiKeyError(
@@ -346,6 +319,4 @@ export class IronaChatClient {
     }
     return apiKey;
   }
-  
-  
 }

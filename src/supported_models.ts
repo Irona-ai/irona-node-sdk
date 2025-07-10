@@ -9,7 +9,6 @@ interface ProviderInfo {
   model_prefix?: Record<string, string>;
   price: Record<string, Record<string, number>>;
   name?: Record<string, string>;
-  support_web_search?: string[];
 }
 
 let PROVIDERS: Record<string, ProviderInfo> = {};
@@ -32,13 +31,4 @@ export function isSupportedModel(provider: string, model: string) {
 }
 export function providerApiKeyName(provider: string) {
   return PROVIDERS[provider]?.api_key;
-}
-
-export function doesModelSupportWebSearch(
-  provider: string,
-  model: string
-): boolean {
-  const supportedModels = PROVIDERS[provider]?.support_web_search;
-  if (!supportedModels) return false;
-  return supportedModels.includes(model);
 }

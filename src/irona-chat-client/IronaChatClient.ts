@@ -7,7 +7,7 @@ import { perplexity } from "@ai-sdk/perplexity";
 import { togetherai } from "@ai-sdk/togetherai";
 import { Config } from "../types";
 import { BadRequestError, MissingApiKeyError } from "../errors";
-import { doesModelSupportMediaTypes, providerApiKeyName } from "../supported_models";
+import { doesModelSupportMediaTypes, providerApiKeyName, doesModelSupportWebSearch } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
@@ -56,10 +56,12 @@ export class IronaChatClient {
         `[IronaChatClient][completions] Invoking chat completions with provider: ${provider}, model: ${model}`
       );
       try {
+        const supportsWebSearch = doesModelSupportWebSearch(provider, model);
         const response = await this.invokeChatCompletions(
           provider,
           model,
-          payload
+          payload,
+          supportsWebSearch
         );
         console.log(`[IronaChatClient][completions] Successfully executed chat completions with provider: ${provider}, model: ${model}`);
         return response; // Return on first success
@@ -79,7 +81,8 @@ export class IronaChatClient {
   private async invokeChatCompletions(
     provider: string,
     model: string,
-    payload: CompletionsPayload
+    payload: CompletionsPayload,
+    supportsWebSearch: boolean
   ) {
     try {
       const apiKey = this.loadApiKeyForProvider(provider, model);
@@ -88,19 +91,25 @@ export class IronaChatClient {
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
       // Get the appropriate model instance
-      const modelInstance = this.getModelInstance(provider, model);
+      const modelInstance = this.getModelInstance(provider, model, payload.search, supportsWebSearch);
       if (!modelInstance) {
         throw new Error(`No model instance found for provider: ${provider}`);
       }
 
-      // Regular completion
+      // Prepare request options
+      const requestOptions = {
+        model: modelInstance(model),
+        messages: vercelMessages,
+        temperature: payload.temperature,
+        maxTokens: payload.maxTokens,
+      } as Parameters<typeof streamText>[0];
+      // Only add tools for OpenAI if search is true
+      if (provider === "openai" && payload.search) {
+        requestOptions.tools = { web_search_preview: openai.tools.webSearchPreview() };
+      }
+
       if (payload.stream) {
-        const stream = await streamText({
-          model: modelInstance(model),
-          messages: vercelMessages,
-          temperature: payload.temperature,
-          maxTokens: payload.maxTokens,
-        });
+        const stream = await streamText(requestOptions);
 
         // Eagerly check the first token to catch early errors (e.g., auth failure)
         const iterator = stream.fullStream[Symbol.asyncIterator]();
@@ -150,13 +159,7 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const response = await generateText({
-          model: modelInstance(model),
-          messages: vercelMessages,
-          temperature: payload.temperature,
-          maxTokens: payload.maxTokens,
-        });
-
+        const response = await generateText(requestOptions);
         return {
           response: {
             content: response.text,
@@ -223,7 +226,7 @@ export class IronaChatClient {
   /**
    * Gets the appropriate model instance
    */
-  private getModelInstance(provider: string, model: string) {
+  private getModelInstance(provider: string, model: string, search?: boolean, supportsWebSearch?: boolean) {
     // Map of provider to their respective model functions
     const providerModels = {
       openai: openai,
@@ -233,9 +236,18 @@ export class IronaChatClient {
       perplexity: perplexity,
       togetherai: togetherai,
     };
-    // Enable search grounding for Gemini models that support it
-    if (provider === "google" && model.startsWith("gemini-")) {
-      return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: true });
+    // web search grounding is only supported for Google and OpenAI providers
+    if (provider === "google") {
+      const enableSearchGrounding = !!search && !!supportsWebSearch;
+      return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: enableSearchGrounding });
+    }
+    if (provider === "openai") {
+      const enableWebSearch = !!search && !!supportsWebSearch;
+      if (enableWebSearch) {
+        return (modelName: string) => openai.responses(modelName);
+      } else {
+        return (modelName: string) => openai(modelName);
+      }
     }
     return providerModels[provider as keyof typeof providerModels];
   }

@@ -5,7 +5,7 @@ const body = {
     {
       role: "user",
       content: [
-        { type: "text", text: "What is the current weather like in Bengaluru Temperature ?" },
+        { type: "text", text: "What is the current Temperature in Bengaluru  ?" },
       ],
     },
   ],

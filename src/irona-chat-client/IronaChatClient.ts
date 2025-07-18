@@ -282,7 +282,16 @@ export class IronaChatClient {
           `No valid providers found that support the media types ${mediaInputsArray.join(", ")}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
         );
       }
-      return mediaSupportedProviderAndModelArray[0]; // Return the first supported provider/model
+      // Web search filtering 
+      const webSearchSupportedProviderAndModelArray = supportedProviderAndModelArray.filter(({ provider, model }) => doesModelSupportWebSearch(provider, model));
+      if (body.search && webSearchSupportedProviderAndModelArray.length === 0) {
+        throw new BadRequestError(
+          `No valid providers found that support web search. Please ensure that the models are correctly formatted and support the required capabilities. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+        );
+      }
+      // At the end, select which array to use for the result
+      const finalProviderAndModelArray = body.search ? webSearchSupportedProviderAndModelArray : mediaSupportedProviderAndModelArray;
+      return finalProviderAndModelArray[0]; // Return the first supported provider/model
     }
 
     try {

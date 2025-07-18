@@ -13,7 +13,7 @@ interface ProviderInfo {
   availableForChatApp: Record<string, string>;
   descriptions: Record<string, string>;
   model_prefix?: Record<string, string>;
-  support_web_search?: string[];
+  capabilities?: Record<string, string[]>;
 }
 
 let PROVIDERS: Record<string, ProviderInfo> = {};
@@ -48,9 +48,9 @@ export function doesModelSupportWebSearch(
   provider: string,
   model: string
 ): boolean {
-  const supportedModels = PROVIDERS[provider]?.support_web_search;
-  if (!supportedModels) return false;
-  return supportedModels.includes(model);
+  const capabilities = PROVIDERS[provider]?.capabilities?.[model];
+  if (!capabilities) return false;
+  return capabilities.includes("search");
 }
 export function providerApiKeyName(provider: string) {
   return PROVIDERS[provider]?.api_key;

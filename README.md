@@ -2,10 +2,52 @@
 This library provides convenient access to the IronaAI's model-routing API from TypeScript or JavaScript. 
 We help you select the best AI model for your specific use case, optimizing for factors like cost, latency, or performance.
 
-Installation
+---
+
+## Local Development & Testing
+
+To run and test this SDK locally, follow these steps:
+
+### 1. Clone the Repository
 ```bash
-npm install ironaai
+git clone https://github.com/Irona-ai/irona-node-sdk.git
+cd irona-node-sdk
 ```
+
+### 2. Install Dependencies
+```bash
+npm install
+```
+
+### 3. Build the SDK
+```bash
+npm run build
+```
+
+### 4. Link the SDK Locally
+```bash
+npm link
+```
+
+### 5. Test the SDK in the Example Folder
+- Change directory to the example folder:
+  ```bash
+  cd example
+  ```
+- Link the SDK in the example folder:
+  ```bash
+  npm link ironaai
+  ```
+- Run any example file (e.g., `basicExample.js`):
+  ```bash
+  node basicExample.js
+  ```
+- You can run any other example with:
+  ```bash
+  node <filename>
+  ```
+
+---
 
 ## Quick Start
 To use the API, you need to sign up for a IronaAI account & obtain an API key. Sign up [here](https://app.irona.ai/).

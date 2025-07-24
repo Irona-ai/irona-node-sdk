@@ -20,6 +20,14 @@ export const CompletionsSchema = ModelSelectSchema.extend({
     .optional(),
   stream: z.boolean().optional(),
   search: z.boolean().optional(),
+  structuredOutput: z.object({
+    prompt: z.string().optional(),         
+    schema: z.any().optional(),            
+  }).optional(),
+  tools: z.any().optional(),
+  toolChoice: z.any().optional(),
+  fc: z.boolean().optional(),
+  so: z.boolean().optional(),
 });
 
 export type CompletionsPayload = z.infer<typeof CompletionsSchema>;

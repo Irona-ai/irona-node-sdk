@@ -7,7 +7,7 @@ import {
 import { Config } from "../types";
 import { MissingApiKeyError, BadRequestError } from "../errors";
 import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
-import { doesModelSupportMediaTypes } from "../supported_models";
+import { doesModelSupportMediaTypes, doesModelSupportWebSearch } from "../supported_models";
 import {
   extractMediaTypeArrayFromMessages,
   getSupportedProviderAndModelArray,
@@ -47,10 +47,26 @@ export class IronaRouterClient extends Base {
         )}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
       );
     }
+    // Web search filtering
+    const webSearchSupportedProviderAndModelArray =
+      supportedProviderAndModelArray.filter(({ provider, model }) =>
+        doesModelSupportWebSearch(provider, model)
+      );
+
+    if (body.search && webSearchSupportedProviderAndModelArray.length === 0) {
+      throw new BadRequestError(
+        `No valid providers found that support web search. Please ensure that the models are correctly formatted and support the required capabilities. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+      );
+    }
+    // At the end, select which array to use for llm_providers
+    const finalProviderAndModelArray = body.search
+      ? webSearchSupportedProviderAndModelArray
+      : mediaSupportedProviderAndModelArray;
+
     const formattedPayload = {
       topk_models: body?.topk_models,
       messages: body.messages,
-      llm_providers: mediaSupportedProviderAndModelArray,
+      llm_providers: finalProviderAndModelArray,
       kwargs: body?.kwargs,
     };
 

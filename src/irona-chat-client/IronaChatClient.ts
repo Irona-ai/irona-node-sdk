@@ -1,4 +1,4 @@
-import { generateText, streamText } from "ai";
+import { generateText, generateObject, streamText, streamObject, tool } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
@@ -19,7 +19,7 @@ import {
 } from "../schemas/modelSelect.schema";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { extractMediaTypeArrayFromMessages, getSupportedProviderAndModelArray, validateAndGetProviderAndModel } from "../utils/providerAndModelUtils";
-import { MessagePayload } from "../schemas/common.schema";
+import { MessagePayload} from "../schemas/common.schema";
 import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 
 export class IronaChatClient {
@@ -31,7 +31,7 @@ export class IronaChatClient {
   /**
    * Processes a completions request and retries with fallback models if necessary.
    */
-  async completions(payload: CompletionsPayload) {
+  async completions(payload: CompletionsPayload,) {
     // Validate input
     const validationResult = validateSchema(CompletionsSchema, payload);
     if (!validationResult.success) {
@@ -61,7 +61,7 @@ export class IronaChatClient {
           provider,
           model,
           payload,
-          supportsWebSearch
+          supportsWebSearch,
         );
         console.log(`[IronaChatClient][completions] Successfully executed chat completions with provider: ${provider}, model: ${model}`);
         return response; // Return on first success
@@ -96,20 +96,42 @@ export class IronaChatClient {
         throw new Error(`No model instance found for provider: ${provider}`);
       }
 
-      // Prepare request options
-      const requestOptions = {
-        model: modelInstance(model),
-        messages: vercelMessages,
-        temperature: payload.temperature,
-        maxTokens: payload.maxTokens,
-      } as Parameters<typeof streamText>[0];
-      // Only add tools for OpenAI if search is true
-      if (provider === "openai" && payload.search) {
-        requestOptions.tools = { web_search_preview: openai.tools.webSearchPreview() };
-      }
+     // Prepare request options
+    const requestOptions = {
+      model: modelInstance(model),
+      messages: vercelMessages,
+      temperature: payload.temperature,
+      maxTokens: payload.maxTokens,
+      maxRetries: payload.maxRetries,
+      ...(payload.tools ? { tools: payload.tools } : {}),
+      ...(payload.toolChoice ? { toolChoice: payload.toolChoice } : {}),
+    } as Parameters<typeof streamText>[0];
+    // Only add tools for OpenAI if search is true and function calling is NOT intended
+    if (provider === "openai" && payload.search && !payload.fc) {
+      requestOptions.tools = [openai.tools.webSearchPreview()] as any;
+    }
 
-      if (payload.stream) {
-        const stream = await streamText(requestOptions);
+    if (payload.stream) {
+      let stream;
+      if (payload.fc && payload.so) {
+          stream = await streamObject({
+          model: modelInstance(model),
+          schema: payload.structuredOutput?.schema,
+          prompt: payload.structuredOutput?.prompt,
+          temperature: payload.temperature,
+          maxTokens: payload.maxTokens,
+          mode: "json",
+    });
+        return {
+          response: { fullStream: stream.partialObjectStream },
+          provider,
+          model,
+        }
+      }
+      else{
+        stream = await streamText(requestOptions);
+      }
+      
 
         // Eagerly check the first token to catch early errors (e.g., auth failure)
         const iterator = stream.fullStream[Symbol.asyncIterator]();
@@ -159,14 +181,34 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const response = await generateText(requestOptions);
+      let response;
+      if (payload.so && !payload.fc) {
+        response = await generateObject({
+          model: modelInstance(model),
+          schema: payload.structuredOutput?.schema,
+          prompt: payload.structuredOutput?.prompt,
+          temperature: payload.temperature,
+          maxTokens: payload.maxTokens,
+        });
         return {
           response: {
-            content: response.text,
+            content: response.object,
             role: "assistant",
           },
           provider,
           model,
+        }
+      } else {
+        response = await generateText(requestOptions);
+      }
+      return {
+        response: {
+          content: response.text,
+          role: "assistant",
+          tool_calls: response.toolCalls,
+        },
+        provider,
+        model,
         };
       }
     } catch (error) {
@@ -282,7 +324,16 @@ export class IronaChatClient {
           `No valid providers found that support the media types ${mediaInputsArray.join(", ")}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
         );
       }
-      return mediaSupportedProviderAndModelArray[0]; // Return the first supported provider/model
+      // Web search filtering 
+      const webSearchSupportedProviderAndModelArray = supportedProviderAndModelArray.filter(({ provider, model }) => doesModelSupportWebSearch(provider, model));
+      if (body.search && webSearchSupportedProviderAndModelArray.length === 0) {
+        throw new BadRequestError(
+          `No valid providers found that support web search. Please ensure that the models are correctly formatted and support the required capabilities. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+        );
+      }
+      // At the end, select which array to use for the result
+      const finalProviderAndModelArray = body.search ? webSearchSupportedProviderAndModelArray : mediaSupportedProviderAndModelArray;
+      return finalProviderAndModelArray[0]; // Return the first supported provider/model
     }
 
     try {

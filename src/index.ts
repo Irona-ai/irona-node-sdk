@@ -78,3 +78,5 @@ export class IronaAI {
     },
   };
 }
+export { z } from "zod";
+export { tool } from "ai";

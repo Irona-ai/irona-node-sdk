@@ -24,8 +24,8 @@ import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 
 export class IronaChatClient {
   constructor(
-    private readonly config: Config,
-    private readonly ironaRouter: IronaRouterClient
+    protected readonly config: Config,
+    protected readonly ironaRouter: IronaRouterClient
   ) {}
 
   /**
@@ -312,8 +312,8 @@ export class IronaChatClient {
       return { provider: null, model: null };
     }
   }
-
-  private loadApiKeyForProvider(provider: string, model: string) {
+  
+  protected loadApiKeyForProvider(provider: string, model: string) {
     const apiKeyName = providerApiKeyName(provider);
     const apiKey = process.env[apiKeyName];
     if (!apiKey) {

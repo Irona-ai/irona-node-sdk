@@ -20,6 +20,8 @@ export const CompletionsSchema = ModelSelectSchema.extend({
     .optional(),
   stream: z.boolean().optional(),
   search: z.boolean().optional(),
+  // Image generation specific fields
+  prompt: z.string().optional(), // For image generation
 });
 
 export type CompletionsPayload = z.infer<typeof CompletionsSchema>;

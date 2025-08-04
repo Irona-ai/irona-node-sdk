@@ -52,6 +52,16 @@ export function doesModelSupportWebSearch(
   if (!capabilities) return false;
   return capabilities.includes("search");
 }
+
+export function doesModelSupportImageGeneration(
+  provider: string,
+  model: string
+): boolean {
+  const capabilities = PROVIDERS[provider]?.capabilities?.[model];
+  if (!capabilities) return false;
+  return capabilities.includes("image-gen");
+}
+
 export function providerApiKeyName(provider: string) {
   return PROVIDERS[provider]?.api_key;
 }

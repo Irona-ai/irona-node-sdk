@@ -8,6 +8,9 @@ export const ModelSelectSchema = z.object({
   fallback_models: z.array(ModelSchema).optional(),
   kwargs: z.record(z.any()).optional(),
   search: z.boolean().optional(),
+  // Image generation specific fields
+  request_type: z.enum(["chat", "image_generation"]).optional().default("chat"),
+  prompt: z.string().optional(), // For image generation
 });
 
 export type ModelSelectPayload = z.infer<typeof ModelSelectSchema>;

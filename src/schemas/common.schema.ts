@@ -54,3 +54,10 @@ export const ModelSchema = z
     "Model must contain a '/' separating provider and model"
   );
 export type ModelPayload = z.infer<typeof ModelSchema>;
+
+// Image generation specific fields
+export const ImageGenerationFieldsSchema = z.object({
+  prompt: z.string().min(1, "Prompt is required"),
+});
+
+export type ImageGenerationFields = z.infer<typeof ImageGenerationFieldsSchema>;

@@ -5,9 +5,10 @@ import { google } from "@ai-sdk/google";
 import { mistral } from "@ai-sdk/mistral";
 import { perplexity } from "@ai-sdk/perplexity";
 import { togetherai } from "@ai-sdk/togetherai";
+import { vertex } from "@ai-sdk/google-vertex";
 import { Config } from "../types";
 import { BadRequestError, MissingApiKeyError } from "../errors";
-import { doesModelSupportMediaTypes, providerApiKeyName, doesModelSupportWebSearch } from "../supported_models";
+import { doesModelSupportMediaTypes, providerApiKeyName, doesModelSupportWebSearch, doesModelSupportImageGeneration } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
@@ -24,8 +25,8 @@ import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 
 export class IronaChatClient {
   constructor(
-    private readonly config: Config,
-    private readonly ironaRouter: IronaRouterClient
+    protected readonly config: Config,
+    protected readonly ironaRouter: IronaRouterClient
   ) {}
 
   /**
@@ -235,6 +236,7 @@ export class IronaChatClient {
       mistral: mistral,
       perplexity: perplexity,
       togetherai: togetherai,
+      vertex: vertex, // Add Vertex AI support
     };
     // web search grounding is only supported for Google and OpenAI providers
     if (provider === "google") {
@@ -282,9 +284,30 @@ export class IronaChatClient {
           `No valid providers found that support the media types ${mediaInputsArray.join(", ")}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
         );
       }
-      return mediaSupportedProviderAndModelArray[0]; // Return the first supported provider/model
-    }
+    
+      const webSearchSupportedProviderAndModelArray = supportedProviderAndModelArray.filter(({ provider, model }) => doesModelSupportWebSearch(provider, model));
+      if (body.search && webSearchSupportedProviderAndModelArray.length === 0) {
+        throw new BadRequestError(
+          `No valid providers found that support web search. Please ensure that the models are correctly formatted and support the required capabilities. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+        );
+      }  
+      let finalProviderAndModelArray;
+      if (body.search) {
+        finalProviderAndModelArray = webSearchSupportedProviderAndModelArray;
+      } else if (mediaInputsArray.length > 0) {
+        finalProviderAndModelArray = mediaSupportedProviderAndModelArray;
+      } else {
+        // No search, no media: allow all models as "normal" text models
+        finalProviderAndModelArray = supportedProviderAndModelArray;
+      }
 
+    // If no models available after filtering, throw error
+    if (finalProviderAndModelArray.length === 0) {
+      throw new BadRequestError(
+        `No valid providers found after filtering. Please check your model requirements and supported capabilities. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+      );
+    }
+  }
     try {
       const response = await this.ironaRouter.modelSelect(
         this.extractModelSelectPayloadFromCompletionsPayload(body)
@@ -304,8 +327,16 @@ export class IronaChatClient {
     }
   }
 
-  private loadApiKeyForProvider(provider: string, model: string) {
+    protected loadApiKeyForProvider(provider: string, model: string) {
+      if (provider === "vertex") {
+        return this.loadVertexCredentials(provider, model);
+      }
     const apiKeyName = providerApiKeyName(provider);
+      if (!apiKeyName || typeof apiKeyName !== "string") {
+        throw new MissingApiKeyError(
+          `Missing or invalid API key name for ${provider}/${model}`
+        );
+      }
     const apiKey = process.env[apiKeyName];
     if (!apiKey) {
       throw new MissingApiKeyError(
@@ -314,4 +345,28 @@ export class IronaChatClient {
     }
     return apiKey;
   }
+  private loadVertexCredentials(provider: string, model: string) {
+    console.log(`[IronaChatClient][loadVertexCredentials] Checking authentication for ${provider}/${model}`);
+    
+    // Only method supported by Vercel AI SDK: Service Account JSON file
+    const googleApplicationCredentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    if (googleApplicationCredentials) {
+      console.log(`[IronaChatClient][loadVertexCredentials] Using GOOGLE_APPLICATION_CREDENTIALS: ${googleApplicationCredentials}`);
+      console.log(`[IronaChatClient][loadVertexCredentials] Service account JSON file detected`);
+      return "vertex-configured";
+    }
+    // No valid credentials found
+    console.log(`[IronaChatClient][loadVertexCredentials] GOOGLE_APPLICATION_CREDENTIALS not set`);
+    throw new MissingApiKeyError(
+      `Missing Google Cloud credentials for vertex/${model}. 
+      
+      Vercel AI SDK requires GOOGLE_APPLICATION_CREDENTIALS environment variable pointing to your service account JSON file.
+      
+      Please set:
+      export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/service-account.json"
+      
+      Current value: ${googleApplicationCredentials || 'Not set'}`
+    );
+  }
+
 }

@@ -1,8 +1,10 @@
 import { IronaChatClient } from "./irona-chat-client/IronaChatClient";
 import { IronaRouterClient } from "./irona-router-client/IronaRouterClient";
+import { IronaImageClient } from "./irona-chat-client/IronaImageClient";
 import { Config } from "./types";
 import { ModelSelectPayload } from "./schemas/modelSelect.schema";
 import { CompletionsPayload } from "./schemas/completions.schema";
+import { ImageGenerationPayload } from "./schemas/imageGeneration.schema";
 import { MissingApiKeyError } from "./errors";
 import { updateProvidersFromGist } from "./supported_models";
 import {
@@ -15,6 +17,7 @@ require("dotenv").config();
 export class IronaAI {
   private ironaRouter: IronaRouterClient;
   private llmChatService: IronaChatClient;
+  private llmImageService: IronaImageClient;
   private constructor(config: Config = {}) {
     // Check for API key
     const apiKey = config.apiKey || process.env.IRONAAI_API_KEY;
@@ -35,6 +38,7 @@ export class IronaAI {
     config.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;
     this.ironaRouter = new IronaRouterClient(config);
     this.llmChatService = new IronaChatClient(config, this.ironaRouter);
+    this.llmImageService = new IronaImageClient(config,this.ironaRouter);
   }
 
   // Static factory method to handle async initialization
@@ -72,9 +76,18 @@ export class IronaAI {
     return this.ironaRouter.modelSelect(body);
   }
 
+  public modelSelectForImageGeneration(body: ImageGenerationPayload): Promise<any> {
+    return this.ironaRouter.modelSelectForImageGeneration(body);
+  }
+
   public completions = {
     create: (body: CompletionsPayload): Promise<any> => {
       return this.llmChatService.completions(body);
+    },
+  };
+  public images = {
+    generate: (body: ImageGenerationPayload): Promise<any> => {
+      return this.llmImageService.generateImage(body);
     },
   };
 }

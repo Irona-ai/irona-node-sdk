@@ -4,7 +4,7 @@ interface ProviderInfo {
   icon: string;
   models: string[];
   api_key: string;
-  support_media_inputs?: Record<string, string[]>;
+  vertex_api_keys: Record<string, string>;
   support_tools?: string[];
   support_response_model?: string[];
   openrouter_identifier?: Record<string, string>;
@@ -13,7 +13,7 @@ interface ProviderInfo {
   availableForChatApp: Record<string, string>;
   descriptions: Record<string, string>;
   model_prefix?: Record<string, string>;
-  support_web_search?: string[];
+  capabilities: Record<string, string[]>;
 }
 
 let PROVIDERS: Record<string, ProviderInfo> = {};
@@ -40,7 +40,7 @@ export function doesModelSupportMediaTypes(
   medias: string[]
 ) {
   if (!medias || medias.length === 0) return true;
-  const supportedInputs = PROVIDERS[provider]?.support_media_inputs?.[model];
+  const supportedInputs = PROVIDERS[provider]?.capabilities?.[model];
   if (!supportedInputs) return false;
   return medias.every((media) => supportedInputs.includes(media));
 }
@@ -48,10 +48,23 @@ export function doesModelSupportWebSearch(
   provider: string,
   model: string
 ): boolean {
-  const supportedModels = PROVIDERS[provider]?.support_web_search;
-  if (!supportedModels) return false;
-  return supportedModels.includes(model);
+  const supporteSearchdModels = PROVIDERS[provider]?.capabilities?.[model];
+  if (!supporteSearchdModels) return false;
+  return supporteSearchdModels.includes("search");
+}
+export function doesModelSupportImageGeneration(
+  provider: string,
+  model: string
+): boolean {
+  const capabilities = PROVIDERS[provider]?.capabilities?.[model];
+  if (!capabilities) return false;
+  return capabilities.includes("image-gen");
 }
 export function providerApiKeyName(provider: string) {
+  // Special handling for Vertex which has multiple API keys
+  if (provider === "vertex") {
+    return PROVIDERS[provider]?.vertex_api_keys || null;
+  }
+
   return PROVIDERS[provider]?.api_key;
 }

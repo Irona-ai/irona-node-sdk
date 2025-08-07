@@ -74,13 +74,15 @@ export class IronaImageClient extends IronaChatClient {
           // Load API key for the selected provider
           const apiKey = this.loadApiKeyForProvider(provider, model);
 
+        console.log(`[IronaImageClient][generateImage] 🎨 Generating image with ${provider}/${model} for prompt: "${prompt}"`);
+
           // Generate image using the model instance
           const { image } = await generateImage({
             model: imageModelInstance(model),
             prompt: prompt,
           });
 
-          console.log(`[IronaImageClient][generateImage] Successfully generated image with provider: ${provider}, model: ${model}`);
+          console.log(`[IronaImageClient][generateImage] ✅ Successfully executed image generation with provider: ${provider}, model: ${model}`);
 
           // Vercel AI SDK generateImage returns { image } where image can be:
           // - { url: string } for URL format
@@ -142,7 +144,7 @@ export class IronaImageClient extends IronaChatClient {
    * Selects the best image generation model using proper criteria
    */
   private async selectBestImageGenerationModel(payload: ImageGenerationPayload) {
-    if (payload.models && payload.models.length === 1) {
+   if (payload.models && payload.models.length === 1) {
       // Single model selection - filter by image generation capability
       const supportedProviderAndModelArray = getSupportedProviderAndModelArray(payload.models);
       const imageGenerationSupportedArray = supportedProviderAndModelArray.filter(
@@ -156,11 +158,11 @@ export class IronaImageClient extends IronaChatClient {
 
       return imageGenerationSupportedArray[0]; // Return the first supported provider/model
     }
-
-    // For multiple models, try local filtering first before router
+    // Get supported models from the provided models array
     const supportedProviderAndModelArray = getSupportedProviderAndModelArray(payload.models);
     console.log(`[IronaImageClient][selectBestImageGenerationModel] All models:`, supportedProviderAndModelArray);
 
+    // Filter models to only include those that support image generation
     const imageGenerationSupportedArray = supportedProviderAndModelArray.filter(
       ({ provider, model }) => {
         const supportsImage = doesModelSupportImageGeneration(provider, model);
@@ -171,33 +173,37 @@ export class IronaImageClient extends IronaChatClient {
 
     console.log(`[IronaImageClient][selectBestImageGenerationModel] Image generation supported models:`, imageGenerationSupportedArray);
 
-    // If we have valid models locally, use the first one
-    if (imageGenerationSupportedArray.length > 0) {
-      console.log(`[IronaImageClient][selectBestImageGenerationModel] Found ${imageGenerationSupportedArray.length} valid models locally, using first one`);
-      return imageGenerationSupportedArray[0];
-    }
-
-    // Only use router if no valid models found locally
-    try {
-      console.log(`[IronaImageClient][selectBestImageGenerationModel] No valid models found locally, trying router`);
-      const response = await this.ironaRouter.modelSelectForImageGeneration(payload);
-
-      // Handle errors from the model selection
-      if (response && response.error) {
-        console.warn(`[IronaImageClient][selectBestImageGenerationModel] Model selection error: ${JSON.stringify(response.error, null, 2)}`);
-        return { provider: null, model: null };
-      }
-
-      // If router returns no providers, return null to trigger fallback
-      if (!response.providers || response.providers.length === 0) {
-        console.warn(`[IronaImageClient][selectBestImageGenerationModel] Router returned no valid providers, will use fallback models`);
-        return { provider: null, model: null };
-      }
-
-      return response.providers[0];
-    } catch (error) {
-      console.error(`[IronaImageClient][selectBestImageGenerationModel] Model selection error: ${(error as Error).message}`);
+    if (imageGenerationSupportedArray.length === 0) {
+      console.warn(`[IronaImageClient][selectBestImageGenerationModel] No valid models found, will use fallback models`);
       return { provider: null, model: null };
     }
+
+    // DUMMY RANDOM SELECTION - No router call, use random selection
+    console.log(`[IronaImageClient][selectBestImageGenerationModel] Using dummy random selection (no router call)`);
+    
+    // Random selection logic with topk_models
+    const topk_models = payload?.topk_models || 1;
+    const selectedModels = this.getRandomModels(imageGenerationSupportedArray, topk_models);
+    
+    console.log(`[IronaImageClient][selectBestImageGenerationModel] Randomly selected ${selectedModels.length} model(s) from ${imageGenerationSupportedArray.length} available:`);
+    selectedModels.forEach((model, index) => {
+      console.log(`[IronaImageClient][selectBestImageGenerationModel]   ${index + 1}. ${model.provider}/${model.model}`);
+    });
+    
+    // Return the first selected model for actual generation
+    const selectedModel = selectedModels[0];
+    console.log(`[IronaImageClient][selectBestImageGenerationModel] Selected model for generation: ${selectedModel.provider}/${selectedModel.model}`);
+    return selectedModel;
+  }
+
+  // Helper method for random model selection
+  private getRandomModels(models: { provider: string; model: string }[], count: number): { provider: string; model: string }[] {
+    // Fisher-Yates shuffle algorithm for better randomization
+    const shuffled = [...models];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled.slice(0, Math.min(count, models.length));
   }
 } 

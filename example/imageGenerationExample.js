@@ -4,22 +4,37 @@ const path = require("path");
 
 const commonImageBody = {
   prompt: "draw a circle",
-  models: [
- "openai/gpt-4o-mini"
+  models: [ 
+ "openai/gpt-image-1",
+ "vertex/imagen-4.0-generate-preview-06-06",
+ "vertex/imagen-4.0-ultra-generate-preview-06-06"
   ],
-  fallback_models: ["vertex/imagen-4.0-generate-preview-06-06"],
+  fallback_models: ["openai/gpt-image-1","vertex/imagen-4.0-generate-preview-06-06"],
 };
 
 async function modelSelectImageTest() {
   let body = {
     ...commonImageBody,
-    topk_models: 2,
+    topk_models: 3,
   }
   const sdkClient = await IronaAI.createInstance();
   try {
     // Select a model for image generation using dedicated method
-    const modelResponse = await sdkClient.modelSelectForImageGeneration(body);
-    console.info("[imageGenerationExample] Model selected:" + JSON.stringify(modelResponse));
+    const modelResponse = await sdkClient.modelSelectForImageGeneration({...body,topk_models: 3});
+    console.info("[imageGenerationExample] Model selected:" + JSON.stringify(modelResponse, null, 2));
+    
+    // Additional logging for dummy selection
+    if (modelResponse.message && modelResponse.message.includes("Dummy model selection")) {
+      console.info("[imageGenerationExample] Using dummy model selection (no external API call)");
+    }
+    
+    // Show selected models in the same format as basic example
+    if (modelResponse.providers && modelResponse.providers.length > 0) {
+      console.log("[imageGenerationExample] Selected models for image generation:");
+      modelResponse.providers.forEach((provider, index) => {
+        console.log(`[imageGenerationExample]   ${index + 1}. ${provider.provider}/${provider.model}`);
+      });
+    }
   } catch (error) {
     console.log("[imageGenerationExample] Error in SDK selectModel usage:\n");
     console.error("[imageGenerationExample]", error);
@@ -36,9 +51,9 @@ async function imageGenerationTest() {
   });
   try {
     const { provider, model, response, prompt, error } = await sdkClient.images.generate(body);
-    console.log(`[imageGenerationExample] Selected provider: ${provider}, model: ${model}, prompt: ${prompt}\n`);
+    console.log(`[imageGenerationExample] FINAL SELECTION - Provider: ${provider}, Model: ${model}, Prompt: "${prompt}"\n`);
     console.log(`[imageGenerationExample] Response type: ${response.type}\n`);
-    console.log(`[imageGenerationExample] Response content: ${JSON.stringify(response.content, null, 2)}\n`);
+    // console.log(`[imageGenerationExample] Response content: ${JSON.stringify(response.content, null, 2)}\n`);
     console.log("[imageGenerationExample] error: " + error);
 
     // Save the generated image
@@ -83,5 +98,5 @@ async function imageGenerationTest() {
   }
 }
 
-// modelSelectImageTest();
+modelSelectImageTest();
 imageGenerationTest(); 

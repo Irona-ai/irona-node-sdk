@@ -130,6 +130,7 @@ export class IronaRouterClient extends Base {
     }
 
     const supportedProviderAndModelArray = getSupportedProviderAndModelArray(body.models);
+    console.log(`[IronaRouterClient][modelSelectForImageGeneration] All models:`, supportedProviderAndModelArray);
     
     // Filter models to only include those that support image generation
     const imageGenerationSupportedProviderAndModelArray =
@@ -137,59 +138,42 @@ export class IronaRouterClient extends Base {
         doesModelSupportImageGeneration(provider, model)
       );
 
+    console.log(`[IronaRouterClient][modelSelectForImageGeneration] Image generation supported models:`, imageGenerationSupportedProviderAndModelArray);
     if (imageGenerationSupportedProviderAndModelArray.length === 0) {
       throw new BadRequestError(
         `No valid providers found that support image generation. Currently only OpenAI models are supported for image generation. Please ensure you are using OpenAI models like 'openai/dall-e-3' or 'openai/dall-e-2'. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
       );
     }
 
-    const formattedPayload = {
-      topk_models: body?.topk_models,
-      prompt: body.prompt, // Image requests use prompt
-      llm_providers: imageGenerationSupportedProviderAndModelArray,
-      kwargs: body?.kwargs,
-    };
-
-    // Check if we have any valid providers after filtering
-    if (formattedPayload.llm_providers.length === 0) {
-      throw new BadRequestError(
-        `No valid providers found in the request. Please ensure that the models are correctly formatted. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
-      );
-    }
+    // DUMMY RANDOM SELECTION - No API call, use random selection
+    console.log("[IronaRouterClient][modelSelectForImageGeneration] Using dummy random selection (no external API call)");
     
-    if (formattedPayload.llm_providers.length === 1) {
-      return {
-        "providers": [formattedPayload.llm_providers[0]]
-      };
+    // Random selection logic with topk_models
+    const topk_models = body?.topk_models || 1;
+    const selectedModels = this.getRandomModels(imageGenerationSupportedProviderAndModelArray, topk_models);
+    
+    console.log(`[IronaRouterClient][modelSelectForImageGeneration] Randomly selected ${selectedModels.length} model(s) from ${imageGenerationSupportedProviderAndModelArray.length} available:`);
+    selectedModels.forEach((model, index) => {
+      console.log(`[IronaRouterClient][modelSelectForImageGeneration]   ${index + 1}. ${model.provider}/${model.model}`);
+    });
+    
+    return {
+      "providers": selectedModels,
+      "success": true,
+      "message": "Dummy model selection - random models selected",
+      "statusCode": 200
+    };
+  }
+
+  // Helper method for random model selection
+  private getRandomModels(models: { provider: string; model: string }[], count: number): { provider: string; model: string }[] {
+    // Fisher-Yates shuffle algorithm for better randomization
+    const shuffled = [...models];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-
-    try {
-      const result = await this.request<{
-        providers: { provider: string; model: string }[];
-        fallback_providers: { provider: string; model: string }[];
-        error: any;
-        success: boolean;
-        prompt: string;
-        statusCode: number;
-      }>(`${resources}`, {
-        method: "POST",
-        data: formattedPayload,
-        headers: {
-          Authorization: "Bearer " + apiKey,
-          "Content-Type": "application/json",
-        },
-      });
-
-      // If the API returned an error, add fallback providers
-      if (result && result.error) {
-        result.fallback_providers = this.getFallbackProviders(body);
-        return result;
-      }
-
-      return result;
-    } catch (error) {
-      throw error;
-    }
+    return shuffled.slice(0, Math.min(count, models.length));
   }
 
   // Helper method to get fallback providers either from the request or defaults

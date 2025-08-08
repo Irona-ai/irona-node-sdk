@@ -5,7 +5,7 @@ const body = {
     {
       role: "user",
       content: [
-        { type: "text", text: "What is the current weather like in Bengaluru Temperature ?" },
+        { type: "text", text: "What is the today's weather like in Bengaluru Temperature ?" },
       ],
     },
   ],
@@ -13,7 +13,6 @@ const body = {
     // You can use any supported model here
     "google/gemini-2.0-flash",
     "openai/gpt-4o-mini",
-    
   ],
   fallback_models: ["openai/gpt-4o-mini",],
   stream: false,
@@ -55,11 +54,11 @@ async function CompletionsTest() {
       console.log(response);
       accumulated += response.content;
     }
-    console.log(accumulated);
-    console.log(usage);
-    console.log(error);
+    console.log("Accumulated:", accumulated);
+    console.log("Usage:", usage);
+    console.log("Error:", error);
   } catch (error) {
-    console.log("Error in SDK Completion usage:\n");
+    console.log("Error in SDK Completion usage or during fallback:\n");
     console.error(error);
   }
 }

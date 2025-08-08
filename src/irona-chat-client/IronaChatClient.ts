@@ -51,9 +51,10 @@ export class IronaChatClient {
     ];
 
     // Attempt execution for each model in the priority queue
+    let attemptNumber = 1;
     for (const { provider, model } of modelPriorityQueue) {
       console.log(
-        `[IronaChatClient][completions] Invoking chat completions with provider: ${provider}, model: ${model}`
+        `[IronaChatClient][completions] Attempt ${attemptNumber}: Invoking chat completions with provider: ${provider}, model: ${model}`
       );
       try {
         const supportsWebSearch = doesModelSupportWebSearch(provider, model);
@@ -63,11 +64,12 @@ export class IronaChatClient {
           payload,
           supportsWebSearch
         );
-        console.log(`[IronaChatClient][completions] Successfully executed chat completions with provider: ${provider}, model: ${model}`);
+        console.log(`[IronaChatClient][completions] Attempt ${attemptNumber}: Successfully executed chat completions with provider: ${provider}, model: ${model}`);
         return response; // Return on first success
       } catch (error) {
-        console.error(`\n[IronaChatClient][completions] Error with ${provider}/${model}: ${(error as Error).message}`);
+        console.error(`\n[IronaChatClient][completions] Attempt ${attemptNumber}: Error with ${provider}/${model}: ${(error as Error).message}`);
       }
+      attemptNumber++;
     }
     // If all retries fail, throw an error
     throw new Error(

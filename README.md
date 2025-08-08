@@ -52,6 +52,19 @@ async function basicExample() {
 basicExample();
 ```
 
+### Build Instructions
+
+`npm run eg-test`
+
+and
+
+### Publish package to NPM Instructions
+
+1. update the version in package.json
+2. npm run build
+3. npm login
+4. npm publish
+
 ## Key Concepts
 * models: An array of AI providers and models you want LLM-Routing to be done from. 
 * tradeoff: The factor to optimize for (e.g., 'latency', 'cost', 'performance').

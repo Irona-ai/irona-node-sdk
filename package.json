@@ -13,6 +13,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
+    "eg-test": "npm run build && npm link && cd example && npm link ironaai"
   },
   "repository": {
     "type": "git",

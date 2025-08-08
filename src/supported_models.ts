@@ -4,7 +4,7 @@ interface ProviderInfo {
   icon: string;
   models: string[];
   api_key: string;
-  support_media_inputs?: Record<string, string[]>;
+  capabilities?: Record<string, string[]>; // New property that replaces support_media_inputs and support_web_search
   support_tools?: string[];
   support_response_model?: string[];
   openrouter_identifier?: Record<string, string>;
@@ -13,7 +13,7 @@ interface ProviderInfo {
   availableForChatApp: Record<string, string>;
   descriptions: Record<string, string>;
   model_prefix?: Record<string, string>;
-  support_web_search?: string[];
+  // Removed support_media_inputs and support_web_search properties
 }
 
 let PROVIDERS: Record<string, ProviderInfo> = {};
@@ -40,17 +40,26 @@ export function doesModelSupportMediaTypes(
   medias: string[]
 ) {
   if (!medias || medias.length === 0) return true;
-  const supportedInputs = PROVIDERS[provider]?.support_media_inputs?.[model];
-  if (!supportedInputs) return false;
-  return medias.every((media) => supportedInputs.includes(media));
+
+  // Updated to use capabilities
+  const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
+  if (!modelCapabilities) return false;
+
+  // Only check for "image" and "pdf" capabilities
+  return medias.every((media) => {
+    // Only allow "image" and "pdf" media types
+    if (media !== "image" && media !== "pdf") return false;
+    return modelCapabilities.includes(media);
+  });
 }
 export function doesModelSupportWebSearch(
   provider: string,
   model: string
 ): boolean {
-  const supportedModels = PROVIDERS[provider]?.support_web_search;
-  if (!supportedModels) return false;
-  return supportedModels.includes(model);
+  // Updated to use capabilities
+  const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
+  if (!modelCapabilities) return false;
+  return modelCapabilities.includes("search");
 }
 export function providerApiKeyName(provider: string) {
   return PROVIDERS[provider]?.api_key;

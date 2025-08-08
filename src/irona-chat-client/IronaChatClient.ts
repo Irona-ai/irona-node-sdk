@@ -275,20 +275,7 @@ export class IronaChatClient {
   }
 
   private async selectBestModel(body: CompletionsPayload) {
-    if (body.models && body.models.length === 1) {
-      console.log(`[IronaChatClient][selectBestModel] Single model provided, skipping router: ${body.models[0]}`);
-      const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
-      const supportedProviderAndModelArray = getSupportedProviderAndModelArray(body.models);
-      const mediaSupportedProviderAndModelArray = supportedProviderAndModelArray.filter(({ provider, model }) => doesModelSupportMediaTypes(provider, model, mediaInputsArray));
-      if(mediaSupportedProviderAndModelArray.length === 0) {
-        throw new BadRequestError(
-          `No valid providers found that support the media types ${mediaInputsArray.join(", ")}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
-        );
-      }
-      return mediaSupportedProviderAndModelArray[0]; // Return the first supported provider/model
-    }
-
-    console.log(`[IronaChatClient][selectBestModel] Multiple models (${body.models?.length || 0}), calling model-select endpoint`);
+    console.log(`[IronaChatClient][selectBestModel] Models provided: ${body.models?.length || 0}, calling model-select endpoint`);
     try {
       const response = await this.ironaRouter.modelSelect(
         this.extractModelSelectPayloadFromCompletionsPayload(body)

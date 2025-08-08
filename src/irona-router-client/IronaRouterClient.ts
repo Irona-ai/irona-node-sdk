@@ -47,6 +47,19 @@ export class IronaRouterClient extends Base {
         )}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
       );
     }
+
+    // Single model optimization - skip API call if only one model provided
+    if (body.models && body.models.length === 1) {
+      console.log(`[IronaRouterClient][modelSelect] Single model provided, skip-API call, returning directly: ${body.models[0]}`);
+      return {
+        providers: [mediaSupportedProviderAndModelArray[0]],
+        fallback_providers: this.getFallbackProviders(body),
+        error: null,
+        success: true,
+        message: "Single model optimization - skipped router API call",
+        statusCode: 200
+      };
+    }
     const formattedPayload = {
       topk_models: body?.topk_models,
       messages: body.messages,

@@ -48,9 +48,9 @@ export function doesModelSupportWebSearch(
   provider: string,
   model: string
 ): boolean {
-  const supporteSearchdModels = PROVIDERS[provider]?.capabilities?.[model];
-  if (!supporteSearchdModels) return false;
-  return supporteSearchdModels.includes("search");
+  const supportedSearchModels = PROVIDERS[provider]?.capabilities?.[model];
+  if (!supportedSearchModels) return false;
+  return supportedSearchModels.includes("search");
 }
 export function doesModelSupportImageGeneration(
   provider: string,

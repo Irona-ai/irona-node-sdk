@@ -71,6 +71,8 @@ For published versions we can use the following:
 
 `npm install ironaai` # in this case sdk must be published by `npm publish`
 
+Ref [blog link](https://medium.com/@oresoftware/node-js-how-to-test-your-new-npm-module-without-publishing-it-every-5-minutes-3b6f8e0491dd). 
+
 ### Publish package to NPM Instructions
 
 1. update the version in package.json

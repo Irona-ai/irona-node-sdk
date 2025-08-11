@@ -52,11 +52,24 @@ async function basicExample() {
 basicExample();
 ```
 
-### Build Instructions
+### Build & test Instructions
 
-`npm run eg-test`
+For local building & testing the package without publishing on npm.
 
+Shortcut command: `npm run eg-test`
+This does the following things in 1 go:
+
+```
+npm run build 
+npm link  # soft link for local for ironaai package.
+cd example // go to run scripts
+npm link ironaai // linked local package is installed for use now. (equivalent to `npm install ironaai` for local testing)
+```
 and
+
+For published versions we can use the following:
+
+`npm install ironaai` # in this case sdk must be published by `npm publish`
 
 ### Publish package to NPM Instructions
 

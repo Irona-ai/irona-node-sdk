@@ -1,6 +1,6 @@
 import { generateText, streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { anthropic, AnthropicProviderOptions } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { mistral } from "@ai-sdk/mistral";
 import { perplexity } from "@ai-sdk/perplexity";
@@ -22,11 +22,81 @@ import { extractMediaTypeArrayFromMessages, getSupportedProviderAndModelArray, v
 import { MessagePayload } from "../schemas/common.schema";
 import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 
+export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
+
 export class IronaChatClient {
   constructor(
     private readonly config: Config,
     private readonly ironaRouter: IronaRouterClient
-  ) {}
+  ) { }
+
+  private getReasoningConfig(
+    provider: string,
+    model: string,
+    reasoningEffort: ReasoningEffort
+  ): any {
+
+    if (reasoningEffort === 'off') {
+      return null;
+
+    }
+    if (provider === 'google' && model.includes("gemini")) {
+      const budgetMap: Record<string, number> = {
+        low: 512,
+        medium: 1048,
+        high: 2048,
+        max: 4096,
+        off: 0
+      }
+      return {
+        google: {
+          thinkingConfig: {
+            thinkingBudget: budgetMap[reasoningEffort],
+            includeThoughts: budgetMap[reasoningEffort] === 0 ? false : true
+          }
+        }
+      }
+    }
+
+    if (provider === "openai") {
+      const effortMap = {
+        low: "low",
+        medium: "medium",
+        high: "high",
+        max: "max",
+        off: "off"
+      }
+      return {
+        openai: {
+          reasoning: {
+            effort: effortMap[reasoningEffort]
+          }
+        }
+      }
+    }
+    if (provider === "anthropic" && model.includes("claude")) {
+      const budgetMap: Record<string, number> = {
+        off: 0,
+        low: 2000,
+        medium: 6000,
+        high: 12000,
+        max: 20000,
+      }
+      return {
+        anthropic: {
+          thinking: {
+            type: budgetMap[reasoningEffort] === 0 ? "disabled" : "enabled",
+            budgetTokens: budgetMap[reasoningEffort] === 0 ? undefined : budgetMap[reasoningEffort],
+          },
+        } satisfies AnthropicProviderOptions,
+      }
+    }
+  }
+
+  private doesModelSupportReasoning(model: string): boolean {
+    const reasoningModels = ['gemini-2.5-flash', "o-3", "o3-mini", "gpt-5", "o1-mini", "claude-opus-4-20250514", "o4-mini"]
+    return reasoningModels.some((reasoningModel => model.includes(reasoningModel.toLowerCase())))
+  }
 
   /**
    * Processes a completions request and retries with fallback models if necessary.
@@ -97,21 +167,42 @@ export class IronaChatClient {
       if (!modelInstance) {
         throw new Error(`No model instance found for provider: ${provider}`);
       }
-
-      // Prepare request options
-      const requestOptions = {
-        model: modelInstance(model),
+    // Prepare base configuration
+      const baseConfig = {
+        model: modelInstance(model) as any,
         messages: vercelMessages,
         temperature: payload.temperature,
-        maxTokens: payload.maxTokens,
-      } as Parameters<typeof streamText>[0];
+        maxOutputTokens: payload.maxTokens,
+      };
       // Only add tools for OpenAI if search is true
       if (provider === "openai" && payload.search) {
-        requestOptions.tools = { web_search_preview: openai.tools.webSearchPreview() };
+        (baseConfig as any).tools = { web_search_preview: openai.tools.webSearchPreview({}) };
       }
 
       if (payload.stream) {
-        const stream = await streamText(requestOptions);
+        const streamConfig: Parameters<typeof streamText>[0] = {
+          ...baseConfig,
+        };
+
+        if (payload.reasoning_effort) {
+          const supportsReasoning = this.doesModelSupportReasoning(model);
+
+          if (supportsReasoning) {
+            const reasoningConfig = this.getReasoningConfig(
+              provider,
+              model,
+              payload.reasoning_effort,
+
+            );
+            if (reasoningConfig) {
+              streamConfig.providerOptions = reasoningConfig;
+              console.log(`[IronaChatClient] Applied reasoning config for ${provider}/${model}:`, reasoningConfig);
+            }
+          } else {
+            console.warn(`[IronaChatClient] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`);
+          }
+        }
+        const stream = await streamText(streamConfig);
 
         // Eagerly check the first token to catch early errors (e.g., auth failure)
         const iterator = stream.fullStream[Symbol.asyncIterator]();
@@ -147,8 +238,7 @@ export class IronaChatClient {
                 err
               );
               throw new Error(
-                `Streaming failed for provider: ${provider}, model: ${model}.\n${
-                  (err as Error).message
+                `Streaming failed for provider: ${provider}, model: ${model}.\n${(err as Error).message
                 }`
               );
             }
@@ -161,7 +251,7 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const response = await generateText(requestOptions);
+        const response = await generateText(baseConfig as Parameters<typeof generateText>[0]);
         return {
           response: {
             content: response.text,
@@ -173,8 +263,7 @@ export class IronaChatClient {
       }
     } catch (error) {
       throw new Error(
-        `Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${
-          (error as Error).message
+        `Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${(error as Error).message
         }\n`
       );
     }
@@ -202,13 +291,13 @@ export class IronaChatClient {
         } else if (part.type === "image_url") {
           return {
             type: "image",
-            image: new URL(part.image_url.url),
+            image: part.image_url.url,
           } as const;
         } else if (part.type === "document") {
           return {
             type: "file",
-            data: new URL(part.source.url),
-            mimeType: "application/pdf",
+            data: part.source.url,
+            mediaType: "application/pdf",
           } as const;
         } else {
           throw new Error(
@@ -241,7 +330,7 @@ export class IronaChatClient {
     // web search grounding is only supported for Google and OpenAI providers
     if (provider === "google") {
       const enableSearchGrounding = !!search && !!supportsWebSearch;
-      return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: enableSearchGrounding });
+      return (modelName: string) => providerModels[provider](modelName);
     }
     if (provider === "openai") {
       const enableWebSearch = !!search && !!supportsWebSearch;

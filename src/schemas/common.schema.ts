@@ -6,6 +6,11 @@ const TextContent = z.object({
   text: z.string(),
 });
 
+const ReasoningContent = z.object({
+  type : z.literal("reasoning"),
+  text: z.string(),
+})
+
 // Schema for image URL content
 const ImageUrlContent = z.object({
   type: z.literal("image_url"),
@@ -30,6 +35,7 @@ export type DocumentContentPayload = z.infer<typeof DocumentContent>;
 // Create a discriminated union based on the 'type' field
 const ContentItem = z.discriminatedUnion("type", [
   TextContent,
+  ReasoningContent,
   ImageUrlContent,
   DocumentContent,
 ]);

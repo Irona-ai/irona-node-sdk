@@ -196,7 +196,10 @@ export class IronaChatClient {
             );
             if (reasoningConfig) {
               streamConfig.providerOptions = reasoningConfig;
-              console.log(`[IronaChatClient] Applied reasoning config for ${provider}/${model}:`, reasoningConfig);
+              console.log(
+                `[IronaChatClient] Applied reasoning config for ${provider}/${model}:`,
+                reasoningConfig
+              );
             }
           } else {
             console.warn(`[IronaChatClient] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`);
@@ -271,7 +274,7 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const response = await generateText(baseConfig as Parameters<typeof generateText>[0]);
+           const response = await generateText(baseConfig as Parameters<typeof generateText>[0]);
         return {
           response: {
             content: response.text,

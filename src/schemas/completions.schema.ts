@@ -20,7 +20,7 @@ export const CompletionsSchema = ModelSelectSchema.extend({
     .optional(),
   stream: z.boolean().optional(),
   search: z.boolean().optional(),
-  reasoning_effort: z.enum(["off", "low", "medium", "high" , "max"]).optional(),
+  reasoning_effort: z.enum(["off", "low", "medium", "high", "max"]).optional(),
 });
 
 export type CompletionsPayload = z.infer<typeof CompletionsSchema>;

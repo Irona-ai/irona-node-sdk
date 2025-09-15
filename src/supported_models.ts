@@ -64,3 +64,14 @@ export function doesModelSupportWebSearch(
 export function providerApiKeyName(provider: string) {
   return PROVIDERS[provider]?.api_key;
 }
+
+export function doesModelSupportReasoning(
+  provider: string,
+  model: string
+): boolean {
+  // Updated to use capabilities
+  const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
+  if (!modelCapabilities) return false;
+
+  return modelCapabilities.includes("reasoning");
+}

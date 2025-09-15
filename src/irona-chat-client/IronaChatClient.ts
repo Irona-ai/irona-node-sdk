@@ -7,7 +7,7 @@ import { perplexity } from "@ai-sdk/perplexity";
 import { togetherai } from "@ai-sdk/togetherai";
 import { Config } from "../types";
 import { BadRequestError, MissingApiKeyError } from "../errors";
-import { doesModelSupportMediaTypes, providerApiKeyName, doesModelSupportWebSearch } from "../supported_models";
+import { doesModelSupportMediaTypes, providerApiKeyName, doesModelSupportWebSearch, doesModelSupportReasoning } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
@@ -93,11 +93,7 @@ export class IronaChatClient {
     }
   }
 
-  private doesModelSupportReasoning(model: string): boolean {
-    const reasoningModels = ['gemini-2.5-flash', "o-3", "o3-mini", "gpt-5", "o1-mini", "claude-opus-4-20250514", "o4-mini"]
-    return reasoningModels.some((reasoningModel => model.includes(reasoningModel.toLowerCase())))
-  }
-
+ 
   /**
    * Processes a completions request and retries with fallback models if necessary.
    */
@@ -185,7 +181,7 @@ export class IronaChatClient {
         };
 
         if (payload.reasoning_effort) {
-          const supportsReasoning = this.doesModelSupportReasoning(model);
+          const supportsReasoning = doesModelSupportReasoning(provider, model);
 
           if (supportsReasoning) {
             const reasoningConfig = this.getReasoningConfig(

@@ -9,7 +9,7 @@ const TextContent = z.object({
 const ReasoningContent = z.object({
   type : z.literal("reasoning"),
   text: z.string(),
-})
+});
 
 // Schema for image URL content
 const ImageUrlContent = z.object({

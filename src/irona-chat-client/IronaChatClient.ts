@@ -187,7 +187,7 @@ export class IronaChatClient {
             const reasoningConfig = this.getReasoningConfig(
               provider,
               model,
-              payload.reasoning_effort,
+              payload.reasoning_effort
 
             );
             if (reasoningConfig) {

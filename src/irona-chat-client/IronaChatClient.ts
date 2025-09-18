@@ -21,8 +21,7 @@ import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { extractMediaTypeArrayFromMessages, getSupportedProviderAndModelArray, validateAndGetProviderAndModel } from "../utils/providerAndModelUtils";
 import { MessagePayload } from "../schemas/common.schema";
 import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
-
-export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
+import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 
 export class IronaChatClient {
   constructor(
@@ -30,70 +29,8 @@ export class IronaChatClient {
     private readonly ironaRouter: IronaRouterClient
   ) { }
 
-  private getReasoningConfig(
-    provider: string,
-    model: string,
-    reasoningEffort: ReasoningEffort
-  ): any {
 
-    if (reasoningEffort === 'off') {
-      return null;
 
-    }
-    if (provider === 'google' && model.includes("gemini")) {
-      const budgetMap: Record<string, number> = {
-        low: 512,
-        medium: 1048,
-        high: 2048,
-        max: 4096,
-        off: 0
-      }
-      return {
-        google: {
-          thinkingConfig: {
-            thinkingBudget: budgetMap[reasoningEffort],
-            includeThoughts: budgetMap[reasoningEffort] === 0 ? false : true
-          }
-        }
-      }
-    }
-
-    if (provider === "openai") {
-      const effortMap = {
-        low: "low",
-        medium: "medium",
-        high: "high",
-        max: "max",
-        off: "off"
-      }
-      return {
-        openai: {
-          reasoning: {
-            effort: effortMap[reasoningEffort]
-          }
-        }
-      }
-    }
-    if (provider === "anthropic" && model.includes("claude")) {
-      const budgetMap: Record<string, number> = {
-        off: 0,
-        low: 2000,
-        medium: 6000,
-        high: 12000,
-        max: 20000,
-      }
-      return {
-        anthropic: {
-          thinking: {
-            type: budgetMap[reasoningEffort] === 0 ? "disabled" : "enabled",
-            budgetTokens: budgetMap[reasoningEffort] === 0 ? undefined : budgetMap[reasoningEffort],
-          },
-        } satisfies AnthropicProviderOptions,
-      }
-    }
-  }
-
- 
   /**
    * Processes a completions request and retries with fallback models if necessary.
    */
@@ -172,35 +109,24 @@ export class IronaChatClient {
       };
       // Only add tools for OpenAI if search is true
       if (provider === "openai" && payload.search) {
-        (baseConfig as any).tools = { web_search_preview: openai.tools.webSearchPreview({}) };
+        (baseConfig as any).tools = { web_search_preview: openai.tools.webSearch({}) };
       }
 
+      // Helper function to apply reasoning configuration
+  const applyReasoningConfig = (config: any): any => {
+        return ReasoningConfig.applyReasoningConfig(
+          config,
+          provider,
+          model,
+          payload.reasoning_effort
+        );
+      };
+
       if (payload.stream) {
-        const streamConfig: Parameters<typeof streamText>[0] = {
+        const streamConfig: Parameters<typeof streamText>[0] = applyReasoningConfig({
           ...baseConfig,
-        };
+        });
 
-        if (payload.reasoning_effort) {
-          const supportsReasoning = doesModelSupportReasoning(provider, model);
-
-          if (supportsReasoning) {
-            const reasoningConfig = this.getReasoningConfig(
-              provider,
-              model,
-              payload.reasoning_effort
-
-            );
-            if (reasoningConfig) {
-              streamConfig.providerOptions = reasoningConfig;
-              console.log(
-                `[IronaChatClient] Applied reasoning config for ${provider}/${model}:`,
-                reasoningConfig
-              );
-            }
-          } else {
-            console.warn(`[IronaChatClient] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`);
-          }
-        }
         const stream = await streamText(streamConfig);
 
         // Eagerly test the stream by consuming multiple chunks to catch errors early
@@ -270,10 +196,15 @@ export class IronaChatClient {
           model,
         };
       } else {
-           const response = await generateText(baseConfig as Parameters<typeof generateText>[0]);
+        const generateConfig: Parameters<typeof generateText>[0] = applyReasoningConfig({
+          ...baseConfig,
+        });
+        const response = await generateText(generateConfig);
+        console.log(`[IronaChatClient][invokeChatCompletions] Received response from generateText}` , response);
         return {
           response: {
             content: response.text,
+            reasoningContent : response.reasoning,
             role: "assistant",
           },
           provider,

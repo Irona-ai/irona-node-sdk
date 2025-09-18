@@ -17,6 +17,7 @@ const commonBody = {
     "anthropic/claude-2.1",
     "mistral/open-mixtral-8x22b",
     "google/gemini-1.0-pro-latest",
+    "google/gemini-2.5-pro",
     "google/gemini-2.5-flash",
   ],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
@@ -43,7 +44,7 @@ async function CompletionsTest() {
     ...commonBody,
     stream: true,
     temperature: 0.2,
-    reasoning_effort : "medium"
+    reasoning_effort : "off"
   };
   const sdkClient = await IronaAI.createInstance({
     fallback_models: ["openai/gpt-4o-mini"],
@@ -70,6 +71,14 @@ async function CompletionsTest() {
     } else {
       console.log("[basicExample]", response);
       accumulated += response.content;
+      // Extract reasoning content if available
+       if (response.reasoningContent) {
+    for (const content of response.reasoningContent) {
+      if (content.type === 'reasoning') {
+        reasoningData += content.text;
+      }
+    }
+  }
     }
     console.log("[basicExample AccumulatedData] " + accumulated);
     console.log("[basicExample ReasoningData] " + reasoningData);

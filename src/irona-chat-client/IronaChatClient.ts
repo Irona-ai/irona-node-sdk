@@ -7,7 +7,7 @@ import { perplexity } from "@ai-sdk/perplexity";
 import { togetherai } from "@ai-sdk/togetherai";
 import { Config } from "../types";
 import { BadRequestError, MissingApiKeyError } from "../errors";
-import { doesModelSupportMediaTypes, providerApiKeyName, doesModelSupportWebSearch, doesModelSupportReasoning } from "../supported_models";
+import { doesModelSupportMediaTypes, providerApiKeyName, doesModelSupportWebSearch, getModelPrefix } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
@@ -23,6 +23,7 @@ import { MessagePayload } from "../schemas/common.schema";
 import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 
+type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity';
 export class IronaChatClient {
   constructor(
     private readonly config: Config,
@@ -95,14 +96,35 @@ export class IronaChatClient {
       // Convert messages to Vercel AI SDK format
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
-      // Get the appropriate model instance
-      const modelInstance = this.getModelInstance(provider, model, payload.search, supportsWebSearch);
-      if (!modelInstance) {
-        throw new Error(`No model instance found for provider: ${provider}`);
+
+    let fullModelName = model;
+      if (provider === "togetherai") {
+        const modelPrefix = getModelPrefix(provider, model);
+        if (modelPrefix) {
+          fullModelName = `${modelPrefix}/${model}`;
+        }
       }
+
+    const modelFactory = this.getModelInstance(
+        provider, 
+        fullModelName,
+        payload.search, 
+        supportsWebSearch, 
+        payload.reasoning_effort
+      );
+      
+      if (!modelFactory) {
+        throw new Error(`No model factory found for provider: ${provider}`);
+      }
+
+
+      const baseModel = modelFactory(fullModelName);
+      let finalModel = baseModel;
+    
+
       // Prepare base configuration
       const baseConfig = {
-        model: modelInstance(model) as any,
+        model: finalModel,
         messages: vercelMessages,
         temperature: payload.temperature,
         maxOutputTokens: payload.maxTokens,
@@ -112,8 +134,16 @@ export class IronaChatClient {
         (baseConfig as any).tools = { web_search_preview: openai.tools.webSearch({}) };
       }
 
+        if (provider === "google" && payload.search) {
+        (baseConfig as any).tools = { google_search: google.tools.googleSearch({}) };
+      }
+
       // Helper function to apply reasoning configuration
-  const applyReasoningConfig = (config: any): any => {
+   const applyReasoningConfig = (config: any): any => {
+        if (provider === "togetherai" || provider === "mistral" || provider === "perplexity") {
+          // For these providers, reasoning is handled by middleware, not provider options
+          return config;
+        }
         return ReasoningConfig.applyReasoningConfig(
           config,
           provider,
@@ -200,7 +230,6 @@ export class IronaChatClient {
           ...baseConfig,
         });
         const response = await generateText(generateConfig);
-        console.log(`[IronaChatClient][invokeChatCompletions] Received response from generateText}` , response);
         return {
           response: {
             content: response.text,
@@ -267,7 +296,7 @@ export class IronaChatClient {
   /**
    * Gets the appropriate model instance
    */
-  private getModelInstance(provider: string, model: string, search?: boolean, supportsWebSearch?: boolean) {
+  private getModelInstance(provider: string, model: string, search?: boolean, supportsWebSearch?: boolean, reasoningEffort?: ReasoningEffort) {
     // Map of provider to their respective model functions
     const providerModels = {
       openai: openai,
@@ -290,6 +319,12 @@ export class IronaChatClient {
         return (modelName: string) => openai(modelName);
       }
     }
+   if (ReasoningConfig.supportsReasoningMiddleware(provider as ProviderName, model)) {
+    return (modelName: string) => {
+      const baseModel = providerModels[provider as keyof typeof providerModels](modelName);
+      return ReasoningConfig.createEnhancedModelWithReasoning(baseModel, reasoningEffort);
+    };
+  }
     return providerModels[provider as keyof typeof providerModels];
   }
 

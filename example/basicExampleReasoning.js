@@ -10,18 +10,47 @@ const commonBody = {
     },
   ],
   models: [
-    "openai/gpt-4-1106-preview",
-    "openai/gpt-4-turbo",
-    "perplexity/sonar",
-    "anthropic/claude-3-opus-20240229",
+ 
+    "perplexity/sonar-reasoning-pro",
+    "anthropic/claude-sonnet-4-20250514",
     "anthropic/claude-2.1",
     "mistral/open-mixtral-8x22b",
     "google/gemini-1.0-pro-latest",
-    "google/gemini-2.5-pro",
+        "google/gemini-2.5-pro",
     "google/gemini-2.5-flash",
+      "togetherai/DeepSeek-R1",
+      "mistral/magistral-small-latest",
+      "openai/o4-mini"
   ],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
 };
+
+function filterOutThinkingContent(text) {
+  if (!text) return text;
+  
+  // Remove various thinking tag patterns
+  const thinkingPatterns = [
+    /<think>[\s\S]*?<\/think>/g,  
+    /<reasoning>[\s\S]*?<\/reasoning>/g, 
+    /<thought>[\s\S]*?<\/thought>/g,    
+    /\[thinking\][\s\S]*?\[\/thinking\]/g, 
+    /Thinking:\s*[\s\S]*?(?=\n\n|$)/g, 
+  ];
+  
+  let cleanedText = text;
+  thinkingPatterns.forEach(pattern => {
+    cleanedText = cleanedText.replace(pattern, '');
+  });
+  
+  // Remove any empty lines or excessive whitespace
+  cleanedText = cleanedText
+    .split('\n')
+    .filter(line => line.trim().length > 0)
+    .join('\n')
+    .trim();
+  
+  return cleanedText;
+}
 
 async function modelSelectTest() {
   let body = {
@@ -44,7 +73,7 @@ async function CompletionsTest() {
     ...commonBody,
     stream: true,
     temperature: 0.2,
-    reasoning_effort : "off"
+    reasoning_effort : "medium", 
   };
   const sdkClient = await IronaAI.createInstance({
     fallback_models: ["openai/gpt-4o-mini"],
@@ -67,6 +96,9 @@ async function CompletionsTest() {
         if (part.type === "finish") {
           usage = part.totalUsage;
         }
+         if (body.reasoning_effort === "off" || body.reasoning_effort === undefined) {
+        accumulated = filterOutThinkingContent(accumulated);
+      }
       }
     } else {
       console.log("[basicExample]", response);
@@ -79,6 +111,9 @@ async function CompletionsTest() {
       }
     }
   }
+    if (body.reasoning_effort === "off") {
+        accumulated = filterOutThinkingContent(accumulated);
+      }
     }
     console.log("[basicExample AccumulatedData] " + accumulated);
     console.log("[basicExample ReasoningData] " + reasoningData);

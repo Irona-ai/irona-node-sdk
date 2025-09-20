@@ -1,5 +1,6 @@
 import { doesModelSupportReasoning } from "../supported_models";
 import { AnthropicProviderOptions } from "@ai-sdk/anthropic";
+import { wrapLanguageModel, extractReasoningMiddleware } from 'ai';
 
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
 
@@ -16,96 +17,175 @@ export interface AnthropicThinkingConfig {
   type: "enabled" | "disabled";
   budgetTokens?: number;
 }
+export interface TogetherAIReasoningConfig {
+  includeReasoning: boolean;
+}
+export interface MistralReasoningConfig {
+  includeReasoning: boolean;
+}
+export interface PerplexityReasoningConfig {
+  effort: ReasoningEffort;
+}
+type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity';
 
 export interface ProviderReasoningOptions {
   google?: { thinkingConfig: GoogleThinkingConfig };
   openai?: { reasoning: OpenAIReasoningConfig };
   anthropic?: { thinking: AnthropicThinkingConfig };
+  togetherai?: { reasoning: TogetherAIReasoningConfig };
+  mistral?: { reasoning: MistralReasoningConfig };
+  perplexity?: { reasoning: PerplexityReasoningConfig };
 }
 
 export class ReasoningConfig {
-  private static readonly EFFORT_MAPPING = {
-    off: 0.0,     // 0% effort
-    low: 0.25,    // 25% effort
-    medium: 0.5,  // 50% effort
-    high: 0.85,   // 85% effort
-    max: 1.0      // 100% effort
+  private static readonly EFFORT_MAPPING: Record<ReasoningEffort, number> = {
+    off: 0.0,
+    low: 0.25,
+    medium: 0.5,
+    high: 0.85,
+    max: 1.0
   };
 
 
   static getReasoningConfig(
-    provider: string,
+    provider: ProviderName,
     model: string,
     reasoningEffort: ReasoningEffort
   ): ProviderReasoningOptions | null {
-
-
     const isOff = reasoningEffort === 'off';
     const multiplier = ReasoningConfig.EFFORT_MAPPING[reasoningEffort];
 
-    if (provider === 'google' && model.includes("gemini")) {
-      const maxBudget = 4096;
-      return {
-        google: {
-          thinkingConfig: {
-            thinkingBudget: isOff ? 0 : Math.floor(maxBudget * multiplier),
-            includeThoughts: !isOff
-          }
-        }
-      };
-    }
+    switch (provider) {
+      case 'google':
+        if (model.includes("gemini")) {
+          let thinkingBudget: number;
+          let includeThoughts: boolean;
 
-    if (provider === "openai") {
-      return {
-        openai: {
-          reasoning: {
-            effort: reasoningEffort
+          // Special handling for gemini-2.5-pro
+          if (model.includes("2.5-pro")) {
+            // Gemini 2.5-pro cannot disable thinking, minimum is 128 tokens
+            thinkingBudget = isOff ? 128 : Math.floor(32768 * multiplier);
+            includeThoughts = true; // Always include thoughts for this model
+          } else {
+            // Regular Gemini models
+            const maxBudget = 24567;
+            thinkingBudget = isOff ? 0 : Math.floor(maxBudget * multiplier);
+            includeThoughts = !isOff;
           }
-        }
-      };
-    }
 
-    if (provider === "anthropic" && model.includes("claude")) {
-      const maxBudget = 20000;
-      return {
-        anthropic: {
-          thinking: {
-            type: isOff ? "disabled" : "enabled",
-            budgetTokens: isOff ? undefined : Math.floor(maxBudget * multiplier),
-          },
-        } satisfies AnthropicProviderOptions,
-      };
+          return {
+            google: {
+              thinkingConfig: {
+                thinkingBudget,
+                includeThoughts
+              }
+            }
+          };
+        }
+        break;
+
+      case 'openai':
+        return {
+          openai: {
+            reasoning: { effort: reasoningEffort }
+          }
+        };
+
+      case 'anthropic':
+        if (model.includes("claude")) {
+          const maxBudget = 20000;
+          return {
+            anthropic: {
+              thinking: {
+                type: isOff ? "disabled" : "enabled",
+                budgetTokens: isOff ? undefined : Math.floor(maxBudget * multiplier),
+              },
+            } satisfies AnthropicProviderOptions,
+          };
+        }
+        break;
+
+      case 'togetherai':
+        if (model.includes("DeepSeek-R1")) {
+          return {
+            togetherai: {
+              reasoning: { includeReasoning: !isOff }
+            }
+          };
+        }
+        break;
+
+      case 'mistral':
+        return {
+          mistral: {
+            reasoning: { includeReasoning: !isOff }
+          }
+        };
+
+      case 'perplexity':
+        return {
+          perplexity: {
+            reasoning: { effort: reasoningEffort }
+          }
+        };
     }
 
     return null;
   }
 
- static applyReasoningConfig(
+  static applyReasoningConfig(
     config: any,
     provider: string,
     model: string,
     reasoningEffort?: ReasoningEffort
   ): any {
+    const effectiveReasoningEffort = reasoningEffort ?? 'off';
 
-    const effectiveReasoningEffort = reasoningEffort !== undefined ? reasoningEffort : 'off';
-    
-    const supportsReasoning = doesModelSupportReasoning(provider, model);
-    
-    if (supportsReasoning) {
-      const reasoningConfig = this.getReasoningConfig(provider, model, effectiveReasoningEffort);
-      if (reasoningConfig) {
-        config.providerOptions = reasoningConfig;
-        console.log(
-          `[ReasoningConfig] Applied reasoning config for ${provider}/${model}:`,
-          reasoningConfig
-        );
+    if (!doesModelSupportReasoning(provider, model)) {
+      if (reasoningEffort !== undefined && reasoningEffort !== 'off') {
+        console.warn(`[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`);
       }
-    } else if (reasoningEffort !== undefined) {
- 
-      console.warn(`[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`);
+      return config;
     }
-    
+
+    const reasoningConfig = this.getReasoningConfig(provider as ProviderName, model, effectiveReasoningEffort);
+    if (reasoningConfig) {
+      config.providerOptions = reasoningConfig;
+    }
+
     return config;
   }
 
+
+  static supportsReasoningMiddleware(provider: ProviderName, model: string): boolean {
+    const providersWithMiddleware = ['togetherai', 'mistral', 'perplexity'];
+
+    // Check if provider supports middleware
+    if (!providersWithMiddleware.includes(provider)) {
+      return false;
+    }
+    const modelName = model.includes('/') ? model.split('/').pop()! : model;
+    const supportsReasoning = doesModelSupportReasoning(provider, modelName);
+
+    if (!supportsReasoning) {
+      console.warn(`[ReasoningConfig] Reasoning middleware not supported for ${provider}/${model}. The model does not support reasoning capabilities.`);
+    }
+    return supportsReasoning;
+  }
+
+  static createEnhancedModelWithReasoning(
+    baseModel: any,
+    reasoningEffort?: ReasoningEffort
+  ) {
+    const shouldIncludeReasoning = reasoningEffort !== undefined && reasoningEffort !== 'off';
+
+    if (!shouldIncludeReasoning) {
+      return baseModel;
+    }
+
+    return wrapLanguageModel({
+      model: baseModel,
+      middleware: extractReasoningMiddleware({ tagName: 'think' }),
+    });
+  }
 }

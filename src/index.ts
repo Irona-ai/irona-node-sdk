@@ -1,3 +1,4 @@
+// src/index.ts
 import { IronaChatClient } from "./irona-chat-client/IronaChatClient";
 import { IronaRouterClient } from "./irona-router-client/IronaRouterClient";
 import { IronaImageClient } from "./irona-chat-client/IronaImageClient";
@@ -12,36 +13,31 @@ import {
   DEFAULT_BASE_URL,
   SUPPORTED_MODELS_DEFAULT_URL,
 } from "./utils/constants";
+
 require("dotenv").config();
+
+import { UseAiToolsClient, UseAiToolsPayload } from "./UseAiToolsClient";
 
 export class IronaAI {
   private ironaRouter: IronaRouterClient;
   private llmChatService: IronaChatClient;
   private llmImageService: IronaImageClient;
-  private constructor(config: Config = {}) {
-    // Check for API key
-    const apiKey = config.apiKey || process.env.IRONAAI_API_KEY;
-    if (!apiKey) {
-      throw new MissingApiKeyError(
-        "The API key is missing. Please provide the API key either through the 'IRONAAI_API_KEY' environment variable or the 'config.apiKey' property."
-      );
-    }
-    if (
-      typeof apiKey !== "string" ||
-      !apiKey.startsWith(IRONAAI_API_KEY_PREFIX)
-    ) {
-      throw new MissingApiKeyError(
-        "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."
-      );
-    }
+  private useAiToolsService: UseAiToolsClient;
 
-    config.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;
+  private constructor(config: Config = {}) {
+    const apiKey = config.apiKey || process.env.IRONAAI_API_KEY;
+    if (!apiKey) throw new MissingApiKeyError("API key missing");
+    if (typeof apiKey !== "string" || !apiKey.startsWith(IRONAAI_API_KEY_PREFIX))
+      throw new MissingApiKeyError("Invalid API key");
+
+    config.baseUrl = config.baseUrl || DEFAULT_BASE_URL;
+
     this.ironaRouter = new IronaRouterClient(config);
     this.llmChatService = new IronaChatClient(config, this.ironaRouter);
-    this.llmImageService = new IronaImageClient(config,this.ironaRouter);
+    this.llmImageService = new IronaImageClient(config, this.ironaRouter);
+    this.useAiToolsService = new UseAiToolsClient();
   }
 
-  // Static factory method to handle async initialization
   public static async createInstance(config: Config = {}): Promise<IronaAI> {
     await this.ensureProvidersLoaded();
     return new IronaAI(config);
@@ -58,20 +54,15 @@ export class IronaAI {
       try {
         await updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL);
         return;
-      } catch (error) {
-        console.warn(
-          `Attempt ${attempt} to load Supported Models details failed. Retrying...`
-        );
-        if (attempt < retries)
-          await new Promise((res) => setTimeout(res, delay));
+      } catch {
+        if (attempt < retries) await new Promise((res) => setTimeout(res, delay));
       }
     }
 
-    throw new Error(
-      "Cannot instantiate IronaAI as it failed to load Supported Models details from Gist after multiple attempts. Please provide correct value of environment key SUPPORTED_MODELS_URL or leave it undefined."
-    );
+    throw new Error("Cannot load Supported Models details from Gist");
   }
 
+  // Router methods
   public modelSelect(body: ModelSelectPayload): Promise<any> {
     return this.ironaRouter.modelSelect(body);
   }
@@ -80,14 +71,26 @@ export class IronaAI {
     return this.ironaRouter.modelSelectForImageGeneration(body);
   }
 
+  // Completions
   public completions = {
-    create: (body: CompletionsPayload): Promise<any> => {
-      return this.llmChatService.completions(body);
-    },
+    create: (body: CompletionsPayload): Promise<any> => this.llmChatService.completions(body),
   };
+
+  // Image generation
   public images = {
-    generate: (body: ImageGenerationPayload): Promise<any> => {
-      return this.llmImageService.generateImage(body);
-    },
+    generate: (body: ImageGenerationPayload): Promise<any> => this.llmImageService.generateImage(body),
+  };
+
+  // Tools integration
+  public tools = {
+    execute: (payload: UseAiToolsPayload) => this.useAiToolsService.execute(payload),
+
+    // Frontend sends only userId + provider, redirectUri handled internally
+    initiateAuth: (provider: string, userId: string) =>
+      this.useAiToolsService.initiateAuth(provider, userId),
+
+    // Callback after OAuth, connectionRequestId comes from Composio callback
+    handleCallback: (provider: string, connectionRequestId: string, userId: string) =>
+      this.useAiToolsService.handleCallback(provider, connectionRequestId, userId),
   };
 }

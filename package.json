@@ -6,7 +6,7 @@
   "unpkg": "dist/index.umd.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "rm -rf dist && microbundle --tsconfig tsconfig.json --target node --no-sourcemap",
+    "build": "rimraf dist && microbundle --tsconfig tsconfig.json --target node --no-sourcemap",
     "devsdk": "microbundle --watch --tsconfig tsconfig.json --no-sourcemap",
     "dev": "ts-node-dev -r tsconfig-paths/register src/server.ts",
     "start": "node dist/app.js"
@@ -45,18 +45,23 @@
     "@ai-sdk/openai": "^1.3.22",
     "@ai-sdk/perplexity": "^1.1.9",
     "@ai-sdk/togetherai": "^0.2.14",
+    "@composio/core": "^0.1.52",
+    "@langchain/core": "^0.3.77",
+    "@modelcontextprotocol/sdk": "^1.18.1",
     "ai": "^4.3.16",
     "axios": "^1.7.7",
-    "dotenv": "^16.4.5",
+    "body-parser": "^2.2.0",
+    "dotenv": "^16.6.1",
+    "express": "^5.1.0",
     "tsconfig-paths": "^4.2.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.7.5",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.18.6",
     "microbundle": "^0.15.1",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5.6.3"
+    "typescript": "^5.9.2"
   }
 }

@@ -12,15 +12,20 @@ const commonBody = {
   models: [
  
     "perplexity/sonar-reasoning-pro",
-    "anthropic/claude-sonnet-4-20250514",
-    "anthropic/claude-2.1",
     "mistral/open-mixtral-8x22b",
     "google/gemini-1.0-pro-latest",
         "google/gemini-2.5-pro",
     "google/gemini-2.5-flash",
       "togetherai/DeepSeek-R1",
       "mistral/magistral-small-latest",
-      "openai/o4-mini"
+      "openai/o4-mini",
+       "anthropic/claude-3-7-sonnet-20250219",  
+      "anthropic/claude-3-7-sonnet-latest", 
+      "anthropic/claude-opus-4-20250514", 
+      "anthropic/claude-opus-4-0",  
+      "anthropic/claude-sonnet-4-20250514",  
+      "anthropic/claude-sonnet-4-0" ,  
+       "openai/gpt-5"
   ],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
 };
@@ -87,10 +92,10 @@ async function CompletionsTest() {
 
     if (body.stream) {
       for await (const part of response.fullStream) {
-        // console.log("part: " + JSON.stringify(part, null, 2));
+        // console.log("part: " + JSON.stringify(part.type, null, 2));
         if (part.type === "text-delta") {
           accumulated += part.text;
-        } if (part.type === "reasoning-delta") {
+        } if (part.type === "reasoning-delta") {      
           reasoningData += part.text;
         }
         if (part.type === "finish") {

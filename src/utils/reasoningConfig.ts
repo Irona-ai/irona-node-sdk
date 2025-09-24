@@ -10,7 +10,8 @@ export interface GoogleThinkingConfig {
 }
 
 export interface OpenAIReasoningConfig {
-  effort: ReasoningEffort;
+  effort?: ReasoningEffort;
+  reasoningSummary?: 'auto' | 'detailed';
 }
 
 export interface AnthropicThinkingConfig {
@@ -30,7 +31,7 @@ type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral'
 
 export interface ProviderReasoningOptions {
   google?: { thinkingConfig: GoogleThinkingConfig };
-  openai?: { reasoning: OpenAIReasoningConfig };
+  openai?: OpenAIReasoningConfig;
   anthropic?: { thinking: AnthropicThinkingConfig };
   togetherai?: { reasoning: TogetherAIReasoningConfig };
   mistral?: { reasoning: MistralReasoningConfig };
@@ -84,10 +85,14 @@ export class ReasoningConfig {
         }
         break;
 
-      case 'openai':
+          case 'openai':
+        if (isOff) {
+          return null; 
+        }
         return {
           openai: {
-            reasoning: { effort: reasoningEffort }
+            reasoningSummary: 'auto', 
+           
           }
         };
 

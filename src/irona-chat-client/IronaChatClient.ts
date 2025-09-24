@@ -97,7 +97,7 @@ export class IronaChatClient {
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
 
-    let fullModelName = model;
+      let fullModelName = model;
       if (provider === "togetherai") {
         const modelPrefix = getModelPrefix(provider, model);
         if (modelPrefix) {
@@ -105,14 +105,14 @@ export class IronaChatClient {
         }
       }
 
-    const modelFactory = this.getModelInstance(
-        provider, 
+      const modelFactory = this.getModelInstance(
+        provider,
         fullModelName,
-        payload.search, 
-        supportsWebSearch, 
+        payload.search,
+        supportsWebSearch,
         payload.reasoning_effort
       );
-      
+
       if (!modelFactory) {
         throw new Error(`No model factory found for provider: ${provider}`);
       }
@@ -120,7 +120,7 @@ export class IronaChatClient {
 
       const baseModel = modelFactory(fullModelName);
       let finalModel = baseModel;
-    
+
 
       // Prepare base configuration
       const baseConfig = {
@@ -134,12 +134,12 @@ export class IronaChatClient {
         (baseConfig as any).tools = { web_search_preview: openai.tools.webSearch({}) };
       }
 
-        if (provider === "google" && payload.search) {
+      if (provider === "google" && payload.search) {
         (baseConfig as any).tools = { google_search: google.tools.googleSearch({}) };
       }
 
       // Helper function to apply reasoning configuration
-   const applyReasoningConfig = (config: any): any => {
+      const applyReasoningConfig = (config: any): any => {
         if (provider === "togetherai" || provider === "mistral" || provider === "perplexity") {
           // For these providers, reasoning is handled by middleware, not provider options
           return config;
@@ -229,16 +229,21 @@ export class IronaChatClient {
         const generateConfig: Parameters<typeof generateText>[0] = applyReasoningConfig({
           ...baseConfig,
         });
-        const response = await generateText(generateConfig);
-        return {
-          response: {
-            content: response.text,
-            reasoningContent : response.reasoning,
-            role: "assistant",
-          },
-          provider,
-          model,
-        };
+        try {
+          const response = await generateText(generateConfig);
+          return {
+            response: {
+              content: response.text,
+              reasoningContent : response.reasoning,
+              role: "assistant",
+            },
+            provider,
+            model,
+          };
+        } catch (error) {
+          console.error(`[IronaChatClient] Non-stream request failed for ${provider}/${model}:`, error);
+          throw error;
+        }
       }
     } catch (error) {
       throw new Error(
@@ -319,12 +324,12 @@ export class IronaChatClient {
         return (modelName: string) => openai(modelName);
       }
     }
-   if (ReasoningConfig.supportsReasoningMiddleware(provider as ProviderName, model)) {
-    return (modelName: string) => {
-      const baseModel = providerModels[provider as keyof typeof providerModels](modelName);
-      return ReasoningConfig.createEnhancedModelWithReasoning(baseModel, reasoningEffort);
-    };
-  }
+    if (ReasoningConfig.supportsReasoningMiddleware(provider as ProviderName, model)) {
+      return (modelName: string) => {
+        const baseModel = providerModels[provider as keyof typeof providerModels](modelName);
+        return ReasoningConfig.createEnhancedModelWithReasoning(baseModel, reasoningEffort);
+      };
+    }
     return providerModels[provider as keyof typeof providerModels];
   }
 

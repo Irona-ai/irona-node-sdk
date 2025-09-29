@@ -64,3 +64,16 @@ export function doesModelSupportWebSearch(
 export function providerApiKeyName(provider: string) {
   return PROVIDERS[provider]?.api_key;
 }
+
+export function doesModelSupportReasoning(provider: string, model: string): boolean {
+  const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
+  if (!modelCapabilities) return false;
+  return modelCapabilities.includes("reasoning");
+}
+
+export function getModelPrefix(provider: string, model: string): string | null {
+  const modelPrefixes = PROVIDERS[provider]?.model_prefix;
+  if (!modelPrefixes) return null;
+
+  return modelPrefixes[model] || null;
+}

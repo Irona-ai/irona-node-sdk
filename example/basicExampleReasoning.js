@@ -10,17 +10,26 @@ const commonBody = {
     },
   ],
   models: [
-    "openai/gpt-4-1106-preview",
-    "openai/gpt-4-turbo",
-    "perplexity/sonar",
-    "anthropic/claude-3-opus-20240229",
-    "anthropic/claude-2.1",
+ 
+    "perplexity/sonar-reasoning-pro",
     "mistral/open-mixtral-8x22b",
     "google/gemini-1.0-pro-latest",
-    "google/gemini-2.0-flash",
+        "google/gemini-2.5-pro",
+    "google/gemini-2.5-flash",
+      "togetherai/DeepSeek-R1",
+      "mistral/magistral-small-latest",
+      "openai/o4-mini",
+       "anthropic/claude-3-7-sonnet-20250219",  
+      "anthropic/claude-3-7-sonnet-latest", 
+      "anthropic/claude-opus-4-20250514", 
+      "anthropic/claude-opus-4-0",  
+      "anthropic/claude-sonnet-4-20250514",  
+      "anthropic/claude-sonnet-4-0" ,  
+       "openai/o1-mini"
   ],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
 };
+
 
 async function modelSelectTest() {
   let body = {
@@ -43,6 +52,7 @@ async function CompletionsTest() {
     ...commonBody,
     stream: true,
     temperature: 0.2,
+    reasoning_effort : "medium", 
   };
   const sdkClient = await IronaAI.createInstance({
     fallback_models: ["openai/gpt-4o-mini"],
@@ -51,26 +61,35 @@ async function CompletionsTest() {
     const { provider, model, response, error } = await sdkClient.completions.create(body);
     console.log(`[basicExample] Selected provider: ${provider}, model: ${model}, response: ${JSON.stringify(response, null, 2)}\n`);
     let accumulated = "";
+    let reasoningData = "";
     let usage = {};
 
     if (body.stream) {
-      for await (const textStreamPart of response.fullStream) {
-        // console.log("textStreamPart: " + JSON.stringify(textStreamPart, null, 2));
-        if (textStreamPart.type === "text-delta") {
-          // accumulated += textStreamPart.textDelta; // this is outdated
-          accumulated += textStreamPart.text;
+      for await (const part of response.fullStream) {
+        // console.log("part: " + JSON.stringify(part.type, null, 2));
+        if (part.type === "text-delta") {
+          accumulated += part.text;
+        } if (part.type === "reasoning-delta") {      
+          reasoningData += part.text;
         }
-        if (textStreamPart.type === "finish") {
-
-          // usage = textStreamPart.usage;  // this is outdated
-          usage = textStreamPart.totalUsage;
+        if (part.type === "finish") {
+          usage = part.totalUsage;
         }
       }
     } else {
       console.log("[basicExample]", response);
       accumulated += response.content;
+      // Extract reasoning content if available
+       if (response.reasoningContent) {
+    for (const content of response.reasoningContent) {
+      if (content.type === 'reasoning') {
+        reasoningData += content.text;
+      }
     }
-    console.log("[basicExample] " + accumulated);
+  }
+    }
+    console.log("[basicExample AccumulatedData] " + accumulated);
+    console.log("[basicExample ReasoningData] " + reasoningData);
     console.log("[basicExample] " + JSON.stringify(usage));
     console.log("[basicExample] error: " + error);
   } catch (error) {

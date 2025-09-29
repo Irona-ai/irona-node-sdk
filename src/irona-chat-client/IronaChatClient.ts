@@ -1,13 +1,13 @@
 import { generateText, streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { anthropic, AnthropicProviderOptions } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { mistral } from "@ai-sdk/mistral";
 import { perplexity } from "@ai-sdk/perplexity";
 import { togetherai } from "@ai-sdk/togetherai";
 import { Config } from "../types";
 import { BadRequestError, MissingApiKeyError } from "../errors";
-import { doesModelSupportMediaTypes, providerApiKeyName, doesModelSupportWebSearch } from "../supported_models";
+import { doesModelSupportMediaTypes, providerApiKeyName, doesModelSupportWebSearch, getModelPrefix } from "../supported_models";
 import { validateSchema } from "../utils/requestValidator";
 import {
   CompletionsPayload,
@@ -21,12 +21,16 @@ import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import { extractMediaTypeArrayFromMessages, getSupportedProviderAndModelArray, validateAndGetProviderAndModel } from "../utils/providerAndModelUtils";
 import { MessagePayload } from "../schemas/common.schema";
 import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
+import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 
+type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity';
 export class IronaChatClient {
   constructor(
     private readonly config: Config,
     private readonly ironaRouter: IronaRouterClient
-  ) {}
+  ) { }
+
+
 
   /**
    * Processes a completions request and retries with fallback models if necessary.
@@ -92,44 +96,104 @@ export class IronaChatClient {
       // Convert messages to Vercel AI SDK format
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
-      // Get the appropriate model instance
-      const modelInstance = this.getModelInstance(provider, model, payload.search, supportsWebSearch);
-      if (!modelInstance) {
-        throw new Error(`No model instance found for provider: ${provider}`);
+
+      let fullModelName = model;
+      if (provider === "togetherai") {
+        const modelPrefix = getModelPrefix(provider, model);
+        if (modelPrefix) {
+          fullModelName = `${modelPrefix}/${model}`;
+        }
       }
 
-      // Prepare request options
-      const requestOptions = {
-        model: modelInstance(model),
+      const modelFactory = this.getModelInstance(
+        provider,
+        fullModelName,
+        payload.reasoning_effort
+      );
+
+      if (!modelFactory) {
+        throw new Error(`No model factory found for provider: ${provider}`);
+      }
+
+
+      const baseModel = modelFactory(fullModelName);
+      let finalModel = baseModel;
+
+
+      // Prepare base configuration
+      const baseConfig = {
+        model: finalModel,
         messages: vercelMessages,
         temperature: payload.temperature,
-        maxTokens: payload.maxTokens,
-      } as Parameters<typeof streamText>[0];
+        maxOutputTokens: payload.maxTokens,
+      };
       // Only add tools for OpenAI if search is true
-      if (provider === "openai" && payload.search) {
-        requestOptions.tools = { web_search_preview: openai.tools.webSearchPreview() };
+      if (provider === "openai" && payload.search && supportsWebSearch) {
+        (baseConfig as any).tools = { web_search_preview: openai.tools.webSearch({}) };
       }
 
+      if (provider === "google" && payload.search && supportsWebSearch) {
+        (baseConfig as any).tools = { google_search: google.tools.googleSearch({}) };
+      }
+
+      // Helper function to apply reasoning configuration
+      const applyReasoningConfig = (config: any): any => {
+        if (provider === "togetherai" || provider === "mistral" || provider === "perplexity") {
+          // For these providers, reasoning is handled by middleware that comes under <think> xml, not provider options
+          return config;
+        }
+        return ReasoningConfig.applyReasoningConfig(
+          config,
+          provider,
+          model,
+          payload.reasoning_effort
+        );
+      };
+
       if (payload.stream) {
-        const stream = await streamText(requestOptions);
+        const streamConfig: Parameters<typeof streamText>[0] = applyReasoningConfig({
+          ...baseConfig,
+        });
 
-        // Eagerly check the first token to catch early errors (e.g., auth failure)
+        const stream = await streamText(streamConfig);
+
+        // Eagerly test the stream by consuming multiple chunks to catch errors early
         const iterator = stream.fullStream[Symbol.asyncIterator]();
-        const firstResult = await iterator.next();
+        const testResults: any = [];
+        try {
+          // Test the first few chunks to ensure the stream is working
+          for (let i = 0; i < 3; i++) {
+            const result = await iterator.next();
 
-        if (firstResult.value?.type === "error") {
-          const err = firstResult.value.error;
-          // console.error("[streamText]: "+err);
-          throw new Error(err);
+            if (result.done) {
+              if (i === 0) {
+                throw new Error(`Empty stream response from ${provider}/${model}`);
+              }
+              break;
+            }
+
+            if (result.value?.type === "error") {
+              const err = result.value.error as { name?: string; statusCode?: number; message?: string };
+              throw new Error(`${err.name} (status ${err.statusCode})`);
+            }
+
+            testResults.push(result.value);
+          }
+        } catch (error) {
+          // If we get an error during the early test, propagate it up to trigger fallbacks
+          console.error(`[IronaChatClient] Stream validation failed for ${provider}/${model}:`, error);
+          throw error;
         }
 
+        // Create a new stream that includes the pre-fetched results
         const fullStream = {
           [Symbol.asyncIterator]: async function* () {
             try {
-              // Yield the first valid result
-              if (!firstResult.done) {
-                yield firstResult.value;
+              // Yield the pre-fetched results first
+              for (const result of testResults) {
+                yield result;
               }
+              // Continue with the rest of the stream
               for await (const part of stream.fullStream) {
                 if (part.type === "error") {
                   // console.error(`Stream yielded error for ${provider}/${model}:`, part.error);
@@ -147,8 +211,7 @@ export class IronaChatClient {
                 err
               );
               throw new Error(
-                `Streaming failed for provider: ${provider}, model: ${model}.\n${
-                  (err as Error).message
+                `Streaming failed for provider: ${provider}, model: ${model}.\n${(err as Error).message
                 }`
               );
             }
@@ -161,20 +224,28 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const response = await generateText(requestOptions);
-        return {
-          response: {
-            content: response.text,
-            role: "assistant",
-          },
-          provider,
-          model,
-        };
+        const generateConfig: Parameters<typeof generateText>[0] = applyReasoningConfig({
+          ...baseConfig,
+        });
+        try {
+          const response = await generateText(generateConfig);
+          return {
+            response: {
+              content: response.text,
+              reasoningContent : response.reasoning,
+              role: "assistant",
+            },
+            provider,
+            model,
+          };
+        } catch (error) {
+          console.error(`[IronaChatClient] Non-stream request failed for ${provider}/${model}:`, error);
+          throw error;
+        }
       }
     } catch (error) {
       throw new Error(
-        `Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${
-          (error as Error).message
+        `Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${(error as Error).message
         }\n`
       );
     }
@@ -202,13 +273,13 @@ export class IronaChatClient {
         } else if (part.type === "image_url") {
           return {
             type: "image",
-            image: new URL(part.image_url.url),
+            image: part.image_url.url,
           } as const;
         } else if (part.type === "document") {
           return {
             type: "file",
-            data: new URL(part.source.url),
-            mimeType: "application/pdf",
+            data: part.source.url,
+            mediaType: "application/pdf",
           } as const;
         } else {
           throw new Error(
@@ -228,7 +299,7 @@ export class IronaChatClient {
   /**
    * Gets the appropriate model instance
    */
-  private getModelInstance(provider: string, model: string, search?: boolean, supportsWebSearch?: boolean) {
+  private getModelInstance(provider: string, model: string, reasoningEffort?: ReasoningEffort) {
     // Map of provider to their respective model functions
     const providerModels = {
       openai: openai,
@@ -238,18 +309,11 @@ export class IronaChatClient {
       perplexity: perplexity,
       togetherai: togetherai,
     };
-    // web search grounding is only supported for Google and OpenAI providers
-    if (provider === "google") {
-      const enableSearchGrounding = !!search && !!supportsWebSearch;
-      return (modelName: string) => providerModels[provider](modelName, { useSearchGrounding: enableSearchGrounding });
-    }
-    if (provider === "openai") {
-      const enableWebSearch = !!search && !!supportsWebSearch;
-      if (enableWebSearch) {
-        return (modelName: string) => openai.responses(modelName);
-      } else {
-        return (modelName: string) => openai(modelName);
-      }
+    if (ReasoningConfig.supportsReasoningMiddleware(provider as ProviderName, model)) {
+      return (modelName: string) => {
+        const baseModel = providerModels[provider as keyof typeof providerModels](modelName);
+        return ReasoningConfig.createEnhancedModelWithReasoning(baseModel, reasoningEffort);
+      };
     }
     return providerModels[provider as keyof typeof providerModels];
   }

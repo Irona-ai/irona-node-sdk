@@ -44,10 +44,12 @@ async function CompletionsTest() {
       for await (const textStreamPart of response.fullStream) {
         console.log("textStreamPart: " + JSON.stringify(textStreamPart, null, 2));
         if (textStreamPart.type === "text-delta") {
-          accumulated += textStreamPart.textDelta;
+          // accumulated += textStreamPart.textDelta;  // this is outdated
+          accumulated += textStreamPart.text; //this is use in updated version
         }
         if (textStreamPart.type === "finish") {
-          usage = textStreamPart.usage;
+          // usage = textStreamPart.usage; // this is outdated
+          usage = textStreamPart.totalUsage; // this is used in updated version
         }
       }
     } else {

@@ -25,37 +25,11 @@ const commonBody = {
       "anthropic/claude-opus-4-0",  
       "anthropic/claude-sonnet-4-20250514",  
       "anthropic/claude-sonnet-4-0" ,  
-       "openai/gpt-5"
+       "openai/o1-mini"
   ],
   fallback_models: ["openai/gpt-4o-mini", "google/gemini-1.5-flash-latest"],
 };
 
-function filterOutThinkingContent(text) {
-  if (!text) return text;
-  
-  // Remove various thinking tag patterns
-  const thinkingPatterns = [
-    /<think>[\s\S]*?<\/think>/g,  
-    /<reasoning>[\s\S]*?<\/reasoning>/g, 
-    /<thought>[\s\S]*?<\/thought>/g,    
-    /\[thinking\][\s\S]*?\[\/thinking\]/g, 
-    /Thinking:\s*[\s\S]*?(?=\n\n|$)/g, 
-  ];
-  
-  let cleanedText = text;
-  thinkingPatterns.forEach(pattern => {
-    cleanedText = cleanedText.replace(pattern, '');
-  });
-  
-  // Remove any empty lines or excessive whitespace
-  cleanedText = cleanedText
-    .split('\n')
-    .filter(line => line.trim().length > 0)
-    .join('\n')
-    .trim();
-  
-  return cleanedText;
-}
 
 async function modelSelectTest() {
   let body = {
@@ -101,9 +75,6 @@ async function CompletionsTest() {
         if (part.type === "finish") {
           usage = part.totalUsage;
         }
-         if (body.reasoning_effort === "off" || body.reasoning_effort === undefined) {
-        accumulated = filterOutThinkingContent(accumulated);
-      }
       }
     } else {
       console.log("[basicExample]", response);
@@ -116,9 +87,6 @@ async function CompletionsTest() {
       }
     }
   }
-    if (body.reasoning_effort === "off") {
-        accumulated = filterOutThinkingContent(accumulated);
-      }
     }
     console.log("[basicExample AccumulatedData] " + accumulated);
     console.log("[basicExample ReasoningData] " + reasoningData);

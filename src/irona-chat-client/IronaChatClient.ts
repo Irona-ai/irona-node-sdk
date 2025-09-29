@@ -108,8 +108,6 @@ export class IronaChatClient {
       const modelFactory = this.getModelInstance(
         provider,
         fullModelName,
-        payload.search,
-        supportsWebSearch,
         payload.reasoning_effort
       );
 
@@ -130,18 +128,18 @@ export class IronaChatClient {
         maxOutputTokens: payload.maxTokens,
       };
       // Only add tools for OpenAI if search is true
-      if (provider === "openai" && payload.search) {
+      if (provider === "openai" && payload.search && supportsWebSearch) {
         (baseConfig as any).tools = { web_search_preview: openai.tools.webSearch({}) };
       }
 
-      if (provider === "google" && payload.search) {
+      if (provider === "google" && payload.search && supportsWebSearch) {
         (baseConfig as any).tools = { google_search: google.tools.googleSearch({}) };
       }
 
       // Helper function to apply reasoning configuration
       const applyReasoningConfig = (config: any): any => {
         if (provider === "togetherai" || provider === "mistral" || provider === "perplexity") {
-          // For these providers, reasoning is handled by middleware, not provider options
+          // For these providers, reasoning is handled by middleware that comes under <think> xml, not provider options
           return config;
         }
         return ReasoningConfig.applyReasoningConfig(
@@ -301,7 +299,7 @@ export class IronaChatClient {
   /**
    * Gets the appropriate model instance
    */
-  private getModelInstance(provider: string, model: string, search?: boolean, supportsWebSearch?: boolean, reasoningEffort?: ReasoningEffort) {
+  private getModelInstance(provider: string, model: string, reasoningEffort?: ReasoningEffort) {
     // Map of provider to their respective model functions
     const providerModels = {
       openai: openai,
@@ -311,19 +309,6 @@ export class IronaChatClient {
       perplexity: perplexity,
       togetherai: togetherai,
     };
-    // web search grounding is only supported for Google and OpenAI providers
-    if (provider === "google") {
-      const enableSearchGrounding = !!search && !!supportsWebSearch;
-      return (modelName: string) => providerModels[provider](modelName);
-    }
-    if (provider === "openai") {
-      const enableWebSearch = !!search && !!supportsWebSearch;
-      if (enableWebSearch) {
-        return (modelName: string) => openai.responses(modelName);
-      } else {
-        return (modelName: string) => openai(modelName);
-      }
-    }
     if (ReasoningConfig.supportsReasoningMiddleware(provider as ProviderName, model)) {
       return (modelName: string) => {
         const baseModel = providerModels[provider as keyof typeof providerModels](modelName);

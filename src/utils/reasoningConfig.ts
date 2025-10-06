@@ -144,6 +144,7 @@ export class ReasoningConfig {
         };
       case 'xai':
         if (model.includes("grok")) {
+          // xAI doesn't support 'medium' effort level - map to 'low'
           const mappedReasoningEffort = reasoningEffort === 'medium' ? 'low' : reasoningEffort;
 
           return {
@@ -152,7 +153,7 @@ export class ReasoningConfig {
             }
           };
         }
-        break
+        break;
     }
 
     return null;

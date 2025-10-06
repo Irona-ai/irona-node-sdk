@@ -135,14 +135,15 @@ export class IronaChatClient {
 
       if (provider === "google" && payload.search && supportsWebSearch) {
         (baseConfig as any).tools = { google_search: google.tools.googleSearch({}) };
-      } 
-       if (provider === "xai" && payload.search && supportsWebSearch) {
-        (baseConfig as any).providerOptions = 
-        { xai: {
-      searchParameters: {
-        mode: 'on',
-      },
-    }, };
+      }
+      if (provider === "xai" && payload.search && supportsWebSearch) {
+        (baseConfig as any).providerOptions = {
+          xai: {
+            searchParameters: {
+              mode: "on",
+            },
+          },
+        };
       }
       // Helper function to apply reasoning configuration
       const applyReasoningConfig = (config: any): any => {
@@ -156,16 +157,16 @@ export class IronaChatClient {
           model,
           payload.reasoning_effort
         );
-      };  
+      };
 
       if (payload.stream) {
-        const streamConfig: Parameters<typeof streamText>[0] = payload.reasoning_effort 
-    ? applyReasoningConfig({
-        ...baseConfig,
-      })
-  : {
-        ...baseConfig,
-      };
+        const streamConfig: Parameters<typeof streamText>[0] = payload.reasoning_effort
+          ? applyReasoningConfig({
+            ...baseConfig,
+          })
+          : {
+            ...baseConfig,
+          };
 
         const stream = await streamText(streamConfig);
 
@@ -236,19 +237,19 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const generateConfig: Parameters<typeof generateText>[0] = payload.reasoning_effort 
-    ? applyReasoningConfig({
-        ...baseConfig,
-      })
-    : {
-        ...baseConfig,
-      };
+        const generateConfig: Parameters<typeof generateText>[0] = payload.reasoning_effort
+          ? applyReasoningConfig({
+            ...baseConfig,
+          })
+          : {
+            ...baseConfig,
+          };
         try {
           const response = await generateText(generateConfig);
           return {
             response: {
               content: response.text,
-              reasoningContent : response.reasoning,
+              reasoningContent: response.reasoning,
               role: "assistant",
             },
             provider,

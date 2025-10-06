@@ -27,7 +27,10 @@ export interface MistralReasoningConfig {
 export interface PerplexityReasoningConfig {
   effort: ReasoningEffort;
 }
-type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity';
+export interface XAIReasoningConfig {
+  reasoningEffort: ReasoningEffort;
+}
+type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity' | "xai";
 
 export interface ProviderReasoningOptions {
   google?: { thinkingConfig: GoogleThinkingConfig };
@@ -36,6 +39,7 @@ export interface ProviderReasoningOptions {
   togetherai?: { reasoning: TogetherAIReasoningConfig };
   mistral?: { reasoning: MistralReasoningConfig };
   perplexity?: { reasoning: PerplexityReasoningConfig };
+  xai?: XAIReasoningConfig;
 }
 
 export class ReasoningConfig {
@@ -85,20 +89,25 @@ export class ReasoningConfig {
         }
         break;
 
-          case 'openai':
+      case 'openai':
         if (isOff) {
-          return null; 
+          return null;
         }
         return {
           openai: {
-            reasoningSummary: 'auto', 
-           
+            effort: reasoningEffort,
+            reasoningSummary: 'auto',
           }
         };
 
       case 'anthropic':
         if (model.includes("claude")) {
-          const maxBudget = 20000;
+          let maxBudget: number;
+          if (model.includes("opus")) {
+            maxBudget = 32000;
+          } else {
+            maxBudget = 64000;
+          }
           return {
             anthropic: {
               thinking: {
@@ -133,6 +142,17 @@ export class ReasoningConfig {
             reasoning: { effort: reasoningEffort }
           }
         };
+      case 'xai':
+        if (model.includes("grok")) {
+          const mappedReasoningEffort = reasoningEffort === 'medium' ? 'low' : reasoningEffort;
+
+          return {
+            xai: {
+              reasoningEffort: mappedReasoningEffort
+            }
+          };
+        }
+        break
     }
 
     return null;

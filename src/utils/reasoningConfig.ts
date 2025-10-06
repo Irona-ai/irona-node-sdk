@@ -27,7 +27,10 @@ export interface MistralReasoningConfig {
 export interface PerplexityReasoningConfig {
   effort: ReasoningEffort;
 }
-type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity';
+export interface XAIReasoningConfig {
+  reasoningEffort: ReasoningEffort;
+}
+type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity' | "xai";
 
 export interface ProviderReasoningOptions {
   google?: { thinkingConfig: GoogleThinkingConfig };
@@ -36,6 +39,7 @@ export interface ProviderReasoningOptions {
   togetherai?: { reasoning: TogetherAIReasoningConfig };
   mistral?: { reasoning: MistralReasoningConfig };
   perplexity?: { reasoning: PerplexityReasoningConfig };
+  xai?: XAIReasoningConfig;
 }
 
 export class ReasoningConfig {
@@ -85,14 +89,14 @@ export class ReasoningConfig {
         }
         break;
 
-          case 'openai':
+      case 'openai':
         if (isOff) {
           return null; 
         }
         return {
           openai: {
+            effort: reasoningEffort,
             reasoningSummary: 'auto', 
-           
           }
         };
 
@@ -133,7 +137,17 @@ export class ReasoningConfig {
             reasoning: { effort: reasoningEffort }
           }
         };
-    }
+
+      case 'xai':
+        if (model.includes("grok")) {
+          return {
+            xai: {
+              reasoningEffort: reasoningEffort
+            }
+          };
+        }
+        break;
+      }
 
     return null;
   }
@@ -160,7 +174,7 @@ export class ReasoningConfig {
 
     return config;
   }
-
+  
 
   static supportsReasoningMiddleware(provider: ProviderName, model: string): boolean {
     const providersWithMiddleware = ['togetherai', 'mistral', 'perplexity'];

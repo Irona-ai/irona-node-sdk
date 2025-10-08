@@ -22,8 +22,9 @@ import { extractMediaTypeArrayFromMessages, getSupportedProviderAndModelArray, v
 import { MessagePayload } from "../schemas/common.schema";
 import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
+import { xai } from "@ai-sdk/xai";
 
-type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity';
+type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity' | 'xai';
 export class IronaChatClient {
   constructor(
     private readonly config: Config,
@@ -135,7 +136,15 @@ export class IronaChatClient {
       if (provider === "google" && payload.search && supportsWebSearch) {
         (baseConfig as any).tools = { google_search: google.tools.googleSearch({}) };
       }
-
+      if (provider === "xai" && payload.search && supportsWebSearch) {
+        (baseConfig as any).providerOptions = {
+          xai: {
+            searchParameters: {
+              mode: "on",
+            },
+          },
+        };
+      }
       // Helper function to apply reasoning configuration
       const applyReasoningConfig = (config: any): any => {
         if (provider === "togetherai" || provider === "mistral" || provider === "perplexity") {
@@ -151,9 +160,13 @@ export class IronaChatClient {
       };
 
       if (payload.stream) {
-        const streamConfig: Parameters<typeof streamText>[0] = applyReasoningConfig({
-          ...baseConfig,
-        });
+        const streamConfig: Parameters<typeof streamText>[0] = payload.reasoning_effort
+          ? applyReasoningConfig({
+            ...baseConfig,
+          })
+          : {
+            ...baseConfig,
+          };
 
         const stream = await streamText(streamConfig);
 
@@ -224,15 +237,19 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const generateConfig: Parameters<typeof generateText>[0] = applyReasoningConfig({
-          ...baseConfig,
-        });
+        const generateConfig: Parameters<typeof generateText>[0] = payload.reasoning_effort
+          ? applyReasoningConfig({
+            ...baseConfig,
+          })
+          : {
+            ...baseConfig,
+          };
         try {
           const response = await generateText(generateConfig);
           return {
             response: {
               content: response.text,
-              reasoningContent : response.reasoning,
+              reasoningContent: response.reasoning,
               role: "assistant",
             },
             provider,
@@ -308,6 +325,7 @@ export class IronaChatClient {
       mistral: mistral,
       perplexity: perplexity,
       togetherai: togetherai,
+      xai: xai,
     };
     if (ReasoningConfig.supportsReasoningMiddleware(provider as ProviderName, model)) {
       return (modelName: string) => {

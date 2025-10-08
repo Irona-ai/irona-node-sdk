@@ -1,6 +1,6 @@
 {
   "name": "ironaai",
-  "version": "0.0.16",
+  "version": "0.0.17",
   "main": "dist/index.js",
   "module": "dist/index.m.js",
   "unpkg": "dist/index.umd.js",
@@ -48,6 +48,7 @@
     "@ai-sdk/openai": "^2.0.32",
     "@ai-sdk/perplexity": "^2.0.9",
     "@ai-sdk/togetherai": "^1.0.18",
+    "@ai-sdk/xai": "^2.0.23",
     "ai": "^5.0.48",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",

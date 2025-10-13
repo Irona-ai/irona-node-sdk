@@ -128,14 +128,24 @@ export class IronaChatClient {
         temperature: payload.temperature,
         maxOutputTokens: payload.maxTokens,
       };
-      // Only add tools for OpenAI if search is true
+
+      // Handle tools from payload
+      let tools = payload.tools ? { ...payload.tools } : {};
+
+      // Add search tools if search is enabled
       if (provider === "openai" && payload.search && supportsWebSearch) {
-        (baseConfig as any).tools = { web_search_preview: openai.tools.webSearch({}) };
+        tools = { ...tools, web_search_preview: openai.tools.webSearch({}) };
       }
 
       if (provider === "google" && payload.search && supportsWebSearch) {
-        (baseConfig as any).tools = { google_search: google.tools.googleSearch({}) };
+        tools = { ...tools, google_search: google.tools.googleSearch({}) };
       }
+
+      // Add tools to config if there are any
+      if (Object.keys(tools).length > 0) {
+        (baseConfig as any).tools = tools;
+      }
+
       if (provider === "xai" && payload.search && supportsWebSearch) {
         (baseConfig as any).providerOptions = {
           xai: {

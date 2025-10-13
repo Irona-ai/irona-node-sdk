@@ -16,12 +16,13 @@ export const setupSuccessfulGeneration = (text: string = 'Test response') => {
   mockGenerateText.mockResolvedValue({ text });
 };
 
-export const setupSuccessfulStream = () => {
+export const setupSuccessfulStream = (chunks: string[] = ['Hello', ' world']) => {
   const mockStream = {
     fullStream: {
       [Symbol.asyncIterator]: async function* () {
-        yield { type: 'text-delta', textDelta: 'Hello' };
-        yield { type: 'text-delta', textDelta: ' world' };
+        for (const chunk of chunks) {
+          yield { type: 'text-delta', textDelta: chunk };
+        }
       },
     },
   };
@@ -39,4 +40,15 @@ export const setupStreamError = () => {
   };
   mockStreamText.mockResolvedValue(mockStream);
   return mockStream;
+};
+
+// Helper functions to get the last call arguments
+export const getLastGenerateTextCall = () => {
+  if (mockGenerateText.mock.calls.length === 0) return undefined;
+  return mockGenerateText.mock.calls[mockGenerateText.mock.calls.length - 1][0];
+};
+
+export const getLastStreamTextCall = () => {
+  if (mockStreamText.mock.calls.length === 0) return undefined;
+  return mockStreamText.mock.calls[mockStreamText.mock.calls.length - 1][0];
 };

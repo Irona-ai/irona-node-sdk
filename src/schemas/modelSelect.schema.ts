@@ -8,6 +8,7 @@ export const ModelSelectSchema = z.object({
   fallback_models: z.array(ModelSchema).optional(),
   kwargs: z.record(z.any()).optional(),
   search: z.boolean().optional(),
+  tools: z.record(z.any()).optional(), // Tools parameter for function calling
 });
 
 export type ModelSelectPayload = z.infer<typeof ModelSelectSchema>;

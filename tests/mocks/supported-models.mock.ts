@@ -1,6 +1,7 @@
 jest.mock('../../src/supported_models', () => ({
   doesModelSupportMediaTypes: jest.fn().mockReturnValue(true),
   doesModelSupportWebSearch: jest.fn().mockReturnValue(false),
+  getModelPrefix: jest.fn().mockReturnValue(null),
   providerApiKeyName: jest.fn().mockImplementation((provider: string) => {
     const mapping: { [key: string]: string } = {
       openai: 'OPENAI_API_KEY',

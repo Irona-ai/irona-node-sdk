@@ -60,3 +60,10 @@ export const ModelSchema = z
     "Model must contain a '/' separating provider and model"
   );
 export type ModelPayload = z.infer<typeof ModelSchema>;
+
+// Tool schema for Vercel AI SDK tools
+// Tools are defined as an object where keys are tool names and values are tool definitions
+// Using z.any() for the tool definition to allow flexibility with Vercel AI SDK tool format
+export const ToolsSchema = z.record(z.string(), z.any()).optional();
+
+export type ToolsPayload = z.infer<typeof ToolsSchema>;

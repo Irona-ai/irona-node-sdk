@@ -122,19 +122,32 @@ export class IronaChatClient {
 
 
       // Prepare base configuration
-      const baseConfig = {
+      const baseConfig: any = {
         model: finalModel,
         messages: vercelMessages,
         temperature: payload.temperature,
         maxOutputTokens: payload.maxTokens,
       };
-      // Only add tools for OpenAI if search is true
+
+      // Add user-provided tools if available
+      if (payload.tools) {
+        baseConfig.tools = payload.tools;
+      }
+
+      // Add search tools if search is enabled and supported
+      // These will be merged with user-provided tools
       if (provider === "openai" && payload.search && supportsWebSearch) {
-        (baseConfig as any).tools = { web_search_preview: openai.tools.webSearch({}) };
+        baseConfig.tools = {
+          ...baseConfig.tools,
+          web_search_preview: openai.tools.webSearch({}),
+        };
       }
 
       if (provider === "google" && payload.search && supportsWebSearch) {
-        (baseConfig as any).tools = { google_search: google.tools.googleSearch({}) };
+        baseConfig.tools = {
+          ...baseConfig.tools,
+          google_search: google.tools.googleSearch({}),
+        };
       }
       if (provider === "xai" && payload.search && supportsWebSearch) {
         (baseConfig as any).providerOptions = {

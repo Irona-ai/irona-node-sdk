@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MessageSchema, ModelSchema } from "./common.schema";
+import { MessageSchema, ModelSchema, ToolsSchema } from "./common.schema";
 
 export const ModelSelectSchema = z.object({
   topk_models: z.number().int().optional(),
@@ -8,6 +8,7 @@ export const ModelSelectSchema = z.object({
   fallback_models: z.array(ModelSchema).optional(),
   kwargs: z.record(z.any()).optional(),
   search: z.boolean().optional(),
+  tools: ToolsSchema,
 });
 
 export type ModelSelectPayload = z.infer<typeof ModelSelectSchema>;

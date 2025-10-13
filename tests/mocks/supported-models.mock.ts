@@ -12,6 +12,8 @@ jest.mock('../../src/supported_models', () => ({
     };
     return mapping[provider] || `${provider.toUpperCase()}_API_KEY`;
   }),
+  getModelPrefix: jest.fn().mockReturnValue(null),
+  updateProvidersFromGist: jest.fn().mockResolvedValue(undefined),
 }));
 
 export const mockDoesModelSupportMediaTypes = require('../../src/supported_models').doesModelSupportMediaTypes as jest.Mock;

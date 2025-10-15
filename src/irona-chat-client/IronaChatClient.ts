@@ -23,6 +23,7 @@ import { MessagePayload } from "../schemas/common.schema";
 import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 import { xai } from "@ai-sdk/xai";
+import { normalizeTools, validateToolsStructure } from "../utils/toolsNormalizer";
 
 type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity' | 'xai';
 export class IronaChatClient {
@@ -141,9 +142,21 @@ export class IronaChatClient {
         tools = { ...tools, google_search: google.tools.googleSearch({}) };
       }
 
-      // Add tools to config if there are any
-      if (Object.keys(tools).length > 0) {
-        (baseConfig as any).tools = tools;
+      // Normalize tools to ensure compatibility with Vercel AI SDK
+      // This fixes issues with Composio tools and other schema formats
+      const normalizedTools = normalizeTools(tools);
+
+      // Validate tools structure (log warnings but don't fail)
+      if (normalizedTools) {
+        const validation = validateToolsStructure(normalizedTools);
+        if (!validation.valid) {
+          console.warn('[IronaChatClient] Tools validation warnings:', validation.errors);
+        }
+      }
+
+      // Add normalized tools to config if there are any
+      if (normalizedTools && Object.keys(normalizedTools).length > 0) {
+        (baseConfig as any).tools = normalizedTools;
       }
 
       if (provider === "xai" && payload.search && supportsWebSearch) {

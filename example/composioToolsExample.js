@@ -1,6 +1,6 @@
 const { IronaAI } = require("ironaai");
-// Note: Install composio-core with: npm install composio-core
-// const { VercelAIToolSet } = require("composio-core");
+// Note: Install @composio/core with: npm install @composio/core
+// const { VercelAIToolSet } = require("@composio/core");
 
 /**
  * Example demonstrating how to use Composio tools with the IronaAI SDK.
@@ -14,7 +14,7 @@ const { IronaAI } = require("ironaai");
  * - And many more...
  *
  * Installation:
- * npm install ironaai composio-core
+ * npm install ironaai @composio/core
  *
  * Setup:
  * 1. Get your Composio API key from https://app.composio.dev
@@ -31,7 +31,7 @@ async function githubToolsExample() {
 
   try {
     // Initialize Composio VercelAIToolSet
-    // Uncomment when you have composio-core installed:
+    // Uncomment when you have @composio/core installed:
     // const toolset = new VercelAIToolSet({ apiKey: process.env.COMPOSIO_API_KEY });
 
     // Get GitHub tools from Composio
@@ -392,7 +392,7 @@ async function main() {
   console.log("=== IronaAI + Composio Integration Examples ===");
   console.log("Demonstrating how to use Composio's 250+ tools with IronaAI SDK\n");
   console.log("Note: These examples use simulated tool definitions.");
-  console.log("In production, use: const toolset = new VercelAIToolSet() from composio-core\n");
+  console.log("In production, use: const toolset = new VercelAIToolSet() from @composio/core\n");
 
   try {
     // Run examples sequentially
@@ -404,7 +404,7 @@ async function main() {
 
     console.log("\n=== All Composio examples completed ===");
     console.log("\nTo use real Composio tools:");
-    console.log("1. Install: npm install composio-core");
+    console.log("1. Install: npm install @composio/core");
     console.log("2. Get API key from: https://app.composio.dev");
     console.log("3. Set env var: export COMPOSIO_API_KEY=your_key");
     console.log("4. Connect your apps via Composio dashboard");

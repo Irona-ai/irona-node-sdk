@@ -9,14 +9,14 @@ Composio provides 250+ pre-built tools for integrating with popular services lik
 ## Installation
 
 ```bash
-npm install ironaai composio-core
+npm install ironaai @composio/core
 ```
 
 ## Quick Start
 
 ```javascript
 const { IronaAI } = require("ironaai");
-const { VercelAIToolSet } = require("composio-core");
+const { VercelAIToolSet } = require("@composio/core");
 
 // Initialize Composio toolset
 const toolset = new VercelAIToolSet({
@@ -245,11 +245,11 @@ node composioToolsExample.js
 
 ## Troubleshooting
 
-### Error: "Cannot find module 'composio-core'"
+### Error: "Cannot find module '@composio/core'"
 
 **Solution**: Install Composio
 ```bash
-npm install composio-core
+npm install @composio/core
 ```
 
 ### Error: "COMPOSIO_API_KEY is required"
@@ -267,7 +267,7 @@ export COMPOSIO_API_KEY="your_key"
 
 **Solution**: This should be automatically handled by the SDK. If you still see this:
 1. Update to the latest version of `ironaai`
-2. Ensure `composio-core` is up to date
+2. Ensure `@composio/core` is up to date
 3. Check that tools are being passed correctly (see examples above)
 
 ## Available Apps

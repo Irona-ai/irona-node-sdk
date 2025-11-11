@@ -1,62 +1,84 @@
 import { z } from "zod";
 
-// Schema for text content
+// Base Utilities
+const urlField = z.string().url();
+const optionalFilename = z.string().optional();
+
+// Content Schemas
+
+// Text content
 const TextContent = z.object({
   type: z.literal("text"),
   text: z.string(),
 });
 
+// Reasoning content
 const ReasoningContent = z.object({
-  type : z.literal("reasoning"),
+  type: z.literal("reasoning"),
   text: z.string(),
 });
 
-// Schema for image URL content
+// Image URL content
 const ImageUrlContent = z.object({
   type: z.literal("image_url"),
   image_url: z.object({
-    url: z.string().url(),
+    url: urlField,
   }),
-  filename: z.string().optional(),
+  filename: optionalFilename,
 });
 
-// Schema for document content (with URL source)
+// Document content
 const DocumentContent = z.object({
   type: z.literal("document"),
   source: z.object({
     type: z.literal("url"),
-    url: z.string().url(),
+    url: urlField,
   }),
-  filename: z.string().optional(),
+  filename: optionalFilename,
+});
+
+// Tool call result content
+const ResultContent = z.object({
+  type: z.literal("tool-result"),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  result: z.any(),
+});
+
+// Tool call request content
+const ToolCallContent = z.object({
+  type: z.literal("tool-call"),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  toolInput: z.any(),
 });
 
 export type DocumentContentPayload = z.infer<typeof DocumentContent>;
 
-// Create a discriminated union based on the 'type' field
+//  Discriminated Content Union
 const ContentItem = z.discriminatedUnion("type", [
   TextContent,
   ReasoningContent,
   ImageUrlContent,
   DocumentContent,
+  ResultContent,
+  ToolCallContent,
 ]);
 
-// Message schema supporting both array and string formats for `content`
+// Message Schema
 export const MessageSchema = z.object({
-  role: z.enum(["system", "assistant", "user"], {
-    required_error: "Role is required",
-  }),
+  role: z.enum(["system", "assistant", "user", "tool"]),
   content: z.union([
-    z.string(), // Legacy support: single string message
-    z.array(ContentItem), // Modern format: array of content objects
+    z.string(), // legacy
+    z.array(ContentItem), // modern
   ]),
 });
 
 export type MessagePayload = z.infer<typeof MessageSchema>;
-// Define modelSchema to validate format like "openai/gpt-4-1106-preview"
+
+//  Model Schema
 export const ModelSchema = z
-  .string({ required_error: "Model is required" })
-  .regex(
-    /^[^/]+\/[^/]+$/,
-    "Model must contain a '/' separating provider and model"
-  );
+  .string()
+  .regex(/^[^/]+\/[^/]+$/, "Model must contain a '/' separating provider and model");
+
 export type ModelPayload = z.infer<typeof ModelSchema>;

@@ -53,8 +53,8 @@ export class ChatPdfModel extends SimpleChatModel {
     try {
       return {
         type: "file",
-        data: contentItem.source.url,
-        mimeType: "application/pdf",
+        url: contentItem.source.url,
+        mediaType: "application/pdf",
         filename: contentItem.filename || "document.pdf",
       };
     } catch (error) {

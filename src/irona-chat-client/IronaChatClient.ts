@@ -342,7 +342,7 @@ export class IronaChatClient {
         } else if (part.type === "document") {
           return {
             type: "file",
-            data: part.source.url,
+            url: part.source.url,
             mediaType: "application/pdf",
           } as const;
         } else if (part.type === "tool-result") {

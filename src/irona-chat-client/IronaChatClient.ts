@@ -32,6 +32,7 @@ import { MessagePayload } from "../schemas/common.schema";
 import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 import { xai } from "@ai-sdk/xai";
+import { fetchAndConvertToBase64, requiresBase64Conversion } from "../utils/fileConverter";
 
 type ProviderName =
   | "google"
@@ -115,7 +116,7 @@ export class IronaChatClient {
       const apiKey = this.loadApiKeyForProvider(provider, model);
 
       // Convert messages to Vercel AI SDK format
-      const vercelMessages = this.convertToVercelMessages(payload.messages);
+      const vercelMessages = await this.convertToVercelMessages(payload.messages, provider);
 
       let fullModelName = model;
       if (provider === "togetherai") {
@@ -317,9 +318,11 @@ export class IronaChatClient {
 
   /**
    * Converts messages to Vercel AI SDK format
+   * @param messages - The messages to convert
+   * @param provider - The AI provider (needed for provider-specific conversions)
    */
-  private convertToVercelMessages(messages: MessagePayload[]): any[] {
-    return messages.map((msg, index) => {
+  private async convertToVercelMessages(messages: MessagePayload[], provider: string): Promise<any[]> {
+    return Promise.all(messages.map(async (msg, index) => {
       if (typeof msg.content === "string") {
         return {
           id: `msg-${index}`,
@@ -328,7 +331,7 @@ export class IronaChatClient {
         };
       }
 
-      const parts = msg.content.map((part) => {
+      const parts = await Promise.all(msg.content.map(async (part) => {
         if (part.type === "text") {
           return {
             type: "text",
@@ -340,9 +343,19 @@ export class IronaChatClient {
             image: part.image_url.url,
           } as const;
         } else if (part.type === "document") {
+          // For OpenAI, we need to convert URLs to base64 data URLs
+          let fileUrl = part.source.url;
+          if (requiresBase64Conversion(provider) && !fileUrl.startsWith('data:')) {
+            try {
+              fileUrl = await fetchAndConvertToBase64(fileUrl, "application/pdf");
+            } catch (error) {
+              console.error(`Failed to convert PDF to base64 for ${provider}:`, error);
+              // Fall back to original URL
+            }
+          }
           return {
             type: "file",
-            url: part.source.url,
+            url: fileUrl,
             mediaType: "application/pdf",
           } as const;
         } else if (part.type === "tool-result") {
@@ -364,14 +377,14 @@ export class IronaChatClient {
             `Unsupported message part type: ${(part as any).type}`
           );
         }
-      });
+      }));
 
       return {
         id: `msg-${index}`,
         role: msg.role,
         content: parts,
       };
-    });
+    }));
   }
 
   /**

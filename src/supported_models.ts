@@ -41,6 +41,20 @@ export function doesModelSupportMediaTypes(
 ) {
   if (!medias || medias.length === 0) return true;
 
+  // Workaround: OpenAI models that support PDFs even if not listed in capabilities
+  // OpenAI announced PDF support for gpt-4o, gpt-4o-mini, and o1 series
+  const openaiPdfSupportedModels = [
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4o-2024-08-06',
+    'gpt-4o-2024-11-20',
+    'chatgpt-4o-latest',
+    'o1',
+    'o1-mini',
+    'o1-preview',
+    'o1-2024-12-17'
+  ];
+
   // Updated to use capabilities
   const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
   if (!modelCapabilities) return false;
@@ -49,6 +63,16 @@ export function doesModelSupportMediaTypes(
   return medias.every((media) => {
     // Only allow "image" and "pdf" media types
     if (media !== "image" && media !== "pdf") return false;
+
+    // Special handling for OpenAI PDF support
+    if (
+      media === "pdf" &&
+      provider === "openai" &&
+      openaiPdfSupportedModels.includes(model)
+    ) {
+      return true;
+    }
+
     return modelCapabilities.includes(media);
   });
 }

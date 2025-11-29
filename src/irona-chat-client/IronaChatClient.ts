@@ -325,7 +325,6 @@ export class IronaChatClient {
     return Promise.all(messages.map(async (msg, index) => {
       if (typeof msg.content === "string") {
         return {
-          id: `msg-${index}`,
           role: msg.role,
           content: msg.content,
         };
@@ -338,16 +337,36 @@ export class IronaChatClient {
             text: part.text,
           } as const;
         } else if (part.type === "image_url") {
+          // For OpenAI, we need to convert image URLs to base64 data URLs
+          let imageUrl = part.image_url.url;
+          if (requiresBase64Conversion(provider) && !imageUrl.startsWith('data:')) {
+            try {
+              // Detect image MIME type from URL extension or default to jpeg
+              const extension = imageUrl.split('.').pop()?.toLowerCase();
+              const mimeTypeMap: Record<string, string> = {
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'png': 'image/png',
+                'gif': 'image/gif',
+                'webp': 'image/webp',
+              };
+              const mimeType = mimeTypeMap[extension || 'jpeg'] || 'image/jpeg';
+              imageUrl = await fetchAndConvertToBase64(imageUrl, mimeType);
+            } catch (error) {
+              console.error(`Failed to convert image to base64 for ${provider}:`, error);
+              // Fall back to original URL
+            }
+          }
           return {
             type: "image",
-            image: part.image_url.url,
+            image: imageUrl,
           } as const;
         } else if (part.type === "document") {
           // For OpenAI, we need to convert URLs to base64 data URLs
-          let fileUrl = part.source.url;
-          if (requiresBase64Conversion(provider) && !fileUrl.startsWith('data:')) {
+          let fileData = part.source.url;
+          if (requiresBase64Conversion(provider) && !fileData.startsWith('data:')) {
             try {
-              fileUrl = await fetchAndConvertToBase64(fileUrl, "application/pdf");
+              fileData = await fetchAndConvertToBase64(fileData, "application/pdf");
             } catch (error) {
               console.error(`Failed to convert PDF to base64 for ${provider}:`, error);
               // Fall back to original URL
@@ -355,7 +374,7 @@ export class IronaChatClient {
           }
           return {
             type: "file",
-            url: fileUrl,
+            data: fileData,
             mediaType: "application/pdf",
           } as const;
         } else if (part.type === "tool-result") {
@@ -380,7 +399,6 @@ export class IronaChatClient {
       }));
 
       return {
-        id: `msg-${index}`,
         role: msg.role,
         content: parts,
       };

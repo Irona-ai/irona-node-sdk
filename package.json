@@ -5,6 +5,7 @@
   "module": "dist/index.m.js",
   "unpkg": "dist/index.umd.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
     "build": "rm -rf dist && microbundle --tsconfig tsconfig.json --target node --no-sourcemap",
     "devsdk": "microbundle --watch --tsconfig tsconfig.json --no-sourcemap",
@@ -13,7 +14,14 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "eg-test": "npm run build && npm link && cd example && npm link ironaai"
+    "eg-test": "npm run build && npm link && cd example && npm link ironaai",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json,md}\"",
+   "clean": "npm run format && npm run lint && npm run type-check",
+    "validate": "npm run lint && npm run type-check && npm run test"
   },
   "repository": {
     "type": "git",
@@ -59,8 +67,12 @@
     "@types/express": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^22.7.5",
+    "@typescript-eslint/eslint-plugin": "^8.49.0",
+    "@typescript-eslint/parser": "^8.49.0",
+    "eslint": "^9.39.1",
     "jest": "^29.7.0",
     "microbundle": "^0.15.1",
+    "prettier": "3.7.4",
     "ts-jest": "^29.4.1",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",

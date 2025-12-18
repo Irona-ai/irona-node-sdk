@@ -1,6 +1,6 @@
 import { generateText, streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { anthropic, AnthropicProviderOptions } from "@ai-sdk/anthropic";
+import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
 import { mistral } from "@ai-sdk/mistral";
 import { perplexity } from "@ai-sdk/perplexity";
@@ -8,7 +8,6 @@ import { togetherai } from "@ai-sdk/togetherai";
 import { Config } from "../types";
 import { BadRequestError, MissingApiKeyError } from "../errors";
 import {
-  doesModelSupportMediaTypes,
   providerApiKeyName,
   doesModelSupportWebSearch,
   getModelPrefix,
@@ -24,12 +23,9 @@ import {
 } from "../schemas/modelSelect.schema";
 import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
 import {
-  extractMediaTypeArrayFromMessages,
-  getSupportedProviderAndModelArray,
   validateAndGetProviderAndModel,
 } from "../utils/providerAndModelUtils";
 import { MessagePayload } from "../schemas/common.schema";
-import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
 import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 import { xai } from "@ai-sdk/xai";
 
@@ -112,7 +108,7 @@ export class IronaChatClient {
     supportsWebSearch: boolean
   ) {
     try {
-      const apiKey = this.loadApiKeyForProvider(provider, model);
+      // const apiKey = this.loadApiKeyForProvider(provider, model);
 
       // Convert messages to Vercel AI SDK format
       const vercelMessages = this.convertToVercelMessages(payload.messages);

@@ -56,7 +56,7 @@ export class IronaAI {
         return;
       } catch (error) {
         console.warn(
-          `Attempt ${attempt} to load Supported Models details failed. Retrying...`
+          `Attempt ${attempt} to load Supported Models details failed. Retrying... ${error}`
         );
         if (attempt < retries)
           await new Promise((res) => setTimeout(res, delay));

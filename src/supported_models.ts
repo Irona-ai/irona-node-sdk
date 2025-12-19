@@ -1,4 +1,5 @@
 import axios from "axios";
+import { logger } from "./utils/logger";
 
 interface ProviderInfo {
   icon: string;
@@ -25,9 +26,9 @@ export async function updateProvidersFromGist(
     const response = await axios.get(SUPPORTED_MODELS_GIST_URL);
     const data = response.data;
     PROVIDERS = typeof data === "string" ? JSON.parse(data) : data;
-    console.info("Supported Models details loaded from Gist.");
+    logger.info("Supported Models details loaded from Gist.");
   } catch (error) {
-    console.error("Failed to load Supported Models details from Gist.");
+    logger.error("Failed to load Supported Models details from Gist.");
     throw error;
   }
 }

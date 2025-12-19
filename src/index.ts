@@ -10,6 +10,7 @@ import {
   DEFAULT_BASE_URL,
   SUPPORTED_MODELS_DEFAULT_URL,
 } from "./utils/constants";
+import { logger } from "./utils/logger";
 require("dotenv").config();
 
 export class IronaAI {
@@ -32,7 +33,7 @@ export class IronaAI {
       );
     }
 
-    config.baseUrl = config?.baseUrl || DEFAULT_BASE_URL;
+    config.baseUrl = config?.baseUrl ?? DEFAULT_BASE_URL;
     this.ironaRouter = new IronaRouterClient(config);
     this.llmChatService = new IronaChatClient(config, this.ironaRouter);
   }
@@ -55,7 +56,7 @@ export class IronaAI {
         await updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL);
         return;
       } catch (error) {
-        console.warn(
+        logger.warn(
           `Attempt ${attempt} to load Supported Models details failed. Retrying... ${error}`
         );
         if (attempt < retries)

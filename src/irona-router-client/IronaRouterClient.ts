@@ -12,6 +12,7 @@ import {
   extractMediaTypeArrayFromMessages,
   getSupportedProviderAndModelArray,
 } from "../utils/providerAndModelUtils";
+import { logger } from "../utils/logger";
 
 const resources = "";
 export class IronaRouterClient extends Base {
@@ -49,8 +50,8 @@ export class IronaRouterClient extends Base {
     }
 
     // Single model optimization - skip API call if only one model provided
-    if (body.models && body.models.length === 1) {
-      console.log(`[IronaRouterClient][modelSelect] Single model provided, skip-API call, returning directly: ${body.models[0]}`);
+    if (body.models && body.models?.length === 1) {
+      logger.info(`[IronaRouterClient][modelSelect] Single model provided, skip-API call, returning directly: ${body.models[0]}`);
       return {
         providers: [mediaSupportedProviderAndModelArray[0]],
         fallback_providers: this.getFallbackProviders(body),
@@ -92,7 +93,7 @@ export class IronaRouterClient extends Base {
       });
 
       // If the API returned an error, add fallback providers
-      if (result && result.error) {
+      if (result?.error) {
         result.fallback_providers = this.getFallbackProviders(body);
         return result;
       }
@@ -120,7 +121,7 @@ export class IronaRouterClient extends Base {
           return { provider, model };
         });
       } catch (error) {
-        console.error("Error parsing fallback models:", error);
+        logger.error(`Error parsing fallback models: ${error}`);
         // Keep the default fallback providers if there's an error
       }
     }

@@ -1,6 +1,7 @@
 import { doesModelSupportReasoning } from "../supported_models";
 import { AnthropicProviderOptions } from "@ai-sdk/anthropic";
 import { wrapLanguageModel, extractReasoningMiddleware } from 'ai';
+import { logger } from "./logger";
 
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
 
@@ -169,7 +170,7 @@ export class ReasoningConfig {
 
     if (!doesModelSupportReasoning(provider, model)) {
       if (reasoningEffort !== undefined && reasoningEffort !== 'off') {
-        console.warn(`[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`);
+        logger.warn(`[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`);
       }
       return config;
     }
@@ -194,7 +195,7 @@ export class ReasoningConfig {
     const supportsReasoning = doesModelSupportReasoning(provider, modelName);
 
     if (!supportsReasoning) {
-      console.warn(`[ReasoningConfig] Reasoning middleware not supported for ${provider}/${model}. The model does not support reasoning capabilities.`);
+      logger.warn(`[ReasoningConfig] Reasoning middleware not supported for ${provider}/${model}. The model does not support reasoning capabilities.`);
     }
     return supportsReasoning;
   }

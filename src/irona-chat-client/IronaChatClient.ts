@@ -28,6 +28,7 @@ import {
 import { MessagePayload } from "../schemas/common.schema";
 import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 import { xai } from "@ai-sdk/xai";
+import { logger } from "../utils/logger";
 
 type ProviderName =
   | "google"
@@ -41,7 +42,7 @@ export class IronaChatClient {
   constructor(
     private readonly config: Config,
     private readonly ironaRouter: IronaRouterClient
-  ) {}
+  ) { }
 
   /**
    * Processes a completions request and retries with fallback models if necessary.
@@ -68,7 +69,7 @@ export class IronaChatClient {
     // Attempt execution for each model in the priority queue
     let attemptNumber = 1;
     for (const { provider, model } of modelPriorityQueue) {
-      console.log(
+      logger.info(
         `[IronaChatClient][completions] Attempt ${attemptNumber}: Invoking chat completions with provider: ${provider}, model: ${model}`
       );
       try {
@@ -79,14 +80,13 @@ export class IronaChatClient {
           payload,
           supportsWebSearch
         );
-        console.log(
+        logger.info(
           `[IronaChatClient][completions] Attempt ${attemptNumber}: Successfully executed chat completions with provider: ${provider}, model: ${model}`
         );
         return response; // Return on first success
       } catch (error) {
-        console.error(
-          `\n[IronaChatClient][completions] Attempt ${attemptNumber}: Error with ${provider}/${model}: ${
-            (error as Error).message
+        logger.error(
+          `\n[IronaChatClient][completions] Attempt ${attemptNumber}: Error with ${provider}/${model}: ${(error as Error).message
           }`
         );
       }
@@ -190,11 +190,11 @@ export class IronaChatClient {
         const streamConfig: Parameters<typeof streamText>[0] =
           payload.reasoning_effort
             ? applyReasoningConfig({
-                ...baseConfig,
-              })
+              ...baseConfig,
+            })
             : {
-                ...baseConfig,
-              };
+              ...baseConfig,
+            };
 
         const stream = await streamText(streamConfig);
 
@@ -228,9 +228,8 @@ export class IronaChatClient {
           }
         } catch (error) {
           // If we get an error during the early test, propagate it up to trigger fallbacks
-          console.error(
-            `[IronaChatClient] Stream validation failed for ${provider}/${model}:`,
-            error
+          logger.error(
+            `[IronaChatClient] Stream validation failed for ${provider}/${model}: ${error}`
           );
           throw error;
         }
@@ -246,7 +245,7 @@ export class IronaChatClient {
               // Continue with the rest of the stream
               for await (const part of stream.fullStream) {
                 if (part.type === "error") {
-                  // console.error(`Stream yielded error for ${provider}/${model}:`, part.error);
+                  // logger.error(`Stream yielded error for ${provider}/${model}:`, part.error);
                   const err = part.error as {
                     name?: string;
                     statusCode?: number;
@@ -256,13 +255,11 @@ export class IronaChatClient {
                 yield part;
               }
             } catch (err) {
-              console.error(
-                `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}:`,
-                err
+              logger.error(
+                `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}: ${err}`
               );
               throw new Error(
-                `Streaming failed for provider: ${provider}, model: ${model}.\n${
-                  (err as Error).message
+                `Streaming failed for provider: ${provider}, model: ${model}.\n${(err as Error).message
                 }`
               );
             }
@@ -278,11 +275,11 @@ export class IronaChatClient {
         const generateConfig: Parameters<typeof generateText>[0] =
           payload.reasoning_effort
             ? applyReasoningConfig({
-                ...baseConfig,
-              })
+              ...baseConfig,
+            })
             : {
-                ...baseConfig,
-              };
+              ...baseConfig,
+            };
         try {
           const response = await generateText(generateConfig);
           return {
@@ -295,17 +292,15 @@ export class IronaChatClient {
             model,
           };
         } catch (error) {
-          console.error(
-            `[IronaChatClient] Non-stream request failed for ${provider}/${model}:`,
-            error
+          logger.error(
+            `[IronaChatClient] Non-stream request failed for ${provider}/${model}: ${error}`
           );
           throw error;
         }
       }
     } catch (error) {
       throw new Error(
-        `Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${
-          (error as Error).message
+        `Failed to execute chat completions for provider: ${provider}, model: ${model}.\n${(error as Error).message
         }\n`
       );
     }
@@ -427,9 +422,8 @@ export class IronaChatClient {
   }
 
   private async selectBestModel(body: CompletionsPayload) {
-    console.log(
-      `[IronaChatClient][selectBestModel] Models provided: ${
-        body.models?.length || 0
+    logger.info(
+      `[IronaChatClient][selectBestModel] Models provided: ${body.models?.length || 0
       }, calling model-select endpoint`
     );
     try {
@@ -439,8 +433,8 @@ export class IronaChatClient {
 
       // Handle errors from the model selection
       // Not using fallbacks here to remove duplicacy as they are added in model priority queue
-      if (response && response.error) {
-        console.warn(
+      if (response?.error) {
+        logger.warn(
           `[IronaChatClient][selectBestModel][IronaML] Model selection error: ${JSON.stringify(
             response.error,
             null,
@@ -452,9 +446,8 @@ export class IronaChatClient {
 
       return response.providers[0];
     } catch (error) {
-      console.error(
-        `[IronaChatClient][selectBestModel] Model selection error: ${
-          (error as Error).message
+      logger.error(
+        `[IronaChatClient][selectBestModel] Model selection error: ${(error as Error).message
         }`
       );
       return { provider: null, model: null };

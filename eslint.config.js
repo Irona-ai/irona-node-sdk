@@ -21,13 +21,13 @@ export default [
 
 
       globals: {
-     
+
         process: "readonly",
         __dirname: "readonly",
         module: "readonly",
         require: "readonly",
 
-        
+
         Promise: "readonly"
       }
     },
@@ -37,12 +37,21 @@ export default [
     },
 
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
-      "@typescript-eslint/no-explicit-any": "warn",
+      "@next/next/no-img-element": "off",
+      "jsx-a11y/alt-text": "off",
+      "react-hooks/exhaustive-deps": "off",
+      "react/display-name": "off",
+      "tailwindcss/enforces-negative-arbitrary-values": "off",
+      "tailwindcss/no-contradicting-classname": "off",
+      "tailwindcss/no-custom-classname": "off",
+      "tailwindcss/no-unnecessary-arbitrary-value": "off",
+      "no-console": "error",
       "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/explicit-module-boundary-types": "off",
-      "@typescript-eslint/no-floating-promises": "error",
-      "no-console": ["warn", { allow: ["warn", "error"] }]
+      "@typescript-eslint/prefer-nullish-coalescing": "warn",
+      "@typescript-eslint/prefer-optional-chain": "warn",
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+      "@typescript-eslint/prefer-as-const": "warn",
+      "@typescript-eslint/no-explicit-any": "warn"
     }
   }
 ];

@@ -1,6 +1,7 @@
 import { isSupportedModel } from "../supported_models";
 import { UnsupportedModelError } from "../errors";
 import { MessagePayload, ModelPayload } from "../schemas/common.schema";
+import { logger } from "./logger";
 
 /**
  * Validates a model string in provider/model format and splits it into provider and model parts
@@ -47,7 +48,7 @@ export function getSupportedProviderAndModelArray(
         return validateAndGetProviderAndModel(model);
       } catch (error) {
         // If validation fails for some models, still continue with valid ones
-        console.error(
+        logger.error(
           `Error validating model ${model}: ${(error as Error).message}`
         );
         return null;

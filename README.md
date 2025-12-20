@@ -77,7 +77,11 @@ Ref [blog link](https://medium.com/@oresoftware/node-js-how-to-test-your-new-npm
 
 1. Update the version in `package.json`
 2. Commit and push changes to GitHub
-3. Create a GitHub Release with tag matching the version (e.g., `v0.0.21`)
+3. Create a GitHub Release with tag matching the version:
+   ```bash
+   gh release create v0.0.21 --title "v0.0.21" --notes "Release notes here" --target main
+   ```
+   Or via GitHub UI: Go to Releases → "Create a new release" → Enter tag (e.g., `v0.0.21`) → Publish
 
 The release triggers the CI workflow which builds and publishes to npm automatically using OIDC trusted publishing.
 

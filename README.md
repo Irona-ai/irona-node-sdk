@@ -73,12 +73,13 @@ For published versions we can use the following:
 
 Ref [blog link](https://medium.com/@oresoftware/node-js-how-to-test-your-new-npm-module-without-publishing-it-every-5-minutes-3b6f8e0491dd). 
 
-### Publish package to NPM Instructions
+### Publish Package to npm
 
-1. update the version in package.json
-2. npm run build
-3. npm login
-4. npm publish
+1. Update the version in `package.json`
+2. Commit and push changes to GitHub
+3. Create a GitHub Release with tag matching the version (e.g., `v0.0.21`)
+
+The release triggers the CI workflow which builds and publishes to npm automatically using OIDC trusted publishing.
 
 ## Key Concepts
 * models: An array of AI providers and models you want LLM-Routing to be done from. 

@@ -29,6 +29,7 @@ import { MessagePayload } from "../schemas/common.schema";
 import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 import { xai } from "@ai-sdk/xai";
 import { logger } from "../utils/logger";
+import { stepCountIs } from 'ai';
 
 type ProviderName =
   | "google"
@@ -157,6 +158,11 @@ export class IronaChatClient {
       // Add tools to config if there are any
       if (Object.keys(tools).length > 0) {
         (baseConfig as any).tools = tools;
+      }
+
+      // Enable multi-step calls only when payload.tools are provided
+      if (payload.tools && Object.keys(payload.tools).length > 0) {
+        (baseConfig as any).stopWhen = stepCountIs(5);
       }
 
       if (provider === "xai" && payload.search && supportsWebSearch) {

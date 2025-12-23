@@ -40,16 +40,16 @@ export function doesModelSupportMediaTypes(
   model: string,
   medias: string[]
 ) {
-  if (!medias || medias.length === 0) return true;
+  if (!medias || medias.length === 0) {return true;}
 
   // Updated to use capabilities
   const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
-  if (!modelCapabilities) return false;
+  if (!modelCapabilities) {return false;}
 
   // Only check for "image" and "pdf" capabilities
   return medias.every((media) => {
     // Only allow "image" and "pdf" media types
-    if (media !== "image" && media !== "pdf") return false;
+    if (media !== "image" && media !== "pdf") {return false;}
     return modelCapabilities.includes(media);
   });
 }
@@ -59,7 +59,7 @@ export function doesModelSupportWebSearch(
 ): boolean {
   // Updated to use capabilities
   const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
-  if (!modelCapabilities) return false;
+  if (!modelCapabilities) {return false;}
   return modelCapabilities.includes("search");
 }
 export function providerApiKeyName(provider: string) {
@@ -68,13 +68,13 @@ export function providerApiKeyName(provider: string) {
 
 export function doesModelSupportReasoning(provider: string, model: string): boolean {
   const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
-  if (!modelCapabilities) return false;
+  if (!modelCapabilities) {return false;}
   return modelCapabilities.includes("reasoning");
 }
 
 export function getModelPrefix(provider: string, model: string): string | null {
   const modelPrefixes = PROVIDERS[provider]?.model_prefix;
-  if (!modelPrefixes) return null;
+  if (!modelPrefixes) {return null;}
 
   return modelPrefixes[model] || null;
 }

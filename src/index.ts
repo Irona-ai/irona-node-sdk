@@ -60,7 +60,7 @@ export class IronaAI {
           `Attempt ${attempt} to load Supported Models details failed. Retrying... ${error}`
         );
         if (attempt < retries)
-          await new Promise((res) => setTimeout(res, delay));
+          {await new Promise((res) => setTimeout(res, delay));}
       }
     }
 

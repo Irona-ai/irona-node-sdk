@@ -15,12 +15,26 @@ import {
 import { logger } from "../utils/logger";
 
 const resources = "";
+export interface ModelInfo {
+  provider: string;
+  model: string;
+}
+
+export interface ModelSelectResponse {
+  providers: ModelInfo[];
+  fallback_providers: ModelInfo[];
+  error: unknown;
+  success: boolean;
+  message: string;
+  statusCode: number;
+}
+
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
     super(config);
   }
 
-  async modelSelect(body: ModelSelectPayload): Promise<any> {
+  async modelSelect(body: ModelSelectPayload): Promise<ModelSelectResponse> {
     const apiKey = process.env.IRONAAI_API_KEY;
     if (!apiKey) {
       throw new MissingApiKeyError(
@@ -76,14 +90,7 @@ export class IronaRouterClient extends Base {
     }
 
     try {
-      const result = await this.request<{
-        providers: { provider: string; model: string }[];
-        fallback_providers: { provider: string; model: string }[];
-        error: any;
-        success: boolean;
-        message: String;
-        statusCode: number;
-      }>(`${resources}`, {
+      const result = await this.request<ModelSelectResponse>(`${resources}`, {
         method: "POST",
         data: formattedPayload,
         headers: {
@@ -105,9 +112,9 @@ export class IronaRouterClient extends Base {
   }
 
   // Helper method to get fallback providers either from the request or defaults
-  private getFallbackProviders(body: ModelSelectPayload) {
+  private getFallbackProviders(body: ModelSelectPayload): ModelInfo[] {
     // Default fallback_providers
-    let fallback_providers: { provider: string; model: string }[] = [
+    let fallback_providers: ModelInfo[] = [
       { provider: "openai", model: "gpt-4o-mini" },
       { provider: "anthropic", model: "claude-3-haiku-20240307" },
     ];

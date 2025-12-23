@@ -1,5 +1,5 @@
-import { IronaChatClient } from "./irona-chat-client/IronaChatClient";
-import { IronaRouterClient } from "./irona-router-client/IronaRouterClient";
+import { IronaChatClient, CompletionsResponse } from "./irona-chat-client/IronaChatClient";
+import { IronaRouterClient, ModelSelectResponse } from "./irona-router-client/IronaRouterClient";
 import { Config } from "./types";
 import { ModelSelectPayload } from "./schemas/modelSelect.schema";
 import { CompletionsPayload } from "./schemas/completions.schema";
@@ -69,12 +69,12 @@ export class IronaAI {
     );
   }
 
-  public modelSelect(body: ModelSelectPayload): Promise<any> {
+  public modelSelect(body: ModelSelectPayload): Promise<ModelSelectResponse> {
     return this.ironaRouter.modelSelect(body);
   }
 
   public completions = {
-    create: (body: CompletionsPayload): Promise<any> => {
+    create: (body: CompletionsPayload): Promise<CompletionsResponse> => {
       return this.llmChatService.completions(body);
     },
   };

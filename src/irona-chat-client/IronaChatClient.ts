@@ -1,4 +1,4 @@
-import { generateText, streamText } from "ai";
+import { generateText, streamText, stepCountIs, ModelMessage, LanguageModel } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { anthropic } from "@ai-sdk/anthropic";
 import { google } from "@ai-sdk/google";
@@ -29,7 +29,6 @@ import { MessagePayload } from "../schemas/common.schema";
 import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 import { xai } from "@ai-sdk/xai";
 import { logger } from "../utils/logger";
-import { stepCountIs } from 'ai';
 
 type ProviderName =
   | "google"
@@ -39,6 +38,18 @@ type ProviderName =
   | "mistral"
   | "perplexity"
   | "xai";
+
+export interface CompletionsResponse {
+  response: {
+    content?: string;
+    reasoningContent?: unknown;
+    role?: string;
+    fullStream?: AsyncIterable<unknown>;
+  };
+  provider: string;
+  model: string;
+}
+
 export class IronaChatClient {
   constructor(
     private readonly config: Config,
@@ -48,7 +59,9 @@ export class IronaChatClient {
   /**
    * Processes a completions request and retries with fallback models if necessary.
    */
-  async completions(payload: CompletionsPayload) {
+  async completions(
+    payload: CompletionsPayload
+  ): Promise<CompletionsResponse> {
     // Validate input
     const validationResult = validateSchema(CompletionsSchema, payload);
     if (!validationResult.success) {
@@ -107,7 +120,7 @@ export class IronaChatClient {
     model: string,
     payload: CompletionsPayload,
     supportsWebSearch: boolean
-  ) {
+  ): Promise<CompletionsResponse> {
     try {
       // const apiKey = this.loadApiKeyForProvider(provider, model);
 
@@ -136,7 +149,15 @@ export class IronaChatClient {
       let finalModel = baseModel;
 
       // Prepare base configuration
-      const baseConfig = {
+      const baseConfig: {
+        model: LanguageModel;
+        messages: ModelMessage[];
+        temperature?: number;
+        maxOutputTokens?: number;
+        tools?: Parameters<typeof streamText>[0]['tools'];
+        stopWhen?: Parameters<typeof streamText>[0]['stopWhen'];
+        providerOptions?: Parameters<typeof streamText>[0]['providerOptions'];
+      } = {
         model: finalModel,
         messages: vercelMessages,
         temperature: payload.temperature,
@@ -157,16 +178,16 @@ export class IronaChatClient {
 
       // Add tools to config if there are any
       if (Object.keys(tools).length > 0) {
-        (baseConfig as any).tools = tools;
+        baseConfig.tools = tools as any;
       }
 
       // Enable multi-step calls only when payload.tools are provided
       if (payload.tools && Object.keys(payload.tools).length > 0) {
-        (baseConfig as any).stopWhen = stepCountIs(5);
+        baseConfig.stopWhen = stepCountIs(5);
       }
 
       if (provider === "xai" && payload.search && supportsWebSearch) {
-        (baseConfig as any).providerOptions = {
+        baseConfig.providerOptions = {
           xai: {
             searchParameters: {
               mode: "on",
@@ -175,7 +196,7 @@ export class IronaChatClient {
         };
       }
       // Helper function to apply reasoning configuration
-      const applyReasoningConfig = (config: any): any => {
+      const applyReasoningConfig = <T extends Record<string, unknown>>(config: T): T => {
         if (
           provider === "togetherai" ||
           provider === "mistral" ||
@@ -193,20 +214,21 @@ export class IronaChatClient {
       };
 
       if (payload.stream) {
-        const streamConfig: Parameters<typeof streamText>[0] =
+        const streamConfig = (
           payload.reasoning_effort
             ? applyReasoningConfig({
               ...baseConfig,
             })
             : {
               ...baseConfig,
-            };
+            }
+        ) as Parameters<typeof streamText>[0];
 
         const stream = await streamText(streamConfig);
 
         // Eagerly test the stream by consuming multiple chunks to catch errors early
         const iterator = stream.fullStream[Symbol.asyncIterator]();
-        const testResults: any = [];
+        const testResults: unknown[] = [];
         try {
           // Test the first few chunks to ensure the stream is working
           for (let i = 0; i < 3; i++) {
@@ -278,14 +300,15 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const generateConfig: Parameters<typeof generateText>[0] =
+        const generateConfig = (
           payload.reasoning_effort
             ? applyReasoningConfig({
               ...baseConfig,
             })
             : {
               ...baseConfig,
-            };
+            }
+        ) as Parameters<typeof generateText>[0];
         try {
           const response = await generateText(generateConfig);
           return {
@@ -315,14 +338,15 @@ export class IronaChatClient {
   /**
    * Converts messages to Vercel AI SDK format
    */
-  private convertToVercelMessages(messages: MessagePayload[]): any[] {
-    return messages.map((msg, index) => {
+  private convertToVercelMessages(messages: MessagePayload[]): ModelMessage[] {
+    return messages.map((msg, index): ModelMessage => {
+      const role = msg.role;
       if (typeof msg.content === "string") {
         return {
           id: `msg-${index}`,
           role: msg.role,
           content: msg.content,
-        };
+        } as any;
       }
 
       const parts = msg.content.map((part) => {
@@ -358,16 +382,16 @@ export class IronaChatClient {
           } as const;
         } else {
           throw new Error(
-            `Unsupported message part type: ${(part as any).type}`
+            `Unsupported message part type: ${part.type}`
           );
         }
       });
 
       return {
         id: `msg-${index}`,
-        role: msg.role,
-        content: parts,
-      };
+        role,
+        content: parts as any,
+      } as any;
     });
   }
 
@@ -410,7 +434,7 @@ export class IronaChatClient {
   private extractModelSelectPayloadFromCompletionsPayload(
     body: CompletionsPayload
   ): ModelSelectPayload {
-    const modelSelectBody: any = {};
+    const modelSelectBody = {} as ModelSelectPayload;
 
     // Get the keys from ModelSelectSchema
     const modelSelectKeys = Object.keys(
@@ -420,7 +444,7 @@ export class IronaChatClient {
     // Extract only the matching keys from CompletionsPayload
     modelSelectKeys.forEach((key) => {
       if (key in body) {
-        modelSelectBody[key] = body[key];
+        (modelSelectBody as Record<string, unknown>)[key] = body[key as keyof CompletionsPayload];
       }
     });
 

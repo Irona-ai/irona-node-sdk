@@ -42,7 +42,7 @@ const ResultContent = z.object({
   type: z.literal("tool-result"),
   toolCallId: z.string(),
   toolName: z.string(),
-  result: z.any(),
+  result: z.unknown(),
 });
 
 // Tool call request content
@@ -50,7 +50,7 @@ const ToolCallContent = z.object({
   type: z.literal("tool-call"),
   toolCallId: z.string(),
   toolName: z.string(),
-  toolInput: z.any(),
+  toolInput: z.unknown(),
 });
 
 export type DocumentContentPayload = z.infer<typeof DocumentContent>;

@@ -1,6 +1,6 @@
 import { doesModelSupportReasoning } from "../supported_models";
 import { AnthropicProviderOptions } from "@ai-sdk/anthropic";
-import { wrapLanguageModel, extractReasoningMiddleware } from 'ai';
+import { wrapLanguageModel, extractReasoningMiddleware, LanguageModel } from 'ai';
 import { logger } from "./logger";
 
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
@@ -160,12 +160,12 @@ export class ReasoningConfig {
     return null;
   }
 
-  static applyReasoningConfig(
-    config: any,
+  static applyReasoningConfig<T extends { providerOptions?: unknown }>(
+    config: T,
     provider: string,
     model: string,
     reasoningEffort?: ReasoningEffort
-  ): any {
+  ): T {
     const effectiveReasoningEffort = reasoningEffort ?? 'off';
 
     if (!doesModelSupportReasoning(provider, model)) {
@@ -177,7 +177,7 @@ export class ReasoningConfig {
 
     const reasoningConfig = this.getReasoningConfig(provider as ProviderName, model, effectiveReasoningEffort);
     if (reasoningConfig) {
-      config.providerOptions = reasoningConfig;
+      config.providerOptions = (reasoningConfig as unknown) as T['providerOptions'];
     }
 
     return config;
@@ -201,13 +201,17 @@ export class ReasoningConfig {
   }
 
   static createEnhancedModelWithReasoning(
-    baseModel: any,
+    baseModel: LanguageModel,
     reasoningEffort?: ReasoningEffort
   ) {
     const shouldIncludeReasoning = reasoningEffort !== undefined && reasoningEffort !== 'off';
 
     if (!shouldIncludeReasoning) {
       return baseModel;
+    }
+
+    if (typeof baseModel === 'string') {
+      throw new Error(`[ReasoningConfig] baseModel cannot be a string when applying reasoning middleware. Received: ${baseModel}`);
     }
 
     return wrapLanguageModel({

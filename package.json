@@ -5,6 +5,7 @@
   "module": "dist/index.m.js",
   "unpkg": "dist/index.umd.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
     "build": "rm -rf dist && microbundle --tsconfig tsconfig.json --target node --no-sourcemap",
     "devsdk": "microbundle --watch --tsconfig tsconfig.json --no-sourcemap",
@@ -49,6 +50,7 @@
     "@ai-sdk/perplexity": "^2.0.9",
     "@ai-sdk/togetherai": "^1.0.18",
     "@ai-sdk/xai": "^2.0.23",
+    "@google/genai": "^1.34.0",
     "ai": "^5.0.48",
     "axios": "^1.7.7",
     "dotenv": "^16.4.5",

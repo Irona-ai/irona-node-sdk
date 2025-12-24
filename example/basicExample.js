@@ -1,4 +1,4 @@
-const { IronaAI } = require("../src/index");
+const { IronaAI } = require("ironaai");
 
 const commonBody = {
   messages: [

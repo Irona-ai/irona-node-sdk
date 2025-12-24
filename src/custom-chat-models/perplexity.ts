@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { CallbackManagerForLLMRun } from "@langchain/core/callbacks/manager";
 import { SimpleChatModel } from "@langchain/core/language_models/chat_models";
 import {
@@ -10,6 +9,28 @@ import {
 import { ChatGenerationChunk } from "@langchain/core/outputs";
 import axios from "axios";
 import { ChatModelConfig } from "../types";
+import { logger } from "../utils/logger";
+
+interface PerplexityResponse {
+  id?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+  choices: Array<{
+    message?: {
+      content: string;
+      role?: string;
+    };
+    delta?: {
+      content?: string;
+      role?: string;
+    };
+    finish_reason?: string;
+  }>;
+  citations?: string[];
+}
 
 const PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions";
 /**
@@ -41,7 +62,7 @@ export class ChatPerplexity extends SimpleChatModel {
       }
     }
   }
-  private mapResponseToAIMessage(data: any): AIMessageFields {
+  private mapResponseToAIMessage(data: PerplexityResponse): AIMessageFields {
     return {
       id: data?.id,
       usage_metadata: {
@@ -57,7 +78,7 @@ export class ChatPerplexity extends SimpleChatModel {
     };
   }
 
-  async _call(messages: BaseMessage[]): Promise<any> {
+  async _call(messages: BaseMessage[]): Promise<AIMessage> {
     this.validateMessages(messages);
     try {
       const { data } = await axios.post(
@@ -103,7 +124,7 @@ export class ChatPerplexity extends SimpleChatModel {
               content: m.content,
             };
           }),
-          stream: true, // Conceptual flag for streaming response
+          stream: true,
         },
         {
           headers: {
@@ -115,17 +136,13 @@ export class ChatPerplexity extends SimpleChatModel {
 
       let buffer = "";
       for await (const chunkBuffer of response.data) {
-        // Accumulate the chunk buffer
         buffer += chunkBuffer.toString();
-
-        // Split the buffer into separate chunks by line breaks
         const rawPayloads = buffer.split("\r\n");
-        buffer = rawPayloads.pop() || ""; // Save any leftover data in the buffer
+        buffer = rawPayloads.pop() || "";
 
-        // Process each chunk
         for (const rawPayload of rawPayloads) {
           if (rawPayload.includes("[DONE]")) {
-            return; // End the stream once we hit the "[DONE]" marker
+            return;
           }
 
           if (!rawPayload.trim() || !rawPayload.startsWith("data:")) {
@@ -133,10 +150,12 @@ export class ChatPerplexity extends SimpleChatModel {
           }
 
           try {
-            // Parse the JSON payload
-            const payload = JSON.parse(rawPayload.replace("data: ", ""));
+            const payload: PerplexityResponse = JSON.parse(
+              rawPayload.replace("data: ", "")
+            );
             const textChunk = payload?.choices?.[0]?.delta?.content ?? "";
             const finish_reason = payload?.choices?.[0]?.finish_reason;
+
             if (textChunk) {
               yield new ChatGenerationChunk({
                 message: new AIMessageChunk({
@@ -160,18 +179,15 @@ export class ChatPerplexity extends SimpleChatModel {
             }
             await runManager?.handleLLMNewToken(textChunk);
           } catch (err) {
-            // Handle any errors in JSON parsing (e.g., incomplete or malformed JSON)
-            console.error("Failed to parse chunk:", rawPayload, err);
+            logger.error(`Failed to parse chunk: ${rawPayload} ${err}`);
           }
         }
       }
     } catch (error) {
-      console.error(
-        "Error in Perplexity streaming generator:",
-        (error as Error).message
+      logger.error(
+        `Error in Perplexity streaming generator: ${(error as Error).message}`
       );
-      const message = (error as Error).message;
-      throw new Error(message);
+      throw new Error((error as Error).message);
     }
   }
 }

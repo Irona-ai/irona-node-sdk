@@ -3,7 +3,7 @@ import tsParser from "@typescript-eslint/parser";
 
 export default [
   {
-    ignores: ["dist", "node_modules", "coverage", "*.js"],
+    ignores: ["dist", "node_modules", "coverage", "*.js", "tests"],
   },
 
   {
@@ -60,7 +60,7 @@ export default [
       "prefer-template": "warn",
       "object-shorthand": "warn",
       "prefer-arrow-callback": "warn",
-      
+
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/prefer-nullish-coalescing": "warn",
       "@typescript-eslint/prefer-optional-chain": "warn",

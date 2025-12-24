@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { CallbackManagerForLLMRun } from "@langchain/core/callbacks/manager";
 import { SimpleChatModel } from "@langchain/core/language_models/chat_models";
 import {
@@ -15,6 +14,23 @@ import {
   DocumentContentPayload,
   MessagePayload,
 } from "../schemas/common.schema";
+import { logger } from "../utils/logger";
+
+interface PerplexityResponse {
+  id?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+  choices: Array<{
+    message: {
+      content: string;
+      role?: string;
+    };
+    finish_reason?: string;
+  }>;
+}
 
 /**
  * ChatPdf model for LangChain.
@@ -33,12 +49,12 @@ export class ChatPdfModel extends SimpleChatModel {
   _llmType(): string {
     return "chatpdf";
   }
-  private validateInputMessages(messages: any[]): void {
+  private validateInputMessages(messages: BaseMessage[]): void {
     if (!messages.length) {
       throw new Error("No messages provided.");
     }
   }
-  private convertLangchainMessages(originalMessages: any[]): MessagePayload[] {
+  private convertLangchainMessages(originalMessages: BaseMessage[]): MessagePayload[] {
     return originalMessages.map((m) => {
       const type = m.getType();
       return {
@@ -54,11 +70,11 @@ export class ChatPdfModel extends SimpleChatModel {
       return {
         type: "file",
         data: contentItem.source.url,
-        mimeType: "application/pdf",
+        mediaType: "application/pdf",
         filename: contentItem.filename || "document.pdf",
       };
     } catch (error) {
-      console.error("Failed to fetch PDF:", error);
+      logger.error(`Failed to fetch PDF: ${error}`);
       throw new Error("Failed to fetch the document for processing.");
     }
   }
@@ -78,8 +94,10 @@ export class ChatPdfModel extends SimpleChatModel {
               if (contentItem.type === "document")
                 return this.fetchDocumentContent(contentItem);
               if (contentItem.type === "image_url")
-                return { type: "image", image: contentItem.image_url.url };
-              return { type: "text", text: contentItem.text };
+                return { type: "image", image: contentItem.image_url.url } as ImagePart;
+              if (contentItem.type === "text" || contentItem.type === "reasoning")
+                return { type: "text", text: contentItem.text } as TextPart;
+              return { type: "text", text: "" } as TextPart;
             })
           );
         }
@@ -95,7 +113,7 @@ export class ChatPdfModel extends SimpleChatModel {
     );
   }
 
-  private parseLLMResponseToAIMessage(data: any): AIMessageFields {
+  private parseLLMResponseToAIMessage(data: PerplexityResponse): AIMessageFields {
     return {
       id: data?.id,
       usage_metadata: {
@@ -111,11 +129,11 @@ export class ChatPdfModel extends SimpleChatModel {
     };
   }
 
-  async _call(messages: BaseMessage[]): Promise<any> {
+  async _call(_messages: BaseMessage[]): Promise<string> {
     throw new Error("Not implemented");
   }
   async *_streamResponseChunks(
-    messages: any[],
+    messages: BaseMessage[],
     _options: this["ParsedCallOptions"],
     runManager?: CallbackManagerForLLMRun
   ): AsyncGenerator<ChatGenerationChunk> {
@@ -124,7 +142,7 @@ export class ChatPdfModel extends SimpleChatModel {
       const finalMessages: CoreMessage[] =
         await this.transformMessagesForCompletions(messages);
       //   const { textStream, usagePromise, responsePromise, finishReasonPromise } =
-      // console.log("finalMessages", JSON.stringify(finalMessages, null, 2));
+
 
       try {
         const { textStream } = await streamText({
@@ -155,16 +173,15 @@ export class ChatPdfModel extends SimpleChatModel {
             });
             await runManager?.handleLLMNewToken(streamedChunk);
           } catch (error) {
-            console.error(
-              "Error in ChatPdf streaming generator:",
-              (error as Error).message
+            logger.error(
+              `Error in ChatPdf streaming generator: ${(error as Error).message}`
             );
             const message = (error as Error).message;
             throw new Error(message);
           }
         }
       } catch (error) {
-        console.error("Error in completions:", (error as Error).message);
+        logger.error(`Error in completions: ${(error as Error).message}`);
         const message = (error as Error).message;
         throw new Error(message);
       }

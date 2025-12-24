@@ -39,6 +39,39 @@ type ProviderName =
   | "perplexity"
   | "xai";
 
+// Type-safe message content parts for Vercel AI SDK
+type TextPart = {
+  type: "text";
+  text: string;
+};
+
+type ImagePart = {
+  type: "image";
+  image: string;
+};
+
+type FilePart = {
+  type: "file";
+  data: string;
+  mediaType: string;
+};
+
+type ToolResultPart = {
+  type: "tool-result";
+  toolCallId: string;
+  toolName: string;
+  result: unknown;
+};
+
+type ToolCallPart = {
+  type: "tool-call";
+  toolCallId: string;
+  toolName: string;
+  input: unknown;
+};
+
+type ContentPart = TextPart | ImagePart | FilePart | ToolResultPart | ToolCallPart;
+
 export interface CompletionsResponse {
   response: {
     content?: string;
@@ -146,7 +179,7 @@ export class IronaChatClient {
       }
 
       const baseModel = modelFactory(fullModelName);
-      let finalModel = baseModel;
+      const finalModel = baseModel;
 
       // Prepare base configuration
       const baseConfig: {
@@ -154,9 +187,9 @@ export class IronaChatClient {
         messages: ModelMessage[];
         temperature?: number;
         maxOutputTokens?: number;
-        tools?: Parameters<typeof streamText>[0]['tools'];
-        stopWhen?: Parameters<typeof streamText>[0]['stopWhen'];
-        providerOptions?: Parameters<typeof streamText>[0]['providerOptions'];
+        tools?: Parameters<typeof streamText>[0]["tools"];
+        stopWhen?: Parameters<typeof streamText>[0]["stopWhen"];
+        providerOptions?: Parameters<typeof streamText>[0]["providerOptions"];
       } = {
         model: finalModel,
         messages: vercelMessages,
@@ -178,7 +211,7 @@ export class IronaChatClient {
 
       // Add tools to config if there are any
       if (Object.keys(tools).length > 0) {
-        baseConfig.tools = tools as any;
+        baseConfig.tools = tools as Parameters<typeof streamText>[0]["tools"];
       }
 
       // Enable multi-step calls only when payload.tools are provided
@@ -264,7 +297,7 @@ export class IronaChatClient {
 
         // Create a new stream that includes the pre-fetched results
         const fullStream = {
-          [Symbol.asyncIterator]: async function* () {
+          async *[Symbol.asyncIterator]() {
             try {
               // Yield the pre-fetched results first
               for (const result of testResults) {
@@ -339,59 +372,57 @@ export class IronaChatClient {
    * Converts messages to Vercel AI SDK format
    */
   private convertToVercelMessages(messages: MessagePayload[]): ModelMessage[] {
-    return messages.map((msg, index): ModelMessage => {
+    return messages.map((msg): ModelMessage => {
       const role = msg.role;
       if (typeof msg.content === "string") {
         return {
-          id: `msg-${index}`,
-          role: msg.role,
+          role: msg.role as ModelMessage["role"],
           content: msg.content,
-        } as any;
+        } as ModelMessage;
       }
 
-      const parts = msg.content.map((part) => {
+      const parts: ContentPart[] = msg.content.map((part) => {
         if (part.type === "text") {
           return {
             type: "text",
             text: part.text,
-          } as const;
+          };
         } else if (part.type === "image_url") {
           return {
             type: "image",
             image: part.image_url.url,
-          } as const;
+          };
         } else if (part.type === "document") {
           return {
             type: "file",
             data: part.source.url,
             mediaType: "application/pdf",
-          } as const;
+          };
         } else if (part.type === "tool-result") {
           return {
             type: "tool-result",
             toolCallId: part.toolCallId,
             toolName: part.toolName,
             result: part.result,
-          } as const;
+          };
         } else if (part.type === "tool-call") {
           return {
             type: "tool-call",
             toolCallId: part.toolCallId,
             toolName: part.toolName,
             input: part.toolInput,
-          } as const;
+          };
         } else {
           throw new Error(
-            `Unsupported message part type: ${part.type}`
+            `Unsupported message part type: ${(part as { type: string }).type}`
           );
         }
       });
 
       return {
-        id: `msg-${index}`,
-        role,
-        content: parts as any,
-      } as any;
+        role: role as ModelMessage["role"],
+        content: parts as ModelMessage["content"],
+      } as ModelMessage;
     });
   }
 
@@ -405,13 +436,13 @@ export class IronaChatClient {
   ) {
     // Map of provider to their respective model functions
     const providerModels = {
-      openai: openai,
-      anthropic: anthropic,
-      google: google,
-      mistral: mistral,
-      perplexity: perplexity,
-      togetherai: togetherai,
-      xai: xai,
+      openai,
+      anthropic,
+      google,
+      mistral,
+      perplexity,
+      togetherai,
+      xai,
     };
     if (
       ReasoningConfig.supportsReasoningMiddleware(

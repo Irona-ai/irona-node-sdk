@@ -70,7 +70,7 @@ export class ChatPerplexity extends SimpleChatModel {
         output_tokens: data?.usage?.completion_tokens,
         total_tokens: data?.usage?.total_tokens,
       },
-      content: data.choices[0]?.message?.content || "",
+      content: data.choices[0]?.message?.content ?? "",
       additional_kwargs: { ...data },
       response_metadata: {
         finish_reason: data?.choices?.[0]?.finish_reason,
@@ -138,7 +138,7 @@ export class ChatPerplexity extends SimpleChatModel {
       for await (const chunkBuffer of response.data) {
         buffer += chunkBuffer.toString();
         const rawPayloads = buffer.split("\r\n");
-        buffer = rawPayloads.pop() || "";
+        buffer = rawPayloads.pop() ?? "";
 
         for (const rawPayload of rawPayloads) {
           if (rawPayload.includes("[DONE]")) {
@@ -154,7 +154,7 @@ export class ChatPerplexity extends SimpleChatModel {
               rawPayload.replace("data: ", "")
             );
             const textChunk = payload?.choices?.[0]?.delta?.content ?? "";
-            const finish_reason = payload?.choices?.[0]?.finish_reason;
+            const finishReason = payload?.choices?.[0]?.finish_reason;
 
             if (textChunk) {
               yield new ChatGenerationChunk({
@@ -167,8 +167,8 @@ export class ChatPerplexity extends SimpleChatModel {
                     total_tokens: payload?.usage?.total_tokens,
                   },
                   response_metadata: {
-                    finish_reason: finish_reason,
-                    finishReason: finish_reason,
+                    finish_reason: finishReason,
+                    finishReason: finishReason,
                   },
                   additional_kwargs: {
                     citations: payload?.citations,

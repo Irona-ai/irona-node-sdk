@@ -71,7 +71,7 @@ export class ChatPdfModel extends SimpleChatModel {
         type: "file",
         data: contentItem.source.url,
         mediaType: "application/pdf",
-        filename: contentItem.filename || "document.pdf",
+        filename: contentItem.filename ?? "document.pdf",
       };
     } catch (error) {
       logger.error(`Failed to fetch PDF: ${error}`);

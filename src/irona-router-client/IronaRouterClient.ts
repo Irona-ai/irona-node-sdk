@@ -13,21 +13,11 @@ import {
   getSupportedProviderAndModelArray,
 } from "../utils/providerAndModelUtils";
 import { logger } from "../utils/logger";
+import { ModelInfo, ModelSelectResponse } from "../responseTypes";
+export { ModelInfo, ModelSelectResponse };
 
 const resources = "";
-export interface ModelInfo {
-  provider: string;
-  model: string;
-}
 
-export interface ModelSelectResponse {
-  providers: ModelInfo[];
-  fallback_providers: ModelInfo[];
-  error: unknown;
-  success: boolean;
-  message: string;
-  statusCode: number;
-}
 
 export class IronaRouterClient extends Base {
   constructor(config: Config) {
@@ -68,7 +58,7 @@ export class IronaRouterClient extends Base {
       logger.info(`[IronaRouterClient][modelSelect] Single model provided, skip-API call, returning directly: ${body.models[0]}`);
       return {
         providers: [mediaSupportedProviderAndModelArray[0]],
-        fallback_providers: this.getFallbackProviders(body),
+        fallbackProviders: this.getFallbackProviders(body),
         error: null,
         success: true,
         message: "Single model optimization - skipped router API call",
@@ -101,7 +91,7 @@ export class IronaRouterClient extends Base {
 
       // If the API returned an error, add fallback providers
       if (result?.error) {
-        result.fallback_providers = this.getFallbackProviders(body);
+        result.fallbackProviders = this.getFallbackProviders(body);
         return result;
       }
 
@@ -114,7 +104,7 @@ export class IronaRouterClient extends Base {
   // Helper method to get fallback providers either from the request or defaults
   private getFallbackProviders(body: ModelSelectPayload): ModelInfo[] {
     // Default fallback_providers
-    let fallback_providers: ModelInfo[] = [
+    let fallbackProviders: ModelInfo[] = [
       { provider: "openai", model: "gpt-4o-mini" },
       { provider: "anthropic", model: "claude-3-haiku-20240307" },
     ];
@@ -122,7 +112,7 @@ export class IronaRouterClient extends Base {
     // Use fallback_providers if they are provided in the request
     if (body.fallback_models && body.fallback_models.length > 0) {
       try {
-        fallback_providers = body.fallback_models.map((modelPayload) => {
+        fallbackProviders = body.fallback_models.map((modelPayload) => {
           const [provider, ...modelParts] = modelPayload.split("/");
           const model = modelParts.join("/");
           return { provider, model };
@@ -133,6 +123,6 @@ export class IronaRouterClient extends Base {
       }
     }
 
-    return fallback_providers;
+    return fallbackProviders;
   }
 }

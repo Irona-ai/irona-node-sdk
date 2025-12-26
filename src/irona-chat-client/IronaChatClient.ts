@@ -29,59 +29,13 @@ import { MessagePayload } from "../schemas/common.schema";
 import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
 import { xai } from "@ai-sdk/xai";
 import { logger } from "../utils/logger";
+import {
+  CompletionsResponse,
+  ProviderName,
+  ContentPart,
+} from "../responseTypes";
+export { CompletionsResponse };
 
-type ProviderName =
-  | "google"
-  | "openai"
-  | "anthropic"
-  | "togetherai"
-  | "mistral"
-  | "perplexity"
-  | "xai";
-
-// Type-safe message content parts for Vercel AI SDK
-type TextPart = {
-  type: "text";
-  text: string;
-};
-
-type ImagePart = {
-  type: "image";
-  image: string;
-};
-
-type FilePart = {
-  type: "file";
-  data: string;
-  mediaType: string;
-};
-
-type ToolResultPart = {
-  type: "tool-result";
-  toolCallId: string;
-  toolName: string;
-  result: unknown;
-};
-
-type ToolCallPart = {
-  type: "tool-call";
-  toolCallId: string;
-  toolName: string;
-  input: unknown;
-};
-
-type ContentPart = TextPart | ImagePart | FilePart | ToolResultPart | ToolCallPart;
-
-export interface CompletionsResponse {
-  response: {
-    content?: string;
-    reasoningContent?: unknown;
-    role?: string;
-    fullStream?: AsyncIterable<unknown>;
-  };
-  provider: string;
-  model: string;
-}
 
 export class IronaChatClient {
   constructor(

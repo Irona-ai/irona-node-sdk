@@ -1,5 +1,7 @@
-import axios, { AxiosRequestConfig } from "axios";
-import { Config } from "../types";
+import type { AxiosRequestConfig } from 'axios';
+import axios from 'axios';
+
+import type { Config } from '../types';
 
 export abstract class Base {
   protected baseUrl: string;

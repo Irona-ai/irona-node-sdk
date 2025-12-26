@@ -1,15 +1,12 @@
-import { CallbackManagerForLLMRun } from "@langchain/core/callbacks/manager";
-import { SimpleChatModel } from "@langchain/core/language_models/chat_models";
-import {
-  AIMessage,
-  BaseMessage,
-  AIMessageChunk,
-  AIMessageFields,
-} from "@langchain/core/messages";
-import { ChatGenerationChunk } from "@langchain/core/outputs";
-import axios from "axios";
-import { ChatModelConfig } from "../types";
-import { logger } from "../utils/logger";
+import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
+import { SimpleChatModel } from '@langchain/core/language_models/chat_models';
+import type { BaseMessage, AIMessageFields } from '@langchain/core/messages';
+import { AIMessage, AIMessageChunk } from '@langchain/core/messages';
+import { ChatGenerationChunk } from '@langchain/core/outputs';
+import axios from 'axios';
+
+import type { ChatModelConfig } from '../types';
+import { logger } from '../utils/logger';
 
 interface PerplexityResponse {
   id?: string;
@@ -32,7 +29,7 @@ interface PerplexityResponse {
   citations?: string[];
 }
 
-const PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions";
+const PERPLEXITY_URL = 'https://api.perplexity.ai/chat/completions';
 /**
  * Perplexity model for LangChain.
  */
@@ -48,17 +45,17 @@ export class ChatPerplexity extends SimpleChatModel {
   }
 
   _llmType(): string {
-    return "perplexity";
+    return 'perplexity';
   }
   private validateMessages(messages: BaseMessage[]): void {
     if (!messages.length) {
-      throw new Error("No messages provided.");
+      throw new Error('No messages provided.');
     }
     for (const message of messages) {
       // Pass `runManager?.getChild()` when invoking internal runnables to enable tracing
       // await subRunnable.invoke(params, runManager?.getChild());
-      if (typeof message.content !== "string") {
-        throw new Error("Multimodal messages are not supported.");
+      if (typeof message.content !== 'string') {
+        throw new Error('Multimodal messages are not supported.');
       }
     }
   }
@@ -70,7 +67,7 @@ export class ChatPerplexity extends SimpleChatModel {
         output_tokens: data?.usage?.completion_tokens,
         total_tokens: data?.usage?.total_tokens,
       },
-      content: data.choices[0]?.message?.content ?? "",
+      content: data.choices[0]?.message?.content ?? '',
       additional_kwargs: { ...data },
       response_metadata: {
         finish_reason: data?.choices?.[0]?.finish_reason,
@@ -85,8 +82,8 @@ export class ChatPerplexity extends SimpleChatModel {
         PERPLEXITY_URL,
         {
           model: this.model,
-          messages: messages.map((m) => ({
-            role: m.getType() === "human" ? "user" : m.getType(),
+          messages: messages.map(m => ({
+            role: m.getType() === 'human' ? 'user' : m.getType(),
             content: m.content,
           })),
         },
@@ -107,7 +104,7 @@ export class ChatPerplexity extends SimpleChatModel {
   }
   async *_streamResponseChunks(
     messages: BaseMessage[],
-    _options: this["ParsedCallOptions"],
+    _options: this['ParsedCallOptions'],
     runManager?: CallbackManagerForLLMRun
   ): AsyncGenerator<ChatGenerationChunk> {
     this.validateMessages(messages);
@@ -116,11 +113,11 @@ export class ChatPerplexity extends SimpleChatModel {
         PERPLEXITY_URL,
         {
           model: this.model,
-          messages: messages.map((m) => {
+          messages: messages.map(m => {
             const type = m.getType();
             return {
               role:
-                type === "human" ? "user" : type === "ai" ? "assistant" : type,
+                type === 'human' ? 'user' : type === 'ai' ? 'assistant' : type,
               content: m.content,
             };
           }),
@@ -130,30 +127,30 @@ export class ChatPerplexity extends SimpleChatModel {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
           },
-          responseType: "stream",
+          responseType: 'stream',
         }
       );
 
-      let buffer = "";
+      let buffer = '';
       for await (const chunkBuffer of response.data) {
         buffer += chunkBuffer.toString();
-        const rawPayloads = buffer.split("\r\n");
-        buffer = rawPayloads.pop() ?? "";
+        const rawPayloads = buffer.split('\r\n');
+        buffer = rawPayloads.pop() ?? '';
 
         for (const rawPayload of rawPayloads) {
-          if (rawPayload.includes("[DONE]")) {
+          if (rawPayload.includes('[DONE]')) {
             return;
           }
 
-          if (!rawPayload.trim() || !rawPayload.startsWith("data:")) {
+          if (!rawPayload.trim() || !rawPayload.startsWith('data:')) {
             continue;
           }
 
           try {
             const payload: PerplexityResponse = JSON.parse(
-              rawPayload.replace("data: ", "")
+              rawPayload.replace('data: ', '')
             );
-            const textChunk = payload?.choices?.[0]?.delta?.content ?? "";
+            const textChunk = payload?.choices?.[0]?.delta?.content ?? '';
             const finishReason = payload?.choices?.[0]?.finish_reason;
 
             if (textChunk) {

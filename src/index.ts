@@ -1,31 +1,33 @@
-import { IronaChatClient, CompletionsResponse } from "./irona-chat-client/IronaChatClient";
-import { IronaRouterClient, ModelSelectResponse } from "./irona-router-client/IronaRouterClient";
-import { Config } from "./types";
-import { ModelSelectPayload } from "./schemas/modelSelect.schema";
-import { CompletionsPayload } from "./schemas/completions.schema";
-import { MissingApiKeyError } from "./errors";
-import { updateProvidersFromGist } from "./supported_models";
+import { MissingApiKeyError } from './errors';
+import type { CompletionsResponse } from './irona-chat-client/IronaChatClient';
+import { IronaChatClient } from './irona-chat-client/IronaChatClient';
+import type { ModelSelectResponse } from './irona-router-client/IronaRouterClient';
+import { IronaRouterClient } from './irona-router-client/IronaRouterClient';
+import type { CompletionsPayload } from './schemas/completions.schema';
+import type { ModelSelectPayload } from './schemas/modelSelect.schema';
+import { updateProvidersFromGist } from './supported_models';
+import type { Config } from './types';
 import {
   IRONAAI_API_KEY_PREFIX,
   DEFAULT_BASE_URL,
   SUPPORTED_MODELS_DEFAULT_URL,
-} from "./utils/constants";
-import { logger } from "./utils/logger";
-require("dotenv").config();
+} from './utils/constants';
+import { logger } from './utils/logger';
+require('dotenv').config();
 
 export class IronaAI {
   private ironaRouter: IronaRouterClient;
   private llmChatService: IronaChatClient;
   private constructor(config: Config = {}) {
     // Check for API key
-    const apiKey = config.apiKey || process.env.IRONAAI_API_KEY;
+    const apiKey = config.apiKey ?? process.env.IRONAAI_API_KEY ?? '';
     if (!apiKey) {
       throw new MissingApiKeyError(
         "The API key is missing. Please provide the API key either through the 'IRONAAI_API_KEY' environment variable or the 'config.apiKey' property."
       );
     }
     if (
-      typeof apiKey !== "string" ||
+      typeof apiKey !== 'string' ||
       !apiKey.startsWith(IRONAAI_API_KEY_PREFIX)
     ) {
       throw new MissingApiKeyError(
@@ -59,13 +61,14 @@ export class IronaAI {
         logger.warn(
           `Attempt ${attempt} to load Supported Models details failed. Retrying... ${error}`
         );
-        if (attempt < retries)
-          {await new Promise((res) => setTimeout(res, delay));}
+        if (attempt < retries) {
+          await new Promise(res => setTimeout(res, delay));
+        }
       }
     }
 
     throw new Error(
-      "Cannot instantiate IronaAI as it failed to load Supported Models details from Gist after multiple attempts. Please provide correct value of environment key SUPPORTED_MODELS_URL or leave it undefined."
+      'Cannot instantiate IronaAI as it failed to load Supported Models details from Gist after multiple attempts. Please provide correct value of environment key SUPPORTED_MODELS_URL or leave it undefined.'
     );
   }
 

@@ -1,103 +1,98 @@
-import tseslint from "@typescript-eslint/eslint-plugin";
-import tsParser from "@typescript-eslint/parser";
+const { FlatCompat } = require('@eslint/eslintrc');
+const js = require('@eslint/js');
 
-export default [
+const compat = new FlatCompat({
+  baseDir: __dirname,
+  recommendedConfig: js.configs.recommended,
+});
+
+module.exports = [
+  // Ignore patterns
   {
-    ignores: ["dist", "node_modules", "coverage", "*.js", "tests"],
+    ignores: ['dist', 'node_modules', 'example', 'tests', '**/*.js', '!eslint.config.js'],
   },
-
+  
+  // Base config for all TypeScript files in src
   {
-    files: ["**/*.ts", "**/*.tsx"],
-
+    files: ['src/**/*.{ts,tsx}'],
     languageOptions: {
-      parser: tsParser,
-      ecmaVersion: 2022,
-      sourceType: "module",
-
+      parser: require('@typescript-eslint/parser'),
       parserOptions: {
-        project: "./tsconfig.json"
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        project: './tsconfig.json',
       },
-
       globals: {
-        process: "readonly",
-        __dirname: "readonly",
-        module: "readonly",
-        require: "readonly",
-        Promise: "readonly"
-      }
+        // Node.js globals
+        global: 'readonly',
+        process: 'readonly',
+        Buffer: 'readonly',
+        __filename: 'readonly',
+        __dirname: 'readonly',
+        setImmediate: 'readonly',
+        setInterval: 'readonly',
+        setTimeout: 'readonly',
+        clearImmediate: 'readonly',
+        clearInterval: 'readonly',
+        clearTimeout: 'readonly',
+        queueMicrotask: 'readonly',
+      },
     },
-
     plugins: {
-      "@typescript-eslint": tseslint
+      '@typescript-eslint': require('@typescript-eslint/eslint-plugin'),
+      prettier: require('eslint-plugin-prettier'),
+      import: require('eslint-plugin-import'),
+      'unused-imports': require('eslint-plugin-unused-imports'),
     },
-
     rules: {
-      "@next/next/no-img-element": "off",
-      "jsx-a11y/alt-text": "off",
-      "react-hooks/exhaustive-deps": "off",
-      "react/display-name": "off",
-      "tailwindcss/enforces-negative-arbitrary-values": "off",
-      "tailwindcss/no-contradicting-classname": "off",
-      "tailwindcss/no-custom-classname": "off",
-      "tailwindcss/no-unnecessary-arbitrary-value": "off",
-      "no-console": "error",
+      /* -------------------- Core Quality -------------------- */
+      'no-console': 'error',
+      'no-debugger': 'error',
+      'no-implicit-coercion': 'error',
+      'no-return-await': 'error',
 
-      /** CamelCase only for variables, NOT for object properties */
-      "camelcase": [
-        "warn",
+      /* -------------------- TypeScript -------------------- */
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports' },
+      ],
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/strict-boolean-expressions': 'error',
+      '@typescript-eslint/prefer-nullish-coalescing': 'error',
+
+      /* -------------------- Imports -------------------- */
+      'import/order': [
+        'error',
         {
-          "properties": "never",
-          "ignoreImports": true
-        }
+          groups: [
+            'builtin',
+            'external',
+            'internal',
+            'parent',
+            'sibling',
+            'index',
+          ],
+          'newlines-between': 'always',
+          alphabetize: { order: 'asc', caseInsensitive: true },
+        },
       ],
 
-      "@typescript-eslint/no-explicit-any": "error",
-      "prefer-const": "error",
-      "no-var": "error",
-      "no-duplicate-imports": "error",
-      "eqeqeq": ["warn", "always"],
-      "curly": ["warn", "all"],
-      "prefer-template": "warn",
-      "object-shorthand": "warn",
-      "prefer-arrow-callback": "warn",
+      /* -------------------- Cleanup -------------------- */
+      'unused-imports/no-unused-imports': 'error',
+      'unused-imports/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
 
-      "@typescript-eslint/explicit-function-return-type": "off",
-      "@typescript-eslint/prefer-nullish-coalescing": "warn",
-      "@typescript-eslint/prefer-optional-chain": "warn",
-      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
-      "@typescript-eslint/prefer-as-const": "warn",
-
-      // TypeScript specific rules
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
-      ]
-    }
+      /* -------------------- Prettier -------------------- */
+      'prettier/prettier': 'error',
+    },
   },
-
-  // Test file overrides
-  {
-    files: [
-      "**/__tests__/**/*.{ts,tsx,js,jsx}",
-      "**/*.test.{ts,tsx,js,jsx}"
-    ],
-    rules: {
-      "no-console": "off",
-      "camelcase": "off",
-      "@typescript-eslint/no-unused-vars": "off",
-      "@typescript-eslint/no-explicit-any": "off",
-      "prefer-const": "off",
-      "no-var": "off",
-      "no-duplicate-imports": "off",
-      "eqeqeq": "off",
-      "curly": "off",
-      "prefer-template": "off",
-      "object-shorthand": "off",
-      "prefer-arrow-callback": "off",
-      "@typescript-eslint/prefer-nullish-coalescing": "off",
-      "@typescript-eslint/prefer-optional-chain": "off",
-      "@typescript-eslint/no-unnecessary-type-assertion": "off",
-      "@typescript-eslint/prefer-as-const": "off"
-    }
-  }
 ];

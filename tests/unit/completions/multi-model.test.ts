@@ -1,32 +1,37 @@
 // Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
-import '../../mocks/supported-models.mock';
-import '../../mocks/provider-utils.mock';
 
 import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
-import { Config } from '../../../src/types';
-import { setupSuccessfulGeneration, mockGenerateText } from '../../mocks/ai-sdk.mock';
-import { 
-  createMockRouterClient, 
-  setupRouterSuccess, 
-  setupRouterError,
-  setupRouterNetworkError 
-} from '../../mocks/router-client.mock';
-import { createMultiModelPayload, setupTestEnv, mockConsole } from '../../utils/test-helpers';
-import { resetSupportedModelsMocks } from '../../mocks/supported-models.mock';
+import type { Config } from '../../../src/types';
+import {
+  setupSuccessfulGeneration,
+  mockGenerateText,
+} from '../../mocks/ai-sdk.mock';
 import { resetProviderUtilsMocks } from '../../mocks/provider-utils.mock';
+import {
+  createMockRouterClient,
+  setupRouterSuccess,
+  setupRouterError,
+  setupRouterNetworkError,
+} from '../../mocks/router-client.mock';
+import { resetSupportedModelsMocks } from '../../mocks/supported-models.mock';
+import {
+  createMultiModelPayload,
+  setupTestEnv,
+  mockConsole,
+} from '../../utils/test-helpers';
 
 describe('Multi-Model Completions', () => {
   let client: IronaChatClient;
   let mockRouter: ReturnType<typeof createMockRouterClient>;
-  
+
   beforeEach(() => {
     jest.clearAllMocks();
     resetSupportedModelsMocks();
     resetProviderUtilsMocks();
     setupTestEnv();
     mockConsole();
-    
+
     mockRouter = createMockRouterClient();
     const config: Config = { apiKey: 'test-api-key' };
     client = new IronaChatClient(config, mockRouter);
@@ -41,7 +46,10 @@ describe('Multi-Model Completions', () => {
 
       expect(mockRouter.modelSelect).toHaveBeenCalledWith({
         messages: expect.any(Array),
-        models: expect.arrayContaining(['openai/gpt-4o-mini', 'anthropic/claude-3-haiku-20240307']),
+        models: expect.arrayContaining([
+          'openai/gpt-4o-mini',
+          'anthropic/claude-3-haiku-20240307',
+        ]),
       });
       expect(result.provider).toBe('openai');
       expect(result.model).toBe('gpt-4o-mini');
@@ -80,13 +88,16 @@ describe('Multi-Model Completions', () => {
   describe('Retry Logic', () => {
     it('retries with fallback models when primary fails', async () => {
       setupRouterSuccess(mockRouter, 'openai', 'gpt-4o');
-      
+
       mockGenerateText
         .mockRejectedValueOnce(new Error('Primary model failed'))
         .mockResolvedValueOnce({ text: 'Fallback success' });
 
       const payload = createMultiModelPayload({
-        fallback_models: ['anthropic/claude-3-haiku-20240307'] as [string, ...string[]],
+        fallback_models: ['anthropic/claude-3-haiku-20240307'] as [
+          string,
+          ...string[],
+        ],
       });
 
       const result = await client.completions(payload);
@@ -104,9 +115,9 @@ describe('Multi-Model Completions', () => {
         fallback_models: ['openai/gpt-4o-mini'] as [string, ...string[]],
       });
 
-      await expect(
-        client.completions(payload)
-      ).rejects.toThrow('All attempts to process the completions request failed');
+      await expect(client.completions(payload)).rejects.toThrow(
+        'All attempts to process the completions request failed'
+      );
     });
   });
 });

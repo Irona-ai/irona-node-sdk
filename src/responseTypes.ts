@@ -1,65 +1,70 @@
 export type ProviderName =
-    | "google"
-    | "openai"
-    | "anthropic"
-    | "togetherai"
-    | "mistral"
-    | "perplexity"
-    | "xai";
+  | 'google'
+  | 'openai'
+  | 'anthropic'
+  | 'togetherai'
+  | 'mistral'
+  | 'perplexity'
+  | 'xai';
 
 export interface CompletionsResponse {
-    response: {
-        content?: string;
-        reasoningContent?: unknown;
-        role?: string;
-        fullStream?: AsyncIterable<unknown>;
-    };
-    provider: string;
-    model: string;
+  response: {
+    content?: string;
+    reasoningContent?: unknown;
+    role?: string;
+    fullStream?: AsyncIterable<unknown>;
+  };
+  provider: string;
+  model: string;
 }
 
 export interface ModelInfo {
-    provider: string;
-    model: string;
+  provider: string;
+  model: string;
 }
 
 export interface ModelSelectResponse {
-    providers: ModelInfo[];
-    fallbackProviders: ModelInfo[];
-    error: unknown;
-    success: boolean;
-    message: string;
-    statusCode: number;
+  providers: ModelInfo[];
+  fallbackProviders: ModelInfo[];
+  error: unknown;
+  success: boolean;
+  message: string;
+  statusCode: number;
 }
 
 export type TextPart = {
-    type: "text";
-    text: string;
+  type: 'text';
+  text: string;
 };
 
 export type ImagePart = {
-    type: "image";
-    image: string;
+  type: 'image';
+  image: string;
 };
 
 export type FilePart = {
-    type: "file";
-    data: string;
-    mediaType: string;
+  type: 'file';
+  data: string;
+  mediaType: string;
 };
 
 export type ToolResultPart = {
-    type: "tool-result";
-    toolCallId: string;
-    toolName: string;
-    result: unknown;
+  type: 'tool-result';
+  toolCallId: string;
+  toolName: string;
+  result: unknown;
 };
 
 export type ToolCallPart = {
-    type: "tool-call";
-    toolCallId: string;
-    toolName: string;
-    input: unknown;
+  type: 'tool-call';
+  toolCallId: string;
+  toolName: string;
+  input: unknown;
 };
 
-export type ContentPart = TextPart | ImagePart | FilePart | ToolResultPart | ToolCallPart;
+export type ContentPart =
+  | TextPart
+  | ImagePart
+  | FilePart
+  | ToolResultPart
+  | ToolCallPart;

@@ -1,4 +1,5 @@
-import { z, ZodError } from "zod";
+import type { z } from 'zod';
+import { ZodError } from 'zod';
 
 /**
  * Validates the input data against the provided zod schema.
@@ -16,13 +17,14 @@ export function validateSchema<T>(
   } catch (error) {
     if (error instanceof ZodError) {
       const errorMessages = JSON.stringify(
-        error.errors.map((issue) => ({
-          message: `${issue.path.length > 1
+        error.errors.map(issue => ({
+          message: `${
+            issue.path.length > 1
               ? issue.path
-                .map((p, index: number) => (index === 0 ? p : `[${p}]`))
-                .join("")
+                  .map((p, index: number) => (index === 0 ? p : `[${p}]`))
+                  .join('')
               : issue.path[0]
-            }: ${issue.message}`,
+          }: ${issue.message}`,
         })),
         null,
         4
@@ -34,7 +36,7 @@ export function validateSchema<T>(
     }
     return {
       success: false,
-      errors: "Unexpected error during validation",
+      errors: 'Unexpected error during validation',
     };
   }
 }

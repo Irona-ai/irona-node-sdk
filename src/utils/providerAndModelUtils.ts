@@ -1,7 +1,8 @@
-import { isSupportedModel } from "../supported_models";
-import { UnsupportedModelError } from "../errors";
-import { MessagePayload, ModelPayload } from "../schemas/common.schema";
-import { logger } from "./logger";
+import { UnsupportedModelError } from '../errors';
+import type { MessagePayload, ModelPayload } from '../schemas/common.schema';
+import { isSupportedModel } from '../supported_models';
+
+import { logger } from './logger';
 
 /**
  * Validates a model string in provider/model format and splits it into provider and model parts
@@ -10,8 +11,8 @@ import { logger } from "./logger";
  * @throws {UnsupportedModelError} If the provider/model combination is not supported
  */
 export function validateAndGetProviderAndModel(modelPayload: ModelPayload) {
-  const [provider, ...modelParts] = modelPayload.split("/");
-  const model = modelParts.join("/");
+  const [provider, ...modelParts] = modelPayload.split('/');
+  const model = modelParts.join('/');
   if (!isSupportedModel(provider, model)) {
     throw new UnsupportedModelError(`${provider}/${model} is not supported.`);
   }
@@ -26,11 +27,11 @@ export function extractMediaTypeArrayFromMessages(
   for (const message of messages) {
     if (Array.isArray(message.content)) {
       for (const item of message.content) {
-        if (item.type === "image_url") {
-          mediaTypes.add("image");
+        if (item.type === 'image_url') {
+          mediaTypes.add('image');
         }
-        if (item.type === "document") {
-          mediaTypes.add("pdf");
+        if (item.type === 'document') {
+          mediaTypes.add('pdf');
         }
       }
     }
@@ -43,7 +44,7 @@ export function getSupportedProviderAndModelArray(
   models: ModelPayload[]
 ): { provider: string; model: string }[] {
   return models
-    .map((model) => {
+    .map(model => {
       try {
         return validateAndGetProviderAndModel(model);
       } catch (error) {
@@ -54,5 +55,5 @@ export function getSupportedProviderAndModelArray(
         return null;
       }
     })
-    .filter((provider) => provider !== null);
+    .filter(provider => provider !== null);
 }

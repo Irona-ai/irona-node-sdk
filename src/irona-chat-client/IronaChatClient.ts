@@ -52,7 +52,7 @@ export class IronaChatClient {
     // Prepare the model priority queue
     // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
     const modelPriorityQueue = [
-      ...(provider && model ? [{ provider, model }] : []),
+      ...(provider !== null && model !== null ? [{ provider, model }] : []),
       ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
         fallback => validateAndGetProviderAndModel(fallback)
       ),
@@ -109,7 +109,7 @@ export class IronaChatClient {
       let fullModelName = model;
       if (provider === 'togetherai') {
         const modelPrefix = getModelPrefix(provider, model);
-        if (modelPrefix) {
+        if (modelPrefix !== null && modelPrefix !== undefined) {
           fullModelName = `${modelPrefix}/${model}`;
         }
       }
@@ -147,11 +147,19 @@ export class IronaChatClient {
       let tools = payload.tools ? { ...payload.tools } : {};
 
       // Add search tools if search is enabled
-      if (provider === 'openai' && payload.search && supportsWebSearch) {
+      if (
+        provider === 'openai' &&
+        payload.search === true &&
+        supportsWebSearch
+      ) {
         tools = { ...tools, web_search_preview: openai.tools.webSearch({}) };
       }
 
-      if (provider === 'google' && payload.search && supportsWebSearch) {
+      if (
+        provider === 'google' &&
+        payload.search === true &&
+        supportsWebSearch
+      ) {
         tools = { ...tools, google_search: google.tools.googleSearch({}) };
       }
 
@@ -165,7 +173,7 @@ export class IronaChatClient {
         baseConfig.stopWhen = stepCountIs(5);
       }
 
-      if (provider === 'xai' && payload.search && supportsWebSearch) {
+      if (provider === 'xai' && payload.search === true && supportsWebSearch) {
         baseConfig.providerOptions = {
           xai: {
             searchParameters: {
@@ -194,7 +202,7 @@ export class IronaChatClient {
         );
       };
 
-      if (payload.stream) {
+      if (payload.stream === true) {
         const streamConfig = (
           payload.reasoning_effort
             ? applyReasoningConfig({
@@ -215,7 +223,7 @@ export class IronaChatClient {
           for (let i = 0; i < 3; i++) {
             const result = await iterator.next();
 
-            if (result.done) {
+            if (result.done === true) {
               if (i === 0) {
                 throw new Error(
                   `Empty stream response from ${provider}/${model}`
@@ -394,6 +402,9 @@ export class IronaChatClient {
       togetherai,
       xai,
     };
+    if (!(provider in providerModels)) {
+      return undefined;
+    }
     if (
       ReasoningConfig.supportsReasoningMiddleware(
         provider as ProviderName,
@@ -446,7 +457,7 @@ export class IronaChatClient {
 
       // Handle errors from the model selection
       // Not using fallbacks here to remove duplicacy as they are added in model priority queue
-      if (response?.error) {
+      if (response.error !== null && response.error !== undefined) {
         logger.warn(
           `[IronaChatClient][selectBestModel][IronaML] Model selection error: ${JSON.stringify(
             response.error,
@@ -471,7 +482,7 @@ export class IronaChatClient {
   private loadApiKeyForProvider(provider: string, model: string) {
     const apiKeyName = providerApiKeyName(provider);
     const apiKey = process.env[apiKeyName];
-    if (!apiKey) {
+    if (apiKey === undefined || apiKey === '') {
       throw new MissingApiKeyError(
         `The environment variable ${apiKeyName} is missing or empty. Please ensure that ${apiKeyName} is set in the environment variables for the ${provider}/${model} model.`
       );

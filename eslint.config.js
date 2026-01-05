@@ -9,9 +9,16 @@ const compat = new FlatCompat({
 module.exports = [
   // Ignore patterns
   {
-    ignores: ['dist', 'node_modules', 'example', 'tests', '**/*.js', '!eslint.config.js'],
+    ignores: [
+      'dist',
+      'node_modules',
+      'example',
+      'tests',
+      '**/*.js',
+      '!eslint.config.js',
+    ],
   },
-  
+
   // Base config for all TypeScript files in src
   {
     files: ['src/**/*.{ts,tsx}'],

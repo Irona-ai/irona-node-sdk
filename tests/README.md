@@ -32,6 +32,7 @@ npm run test:coverage    # Run tests with coverage report
 ## Writing New Tests
 
 ### 1. Import mocks first
+
 Always import mock files before importing the code being tested:
 
 ```typescript
@@ -45,18 +46,20 @@ import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient'
 ```
 
 ### 2. Use test helpers
+
 Use the provided test helpers for common operations:
 
 ```typescript
-import { 
-  createTestPayload,      // Create single-model payload
-  createMultiModelPayload,// Create multi-model payload
-  setupTestEnv,          // Setup environment variables
-  mockConsole            // Mock console methods
+import {
+  createTestPayload, // Create single-model payload
+  createMultiModelPayload, // Create multi-model payload
+  setupTestEnv, // Setup environment variables
+  mockConsole, // Mock console methods
 } from '../../utils/test-helpers';
 ```
 
 ### 3. Reset mocks in beforeEach
+
 Always reset mocks to ensure test isolation:
 
 ```typescript
@@ -70,6 +73,7 @@ beforeEach(() => {
 ```
 
 ### 4. Use descriptive test names
+
 Group related tests using `describe` blocks and use clear test names:
 
 ```typescript
@@ -85,17 +89,20 @@ describe('Feature Name', () => {
 ## Mock Utilities
 
 ### AI SDK Mocks
+
 - `setupSuccessfulGeneration(text)`: Mock successful text generation
 - `setupSuccessfulStream()`: Mock successful streaming
 - `setupStreamError()`: Mock streaming error
 
 ### Router Client Mocks
+
 - `createMockRouterClient()`: Create a mock router client
 - `setupRouterSuccess(mockRouter, provider, model)`: Mock successful routing
 - `setupRouterError(mockRouter)`: Mock router error
 - `setupRouterNetworkError(mockRouter)`: Mock network error
 
 ### Model Support Mocks
+
 - `mockDoesModelSupportMediaTypes`: Control media type support
 - `mockDoesModelSupportWebSearch`: Control web search support
 - `resetSupportedModelsMocks()`: Reset to defaults

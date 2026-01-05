@@ -16,14 +16,14 @@ async function basicExample() {
     ],
     // use either of the falling params:
     // fallback_models: ['openai/gpt-4o-mini', 'anthropic/claude-3-5-turbo'],
-    // or use 
+    // or use
     fallbackProviders: [
       { provider: 'openai', model: 'gpt-3.5-turbo-20230111' },
       { provider: 'anthropic', model: 'claude-2-100k-20230111' },
       { provider: 'google', model: 'text-bison-001-20230111' },
     ],
     // timeout in seconds
-    timeout: 10, 
+    timeout: 10,
     // Set the optimization criteria to latency
     tradeoff: 'latency',
   });

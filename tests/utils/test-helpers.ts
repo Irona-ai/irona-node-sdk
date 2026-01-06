@@ -1,7 +1,9 @@
-import { CompletionsPayload } from '../../src/schemas/completions.schema';
+import type { CompletionsPayload } from '../../src/schemas/completions.schema';
 
 // Create test payloads with type safety
-export const createTestPayload = (overrides?: Partial<CompletionsPayload>): CompletionsPayload => {
+export const createTestPayload = (
+  overrides?: Partial<CompletionsPayload>
+): CompletionsPayload => {
   return {
     messages: [{ role: 'user', content: 'Hello world' }],
     models: ['openai/gpt-4o-mini'] as [string, ...string[]],
@@ -9,10 +11,15 @@ export const createTestPayload = (overrides?: Partial<CompletionsPayload>): Comp
   };
 };
 
-export const createMultiModelPayload = (overrides?: Partial<CompletionsPayload>): CompletionsPayload => {
+export const createMultiModelPayload = (
+  overrides?: Partial<CompletionsPayload>
+): CompletionsPayload => {
   return {
     messages: [{ role: 'user', content: 'Hello world' }],
-    models: ['openai/gpt-4o-mini', 'anthropic/claude-3-haiku-20240307'] as [string, ...string[]],
+    models: ['openai/gpt-4o-mini', 'anthropic/claude-3-haiku-20240307'] as [
+      string,
+      ...string[],
+    ],
     ...overrides,
   };
 };
@@ -24,7 +31,10 @@ export const createImagePayload = (): CompletionsPayload => {
         role: 'user',
         content: [
           { type: 'text', text: 'What is this image?' },
-          { type: 'image_url', image_url: { url: 'https://example.com/image.jpg' } },
+          {
+            type: 'image_url',
+            image_url: { url: 'https://example.com/image.jpg' },
+          },
         ],
       },
     ],

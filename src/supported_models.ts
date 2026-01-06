@@ -1,4 +1,6 @@
-import axios from "axios";
+import axios from 'axios';
+
+import { logger } from './utils/logger';
 
 interface ProviderInfo {
   icon: string;
@@ -24,10 +26,10 @@ export async function updateProvidersFromGist(
   try {
     const response = await axios.get(SUPPORTED_MODELS_GIST_URL);
     const data = response.data;
-    PROVIDERS = typeof data === "string" ? JSON.parse(data) : data;
-    console.info("Supported Models details loaded from Gist.");
+    PROVIDERS = typeof data === 'string' ? JSON.parse(data) : data;
+    logger.info('Supported Models details loaded from Gist.');
   } catch (error) {
-    console.error("Failed to load Supported Models details from Gist.");
+    logger.error('Failed to load Supported Models details from Gist.');
     throw error;
   }
 }
@@ -39,16 +41,22 @@ export function doesModelSupportMediaTypes(
   model: string,
   medias: string[]
 ) {
-  if (!medias || medias.length === 0) return true;
+  if (!Array.isArray(medias) || medias.length === 0) {
+    return true;
+  }
 
   // Updated to use capabilities
   const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
-  if (!modelCapabilities) return false;
+  if (!modelCapabilities) {
+    return false;
+  }
 
   // Only check for "image" and "pdf" capabilities
-  return medias.every((media) => {
+  return medias.every(media => {
     // Only allow "image" and "pdf" media types
-    if (media !== "image" && media !== "pdf") return false;
+    if (media !== 'image' && media !== 'pdf') {
+      return false;
+    }
     return modelCapabilities.includes(media);
   });
 }
@@ -58,22 +66,31 @@ export function doesModelSupportWebSearch(
 ): boolean {
   // Updated to use capabilities
   const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
-  if (!modelCapabilities) return false;
-  return modelCapabilities.includes("search");
+  if (!modelCapabilities) {
+    return false;
+  }
+  return modelCapabilities.includes('search');
 }
 export function providerApiKeyName(provider: string) {
   return PROVIDERS[provider]?.api_key;
 }
 
-export function doesModelSupportReasoning(provider: string, model: string): boolean {
+export function doesModelSupportReasoning(
+  provider: string,
+  model: string
+): boolean {
   const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
-  if (!modelCapabilities) return false;
-  return modelCapabilities.includes("reasoning");
+  if (!modelCapabilities) {
+    return false;
+  }
+  return modelCapabilities.includes('reasoning');
 }
 
 export function getModelPrefix(provider: string, model: string): string | null {
   const modelPrefixes = PROVIDERS[provider]?.model_prefix;
-  if (!modelPrefixes) return null;
+  if (!modelPrefixes) {
+    return null;
+  }
 
   return modelPrefixes[model] || null;
 }

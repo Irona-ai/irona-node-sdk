@@ -16,9 +16,12 @@ jest.mock('../../src/supported_models', () => ({
   updateProvidersFromGist: jest.fn().mockResolvedValue(undefined),
 }));
 
-export const mockDoesModelSupportMediaTypes = require('../../src/supported_models').doesModelSupportMediaTypes as jest.Mock;
-export const mockDoesModelSupportWebSearch = require('../../src/supported_models').doesModelSupportWebSearch as jest.Mock;
-export const mockProviderApiKeyName = require('../../src/supported_models').providerApiKeyName as jest.Mock;
+export const mockDoesModelSupportMediaTypes =
+  require('../../src/supported_models').doesModelSupportMediaTypes as jest.Mock;
+export const mockDoesModelSupportWebSearch =
+  require('../../src/supported_models').doesModelSupportWebSearch as jest.Mock;
+export const mockProviderApiKeyName = require('../../src/supported_models')
+  .providerApiKeyName as jest.Mock;
 
 export const resetSupportedModelsMocks = () => {
   mockDoesModelSupportMediaTypes.mockReset().mockReturnValue(true);

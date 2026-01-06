@@ -1,35 +1,38 @@
 // Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
-import '../../mocks/supported-models.mock';
-import '../../mocks/provider-utils.mock';
 
-import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
-import { Config } from '../../../src/types';
 import { BadRequestError } from '../../../src/errors';
+import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
+import type { Config } from '../../../src/types';
 import { setupStreamError } from '../../mocks/ai-sdk.mock';
-import { createMockRouterClient } from '../../mocks/router-client.mock';
-import { createTestPayload, createImagePayload, setupTestEnv, mockConsole } from '../../utils/test-helpers';
-import { 
-  mockDoesModelSupportMediaTypes,
-  resetSupportedModelsMocks 
-} from '../../mocks/supported-models.mock';
-import { 
+import {
   mockExtractMediaTypeArrayFromMessages,
   mockGetSupportedProviderAndModelArray,
-  resetProviderUtilsMocks 
+  resetProviderUtilsMocks,
 } from '../../mocks/provider-utils.mock';
+import { createMockRouterClient } from '../../mocks/router-client.mock';
+import {
+  mockDoesModelSupportMediaTypes,
+  resetSupportedModelsMocks,
+} from '../../mocks/supported-models.mock';
+import {
+  createTestPayload,
+  createImagePayload,
+  setupTestEnv,
+  mockConsole,
+} from '../../utils/test-helpers';
 
 describe('Edge Cases', () => {
   let client: IronaChatClient;
   let mockRouter: ReturnType<typeof createMockRouterClient>;
-  
+
   beforeEach(() => {
     jest.clearAllMocks();
     resetSupportedModelsMocks();
     resetProviderUtilsMocks();
     setupTestEnv();
     mockConsole();
-    
+
     mockRouter = createMockRouterClient();
     const config: Config = { apiKey: 'test-api-key' };
     client = new IronaChatClient(config, mockRouter);
@@ -42,10 +45,10 @@ describe('Edge Cases', () => {
         models: ['openai/gpt-4o-mini'] as [string, ...string[]],
       } as any;
 
-      await expect(
-        client.completions(invalidPayload)
-      ).rejects.toThrow(BadRequestError);
-      
+      await expect(client.completions(invalidPayload)).rejects.toThrow(
+        BadRequestError
+      );
+
       expect(mockRouter.modelSelect).not.toHaveBeenCalled();
     });
 
@@ -54,9 +57,7 @@ describe('Edge Cases', () => {
         models: ['invalid-model-format'] as [string, ...string[]],
       });
 
-      await expect(
-        client.completions(payload)
-      ).rejects.toThrow();
+      await expect(client.completions(payload)).rejects.toThrow();
     });
   });
 
@@ -65,15 +66,15 @@ describe('Edge Cases', () => {
       mockDoesModelSupportMediaTypes.mockReturnValue(false);
       mockExtractMediaTypeArrayFromMessages.mockReturnValue(['image']);
       mockGetSupportedProviderAndModelArray.mockReturnValue([
-        { provider: 'openai', model: 'gpt-4o-mini' }
+        { provider: 'openai', model: 'gpt-4o-mini' },
       ]);
 
       const payload = createImagePayload();
 
-      await expect(
-        client.completions(payload)
-      ).rejects.toThrow(BadRequestError);
-      
+      await expect(client.completions(payload)).rejects.toThrow(
+        BadRequestError
+      );
+
       expect(mockRouter.modelSelect).not.toHaveBeenCalled();
     });
   });

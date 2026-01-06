@@ -16,7 +16,9 @@ export const setupSuccessfulGeneration = (text: string = 'Test response') => {
   mockGenerateText.mockResolvedValue({ text });
 };
 
-export const setupSuccessfulStream = (chunks: string[] = ['Hello', ' world']) => {
+export const setupSuccessfulStream = (
+  chunks: string[] = ['Hello', ' world']
+) => {
   const mockStream = {
     fullStream: {
       [Symbol.asyncIterator]: async function* () {

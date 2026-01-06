@@ -1,26 +1,27 @@
 // completionsSchema.ts
-import { z } from "zod";
-import { ModelSelectSchema } from "./modelSelect.schema";
+import { z } from 'zod';
+
+import { ModelSelectSchema } from './modelSelect.schema';
 
 export const CompletionsSchema = ModelSelectSchema.extend({
   temperature: z
     .number()
-    .min(0, "Temperature must be at least 0")
-    .max(1, "Temperature cannot exceed 1")
+    .min(0, 'Temperature must be at least 0')
+    .max(1, 'Temperature cannot exceed 1')
     .optional(),
   maxRetries: z
     .number()
-    .int("Max retries must be an integer")
-    .positive("Max retries must be a positive integer")
+    .int('Max retries must be an integer')
+    .positive('Max retries must be a positive integer')
     .optional(),
   maxTokens: z
     .number()
-    .int("Max tokens must be an integer")
-    .positive("Max tokens must be a positive integer")
+    .int('Max tokens must be an integer')
+    .positive('Max tokens must be a positive integer')
     .optional(),
   stream: z.boolean().optional(),
   search: z.boolean().optional(),
-  reasoning_effort: z.enum(["off", "low", "medium", "high", "max"]).optional(),
+  reasoning_effort: z.enum(['off', 'low', 'medium', 'high', 'max']).optional(),
   // Note: tools parameter is inherited from ModelSelectSchema
 });
 

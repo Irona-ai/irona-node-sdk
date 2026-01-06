@@ -1,47 +1,35 @@
-import { generateText, streamText } from "ai";
-import { openai } from "@ai-sdk/openai";
-import { anthropic, AnthropicProviderOptions } from "@ai-sdk/anthropic";
-import { google } from "@ai-sdk/google";
-import { mistral } from "@ai-sdk/mistral";
-import { perplexity } from "@ai-sdk/perplexity";
-import { togetherai } from "@ai-sdk/togetherai";
-import { Config } from "../types";
-import { BadRequestError, MissingApiKeyError } from "../errors";
+import { anthropic } from '@ai-sdk/anthropic';
+import { google } from '@ai-sdk/google';
+import { mistral } from '@ai-sdk/mistral';
+import { openai } from '@ai-sdk/openai';
+import { perplexity } from '@ai-sdk/perplexity';
+import { togetherai } from '@ai-sdk/togetherai';
+import { xai } from '@ai-sdk/xai';
+import { generateText, streamText, stepCountIs } from 'ai';
+import type { ModelMessage, LanguageModel } from 'ai';
+
+import { BadRequestError, MissingApiKeyError } from '../errors';
+import type { IronaRouterClient } from '../irona-router-client/IronaRouterClient';
+import type { ProviderName, ContentPart } from '../responseTypes';
+import { CompletionsResponse } from '../responseTypes';
+import type { MessagePayload } from '../schemas/common.schema';
+import { CompletionsSchema } from '../schemas/completions.schema';
+import type { CompletionsPayload } from '../schemas/completions.schema';
+import { ModelSelectSchema } from '../schemas/modelSelect.schema';
+import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import {
-  doesModelSupportMediaTypes,
   providerApiKeyName,
   doesModelSupportWebSearch,
   getModelPrefix,
-} from "../supported_models";
-import { validateSchema } from "../utils/requestValidator";
-import {
-  CompletionsPayload,
-  CompletionsSchema,
-} from "../schemas/completions.schema";
-import {
-  ModelSelectPayload,
-  ModelSelectSchema,
-} from "../schemas/modelSelect.schema";
-import { IronaRouterClient } from "../irona-router-client/IronaRouterClient";
-import {
-  extractMediaTypeArrayFromMessages,
-  getSupportedProviderAndModelArray,
-  validateAndGetProviderAndModel,
-} from "../utils/providerAndModelUtils";
-import { MessagePayload } from "../schemas/common.schema";
-import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
-import { ReasoningConfig, ReasoningEffort } from "../utils/reasoningConfig";
-import { xai } from "@ai-sdk/xai";
-import { stepCountIs } from 'ai';
+} from '../supported_models';
+import type { Config } from '../types';
+import { logger } from '../utils/logger';
+import { validateAndGetProviderAndModel } from '../utils/providerAndModelUtils';
+import { ReasoningConfig } from '../utils/reasoningConfig';
+import type { ReasoningEffort } from '../utils/reasoningConfig';
+import { validateSchema } from '../utils/requestValidator';
+export { CompletionsResponse };
 
-type ProviderName =
-  | "google"
-  | "openai"
-  | "anthropic"
-  | "togetherai"
-  | "mistral"
-  | "perplexity"
-  | "xai";
 export class IronaChatClient {
   constructor(
     private readonly config: Config,
@@ -51,7 +39,7 @@ export class IronaChatClient {
   /**
    * Processes a completions request and retries with fallback models if necessary.
    */
-  async completions(payload: CompletionsPayload) {
+  async completions(payload: CompletionsPayload): Promise<CompletionsResponse> {
     // Validate input
     const validationResult = validateSchema(CompletionsSchema, payload);
     if (!validationResult.success) {
@@ -64,16 +52,16 @@ export class IronaChatClient {
     // Prepare the model priority queue
     // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
     const modelPriorityQueue = [
-      ...(provider && model ? [{ provider, model }] : []),
+      ...(provider !== null && model !== null ? [{ provider, model }] : []),
       ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
-        (fallback) => validateAndGetProviderAndModel(fallback)
+        fallback => validateAndGetProviderAndModel(fallback)
       ),
     ];
 
     // Attempt execution for each model in the priority queue
     let attemptNumber = 1;
     for (const { provider, model } of modelPriorityQueue) {
-      console.log(
+      logger.info(
         `[IronaChatClient][completions] Attempt ${attemptNumber}: Invoking chat completions with provider: ${provider}, model: ${model}`
       );
       try {
@@ -84,12 +72,12 @@ export class IronaChatClient {
           payload,
           supportsWebSearch
         );
-        console.log(
+        logger.info(
           `[IronaChatClient][completions] Attempt ${attemptNumber}: Successfully executed chat completions with provider: ${provider}, model: ${model}`
         );
         return response; // Return on first success
       } catch (error) {
-        console.error(
+        logger.error(
           `\n[IronaChatClient][completions] Attempt ${attemptNumber}: Error with ${provider}/${model}: ${
             (error as Error).message
           }`
@@ -111,17 +99,17 @@ export class IronaChatClient {
     model: string,
     payload: CompletionsPayload,
     supportsWebSearch: boolean
-  ) {
+  ): Promise<CompletionsResponse> {
     try {
-      const apiKey = this.loadApiKeyForProvider(provider, model);
+      // const apiKey = this.loadApiKeyForProvider(provider, model);
 
       // Convert messages to Vercel AI SDK format
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
       let fullModelName = model;
-      if (provider === "togetherai") {
+      if (provider === 'togetherai') {
         const modelPrefix = getModelPrefix(provider, model);
-        if (modelPrefix) {
+        if (modelPrefix !== null && modelPrefix !== undefined) {
           fullModelName = `${modelPrefix}/${model}`;
         }
       }
@@ -137,10 +125,18 @@ export class IronaChatClient {
       }
 
       const baseModel = modelFactory(fullModelName);
-      let finalModel = baseModel;
+      const finalModel = baseModel;
 
       // Prepare base configuration
-      const baseConfig = {
+      const baseConfig: {
+        model: LanguageModel;
+        messages: ModelMessage[];
+        temperature?: number;
+        maxOutputTokens?: number;
+        tools?: Parameters<typeof streamText>[0]['tools'];
+        stopWhen?: Parameters<typeof streamText>[0]['stopWhen'];
+        providerOptions?: Parameters<typeof streamText>[0]['providerOptions'];
+      } = {
         model: finalModel,
         messages: vercelMessages,
         temperature: payload.temperature,
@@ -151,39 +147,49 @@ export class IronaChatClient {
       let tools = payload.tools ? { ...payload.tools } : {};
 
       // Add search tools if search is enabled
-      if (provider === "openai" && payload.search && supportsWebSearch) {
+      if (
+        provider === 'openai' &&
+        payload.search === true &&
+        supportsWebSearch
+      ) {
         tools = { ...tools, web_search_preview: openai.tools.webSearch({}) };
       }
 
-      if (provider === "google" && payload.search && supportsWebSearch) {
+      if (
+        provider === 'google' &&
+        payload.search === true &&
+        supportsWebSearch
+      ) {
         tools = { ...tools, google_search: google.tools.googleSearch({}) };
       }
 
       // Add tools to config if there are any
       if (Object.keys(tools).length > 0) {
-        (baseConfig as any).tools = tools;
+        baseConfig.tools = tools as Parameters<typeof streamText>[0]['tools'];
       }
 
       // Enable multi-step calls only when payload.tools are provided
       if (payload.tools && Object.keys(payload.tools).length > 0) {
-        (baseConfig as any).stopWhen = stepCountIs(5);
+        baseConfig.stopWhen = stepCountIs(5);
       }
 
-      if (provider === "xai" && payload.search && supportsWebSearch) {
-        (baseConfig as any).providerOptions = {
+      if (provider === 'xai' && payload.search === true && supportsWebSearch) {
+        baseConfig.providerOptions = {
           xai: {
             searchParameters: {
-              mode: "on",
+              mode: 'on',
             },
           },
         };
       }
       // Helper function to apply reasoning configuration
-      const applyReasoningConfig = (config: any): any => {
+      const applyReasoningConfig = <T extends Record<string, unknown>>(
+        config: T
+      ): T => {
         if (
-          provider === "togetherai" ||
-          provider === "mistral" ||
-          provider === "perplexity"
+          provider === 'togetherai' ||
+          provider === 'mistral' ||
+          provider === 'perplexity'
         ) {
           // For these providers, reasoning is handled by middleware that comes under <think> xml, not provider options
           return config;
@@ -196,27 +202,28 @@ export class IronaChatClient {
         );
       };
 
-      if (payload.stream) {
-        const streamConfig: Parameters<typeof streamText>[0] =
+      if (payload.stream === true) {
+        const streamConfig = (
           payload.reasoning_effort
             ? applyReasoningConfig({
                 ...baseConfig,
               })
             : {
                 ...baseConfig,
-              };
+              }
+        ) as Parameters<typeof streamText>[0];
 
         const stream = await streamText(streamConfig);
 
         // Eagerly test the stream by consuming multiple chunks to catch errors early
         const iterator = stream.fullStream[Symbol.asyncIterator]();
-        const testResults: any = [];
+        const testResults: unknown[] = [];
         try {
           // Test the first few chunks to ensure the stream is working
           for (let i = 0; i < 3; i++) {
             const result = await iterator.next();
 
-            if (result.done) {
+            if (result.done === true) {
               if (i === 0) {
                 throw new Error(
                   `Empty stream response from ${provider}/${model}`
@@ -225,7 +232,7 @@ export class IronaChatClient {
               break;
             }
 
-            if (result.value?.type === "error") {
+            if (result.value?.type === 'error') {
               const err = result.value.error as {
                 name?: string;
                 statusCode?: number;
@@ -238,16 +245,15 @@ export class IronaChatClient {
           }
         } catch (error) {
           // If we get an error during the early test, propagate it up to trigger fallbacks
-          console.error(
-            `[IronaChatClient] Stream validation failed for ${provider}/${model}:`,
-            error
+          logger.error(
+            `[IronaChatClient] Stream validation failed for ${provider}/${model}: ${error}`
           );
           throw error;
         }
 
         // Create a new stream that includes the pre-fetched results
         const fullStream = {
-          [Symbol.asyncIterator]: async function* () {
+          async *[Symbol.asyncIterator]() {
             try {
               // Yield the pre-fetched results first
               for (const result of testResults) {
@@ -255,8 +261,8 @@ export class IronaChatClient {
               }
               // Continue with the rest of the stream
               for await (const part of stream.fullStream) {
-                if (part.type === "error") {
-                  // console.error(`Stream yielded error for ${provider}/${model}:`, part.error);
+                if (part.type === 'error') {
+                  // logger.error(`Stream yielded error for ${provider}/${model}:`, part.error);
                   const err = part.error as {
                     name?: string;
                     statusCode?: number;
@@ -266,9 +272,8 @@ export class IronaChatClient {
                 yield part;
               }
             } catch (err) {
-              console.error(
-                `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}:`,
-                err
+              logger.error(
+                `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}: ${err}`
               );
               throw new Error(
                 `Streaming failed for provider: ${provider}, model: ${model}.\n${
@@ -285,29 +290,29 @@ export class IronaChatClient {
           model,
         };
       } else {
-        const generateConfig: Parameters<typeof generateText>[0] =
+        const generateConfig = (
           payload.reasoning_effort
             ? applyReasoningConfig({
                 ...baseConfig,
               })
             : {
                 ...baseConfig,
-              };
+              }
+        ) as Parameters<typeof generateText>[0];
         try {
           const response = await generateText(generateConfig);
           return {
             response: {
               content: response.text,
               reasoningContent: response.reasoning,
-              role: "assistant",
+              role: 'assistant',
             },
             provider,
             model,
           };
         } catch (error) {
-          console.error(
-            `[IronaChatClient] Non-stream request failed for ${provider}/${model}:`,
-            error
+          logger.error(
+            `[IronaChatClient] Non-stream request failed for ${provider}/${model}: ${error}`
           );
           throw error;
         }
@@ -324,59 +329,58 @@ export class IronaChatClient {
   /**
    * Converts messages to Vercel AI SDK format
    */
-  private convertToVercelMessages(messages: MessagePayload[]): any[] {
-    return messages.map((msg, index) => {
-      if (typeof msg.content === "string") {
+  private convertToVercelMessages(messages: MessagePayload[]): ModelMessage[] {
+    return messages.map((msg): ModelMessage => {
+      const role = msg.role;
+      if (typeof msg.content === 'string') {
         return {
-          id: `msg-${index}`,
           role: msg.role,
           content: msg.content,
-        };
+        } as ModelMessage;
       }
 
-      const parts = msg.content.map((part) => {
-        if (part.type === "text") {
+      const parts: ContentPart[] = msg.content.map(part => {
+        if (part.type === 'text') {
           return {
-            type: "text",
+            type: 'text',
             text: part.text,
-          } as const;
-        } else if (part.type === "image_url") {
+          };
+        } else if (part.type === 'image_url') {
           return {
-            type: "image",
+            type: 'image',
             image: part.image_url.url,
-          } as const;
-        } else if (part.type === "document") {
+          };
+        } else if (part.type === 'document') {
           return {
-            type: "file",
+            type: 'file',
             data: part.source.url,
-            mediaType: "application/pdf",
-          } as const;
-        } else if (part.type === "tool-result") {
+            mediaType: 'application/pdf',
+          };
+        } else if (part.type === 'tool-result') {
           return {
-            type: "tool-result",
+            type: 'tool-result',
             toolCallId: part.toolCallId,
             toolName: part.toolName,
             result: part.result,
-          } as const;
-        } else if (part.type === "tool-call") {
+          };
+        } else if (part.type === 'tool-call') {
           return {
-            type: "tool-call",
+            type: 'tool-call',
             toolCallId: part.toolCallId,
             toolName: part.toolName,
             input: part.toolInput,
-          } as const;
+          };
         } else {
           throw new Error(
-            `Unsupported message part type: ${(part as any).type}`
+            `Unsupported message part type: ${(part as { type: string }).type}`
           );
         }
       });
 
       return {
-        id: `msg-${index}`,
-        role: msg.role,
-        content: parts,
-      };
+        role: role,
+        content: parts as ModelMessage['content'],
+      } as ModelMessage;
     });
   }
 
@@ -390,14 +394,17 @@ export class IronaChatClient {
   ) {
     // Map of provider to their respective model functions
     const providerModels = {
-      openai: openai,
-      anthropic: anthropic,
-      google: google,
-      mistral: mistral,
-      perplexity: perplexity,
-      togetherai: togetherai,
-      xai: xai,
+      openai,
+      anthropic,
+      google,
+      mistral,
+      perplexity,
+      togetherai,
+      xai,
     };
+    if (!(provider in providerModels)) {
+      return undefined;
+    }
     if (
       ReasoningConfig.supportsReasoningMiddleware(
         provider as ProviderName,
@@ -419,7 +426,7 @@ export class IronaChatClient {
   private extractModelSelectPayloadFromCompletionsPayload(
     body: CompletionsPayload
   ): ModelSelectPayload {
-    const modelSelectBody: any = {};
+    const modelSelectBody = {} as ModelSelectPayload;
 
     // Get the keys from ModelSelectSchema
     const modelSelectKeys = Object.keys(
@@ -427,9 +434,10 @@ export class IronaChatClient {
     ) as (keyof ModelSelectPayload)[];
 
     // Extract only the matching keys from CompletionsPayload
-    modelSelectKeys.forEach((key) => {
+    modelSelectKeys.forEach(key => {
       if (key in body) {
-        modelSelectBody[key] = body[key];
+        (modelSelectBody as Record<string, unknown>)[key] =
+          body[key as keyof CompletionsPayload];
       }
     });
 
@@ -437,7 +445,7 @@ export class IronaChatClient {
   }
 
   private async selectBestModel(body: CompletionsPayload) {
-    console.log(
+    logger.info(
       `[IronaChatClient][selectBestModel] Models provided: ${
         body.models?.length || 0
       }, calling model-select endpoint`
@@ -449,8 +457,8 @@ export class IronaChatClient {
 
       // Handle errors from the model selection
       // Not using fallbacks here to remove duplicacy as they are added in model priority queue
-      if (response && response.error) {
-        console.warn(
+      if (response.error !== null && response.error !== undefined) {
+        logger.warn(
           `[IronaChatClient][selectBestModel][IronaML] Model selection error: ${JSON.stringify(
             response.error,
             null,
@@ -462,7 +470,7 @@ export class IronaChatClient {
 
       return response.providers[0];
     } catch (error) {
-      console.error(
+      logger.error(
         `[IronaChatClient][selectBestModel] Model selection error: ${
           (error as Error).message
         }`
@@ -474,7 +482,7 @@ export class IronaChatClient {
   private loadApiKeyForProvider(provider: string, model: string) {
     const apiKeyName = providerApiKeyName(provider);
     const apiKey = process.env[apiKeyName];
-    if (!apiKey) {
+    if (apiKey === undefined || apiKey === '') {
       throw new MissingApiKeyError(
         `The environment variable ${apiKeyName} is missing or empty. Please ensure that ${apiKeyName} is set in the environment variables for the ${provider}/${model} model.`
       );

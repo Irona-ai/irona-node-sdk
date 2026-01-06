@@ -1,30 +1,35 @@
 // Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
-import '../../mocks/supported-models.mock';
-import '../../mocks/provider-utils.mock';
 
 import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
-import { Config } from '../../../src/types';
-import { setupSuccessfulGeneration, mockGenerateText } from '../../mocks/ai-sdk.mock';
-import { createMockRouterClient } from '../../mocks/router-client.mock';
-import { createTestPayload, setupTestEnv, mockConsole } from '../../utils/test-helpers';
-import { 
-  mockDoesModelSupportWebSearch,
-  resetSupportedModelsMocks 
-} from '../../mocks/supported-models.mock';
+import type { Config } from '../../../src/types';
+import {
+  setupSuccessfulGeneration,
+  mockGenerateText,
+} from '../../mocks/ai-sdk.mock';
 import { resetProviderUtilsMocks } from '../../mocks/provider-utils.mock';
+import { createMockRouterClient } from '../../mocks/router-client.mock';
+import {
+  mockDoesModelSupportWebSearch,
+  resetSupportedModelsMocks,
+} from '../../mocks/supported-models.mock';
+import {
+  createTestPayload,
+  setupTestEnv,
+  mockConsole,
+} from '../../utils/test-helpers';
 
 describe('Web Search Integration', () => {
   let client: IronaChatClient;
   let mockRouter: ReturnType<typeof createMockRouterClient>;
-  
+
   beforeEach(() => {
     jest.clearAllMocks();
     resetSupportedModelsMocks();
     resetProviderUtilsMocks();
     setupTestEnv();
     mockConsole();
-    
+
     mockRouter = createMockRouterClient();
     const config: Config = { apiKey: 'test-api-key' };
     client = new IronaChatClient(config, mockRouter);

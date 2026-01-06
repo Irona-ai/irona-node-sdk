@@ -1,20 +1,35 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { CallbackManagerForLLMRun } from "@langchain/core/callbacks/manager";
-import { SimpleChatModel } from "@langchain/core/language_models/chat_models";
-import {
-  BaseMessage,
-  AIMessageChunk,
-  AIMessageFields,
-} from "@langchain/core/messages";
-import { ChatGenerationChunk } from "@langchain/core/outputs";
-import axios from "axios";
-import { ChatModelConfig } from "../types";
-import { CoreMessage, FilePart, ImagePart, streamText, TextPart } from "ai";
-import { openai } from "@ai-sdk/openai";
-import {
+import { openai } from '@ai-sdk/openai';
+import type { CallbackManagerForLLMRun } from '@langchain/core/callbacks/manager';
+import { SimpleChatModel } from '@langchain/core/language_models/chat_models';
+import type { BaseMessage, AIMessageFields } from '@langchain/core/messages';
+import { AIMessageChunk } from '@langchain/core/messages';
+import { ChatGenerationChunk } from '@langchain/core/outputs';
+import type { CoreMessage, FilePart, ImagePart, TextPart } from 'ai';
+import { streamText } from 'ai';
+import axios from 'axios';
+
+import type {
   DocumentContentPayload,
   MessagePayload,
-} from "../schemas/common.schema";
+} from '../schemas/common.schema';
+import type { ChatModelConfig } from '../types';
+import { logger } from '../utils/logger';
+
+interface PerplexityResponse {
+  id?: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+  choices: Array<{
+    message: {
+      content: string;
+      role?: string;
+    };
+    finish_reason?: string;
+  }>;
+}
 
 /**
  * ChatPdf model for LangChain.
@@ -31,18 +46,20 @@ export class ChatPdfModel extends SimpleChatModel {
   }
 
   _llmType(): string {
-    return "chatpdf";
+    return 'chatpdf';
   }
-  private validateInputMessages(messages: any[]): void {
+  private validateInputMessages(messages: BaseMessage[]): void {
     if (!messages.length) {
-      throw new Error("No messages provided.");
+      throw new Error('No messages provided.');
     }
   }
-  private convertLangchainMessages(originalMessages: any[]): MessagePayload[] {
-    return originalMessages.map((m) => {
+  private convertLangchainMessages(
+    originalMessages: BaseMessage[]
+  ): MessagePayload[] {
+    return originalMessages.map(m => {
       const type = m.getType();
       return {
-        role: type === "human" ? "user" : type === "ai" ? "assistant" : type,
+        role: type === 'human' ? 'user' : type === 'ai' ? 'assistant' : type,
         content: m.content,
       };
     });
@@ -52,14 +69,14 @@ export class ChatPdfModel extends SimpleChatModel {
   ): Promise<FilePart> {
     try {
       return {
-        type: "file",
+        type: 'file',
         data: contentItem.source.url,
-        mimeType: "application/pdf",
-        filename: contentItem.filename || "document.pdf",
+        mediaType: 'application/pdf',
+        filename: contentItem.filename ?? 'document.pdf',
       };
     } catch (error) {
-      console.error("Failed to fetch PDF:", error);
-      throw new Error("Failed to fetch the document for processing.");
+      logger.error(`Failed to fetch PDF: ${error}`);
+      throw new Error('Failed to fetch the document for processing.');
     }
   }
 
@@ -69,17 +86,25 @@ export class ChatPdfModel extends SimpleChatModel {
     const formattedMessages = this.convertLangchainMessages(messages);
 
     return Promise.all(
-      formattedMessages.map(async (message) => {
+      formattedMessages.map(async message => {
         let transformedContent: (TextPart | ImagePart | FilePart)[] = [];
 
         if (Array.isArray(message.content)) {
           transformedContent = await Promise.all(
-            message.content.map(async (contentItem) => {
-              if (contentItem.type === "document")
+            message.content.map(async contentItem => {
+              if (contentItem.type === 'document')
                 return this.fetchDocumentContent(contentItem);
-              if (contentItem.type === "image_url")
-                return { type: "image", image: contentItem.image_url.url };
-              return { type: "text", text: contentItem.text };
+              if (contentItem.type === 'image_url')
+                return {
+                  type: 'image',
+                  image: contentItem.image_url.url,
+                } as ImagePart;
+              if (
+                contentItem.type === 'text' ||
+                contentItem.type === 'reasoning'
+              )
+                return { type: 'text', text: contentItem.text } as TextPart;
+              return { type: 'text', text: '' } as TextPart;
             })
           );
         }
@@ -87,7 +112,7 @@ export class ChatPdfModel extends SimpleChatModel {
         return {
           role: message.role,
           content:
-            message.role === "system"
+            message.role === 'system'
               ? JSON.stringify(transformedContent)
               : transformedContent,
         } as CoreMessage;
@@ -95,7 +120,9 @@ export class ChatPdfModel extends SimpleChatModel {
     );
   }
 
-  private parseLLMResponseToAIMessage(data: any): AIMessageFields {
+  private parseLLMResponseToAIMessage(
+    data: PerplexityResponse
+  ): AIMessageFields {
     return {
       id: data?.id,
       usage_metadata: {
@@ -103,7 +130,7 @@ export class ChatPdfModel extends SimpleChatModel {
         output_tokens: data?.usage?.completion_tokens,
         total_tokens: data?.usage?.total_tokens,
       },
-      content: data.choices[0]?.message?.content || "",
+      content: data.choices[0]?.message?.content || '',
       additional_kwargs: { ...data },
       response_metadata: {
         finish_reason: data?.choices?.[0]?.finish_reason,
@@ -111,12 +138,12 @@ export class ChatPdfModel extends SimpleChatModel {
     };
   }
 
-  async _call(messages: BaseMessage[]): Promise<any> {
-    throw new Error("Not implemented");
+  async _call(_messages: BaseMessage[]): Promise<string> {
+    throw new Error('Not implemented');
   }
   async *_streamResponseChunks(
-    messages: any[],
-    _options: this["ParsedCallOptions"],
+    messages: BaseMessage[],
+    _options: this['ParsedCallOptions'],
     runManager?: CallbackManagerForLLMRun
   ): AsyncGenerator<ChatGenerationChunk> {
     this.validateInputMessages(messages);
@@ -124,7 +151,6 @@ export class ChatPdfModel extends SimpleChatModel {
       const finalMessages: CoreMessage[] =
         await this.transformMessagesForCompletions(messages);
       //   const { textStream, usagePromise, responsePromise, finishReasonPromise } =
-      // console.log("finalMessages", JSON.stringify(finalMessages, null, 2));
 
       try {
         const { textStream } = await streamText({
@@ -155,16 +181,15 @@ export class ChatPdfModel extends SimpleChatModel {
             });
             await runManager?.handleLLMNewToken(streamedChunk);
           } catch (error) {
-            console.error(
-              "Error in ChatPdf streaming generator:",
-              (error as Error).message
+            logger.error(
+              `Error in ChatPdf streaming generator: ${(error as Error).message}`
             );
             const message = (error as Error).message;
             throw new Error(message);
           }
         }
       } catch (error) {
-        console.error("Error in completions:", (error as Error).message);
+        logger.error(`Error in completions: ${(error as Error).message}`);
         const message = (error as Error).message;
         throw new Error(message);
       }

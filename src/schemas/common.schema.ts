@@ -53,6 +53,19 @@ const ToolCallContent = z.object({
   toolInput: z.unknown(),
 });
 
+// Source content
+const SourceContent = z
+  .object({
+    type: z.literal('source'),
+    sourceType: z.literal('url'),
+    id: z.string(),
+    url: z.string().url(),
+    title: z.string(),
+    content: z.string().optional(),
+    favicon: z.string().optional(),
+  })
+  .describe('Source citation block');
+
 export type DocumentContentPayload = z.infer<typeof DocumentContent>;
 
 //  Discriminated Content Union
@@ -63,6 +76,7 @@ const ContentItem = z.discriminatedUnion('type', [
   DocumentContent,
   ResultContent,
   ToolCallContent,
+  SourceContent,
 ]);
 
 // Message Schema

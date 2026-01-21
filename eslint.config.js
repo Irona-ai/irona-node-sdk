@@ -16,6 +16,7 @@ module.exports = [
       'tests',
       '**/*.js',
       '!eslint.config.js',
+      'custom-chat-models',
     ],
   },
 

@@ -230,7 +230,7 @@ export class ReasoningConfig {
     if (!doesModelSupportReasoning(provider, model)) {
       if (reasoningEffort !== undefined && reasoningEffort !== 'off') {
         logger.warn(
-          `[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`
+          `[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoningEffort`
         );
       }
       return config;

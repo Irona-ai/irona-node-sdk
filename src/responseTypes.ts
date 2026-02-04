@@ -37,6 +37,11 @@ export type TextPart = {
   text: string;
 };
 
+export type ReasoningPart = {
+  type: 'reasoning';
+  text: string;
+};
+
 export type ImagePart = {
   type: 'image';
   image: string;
@@ -52,7 +57,8 @@ export type ToolResultPart = {
   type: 'tool-result';
   toolCallId: string;
   toolName: string;
-  result: unknown;
+  output: unknown;
+  isError?: string;
 };
 
 export type ToolCallPart = {
@@ -64,6 +70,7 @@ export type ToolCallPart = {
 
 export type ContentPart =
   | TextPart
+  | ReasoningPart
   | ImagePart
   | FilePart
   | ToolResultPart

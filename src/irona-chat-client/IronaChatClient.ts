@@ -10,7 +10,7 @@ import type { ModelMessage, LanguageModel } from 'ai';
 
 import { BadRequestError, MissingApiKeyError } from '../errors';
 import type { IronaRouterClient } from '../irona-router-client/IronaRouterClient';
-import type { ProviderName, ContentPart } from '../responseTypes';
+import type { ProviderName } from '../responseTypes';
 import { CompletionsResponse } from '../responseTypes';
 import type { MessagePayload } from '../schemas/common.schema';
 import { CompletionsSchema } from '../schemas/completions.schema';
@@ -331,7 +331,6 @@ export class IronaChatClient {
    */
   private convertToVercelMessages(messages: MessagePayload[]): ModelMessage[] {
     return messages.map((msg): ModelMessage => {
-      const role = msg.role;
       if (typeof msg.content === 'string') {
         return {
           role: msg.role,
@@ -339,48 +338,66 @@ export class IronaChatClient {
         } as ModelMessage;
       }
 
-      const parts: ContentPart[] = msg.content.map(part => {
-        if (part.type === 'text') {
-          return {
-            type: 'text',
-            text: part.text,
-          };
-        } else if (part.type === 'image_url') {
-          return {
-            type: 'image',
-            image: part.image_url.url,
-          };
-        } else if (part.type === 'document') {
-          return {
-            type: 'file',
-            data: part.source.url,
-            mediaType: 'application/pdf',
-          };
-        } else if (part.type === 'tool-result') {
-          return {
-            type: 'tool-result',
-            toolCallId: part.toolCallId,
-            toolName: part.toolName,
-            result: part.result,
-          };
-        } else if (part.type === 'tool-call') {
-          return {
-            type: 'tool-call',
-            toolCallId: part.toolCallId,
-            toolName: part.toolName,
-            input: part.toolInput,
-          };
-        } else {
+      if (msg.role === 'user') {
+        const parts = msg.content.map(part => {
+          if (part.type === 'text') {
+            return { type: 'text' as const, text: part.text };
+          } else if (part.type === 'image') {
+            return { type: 'image' as const, image: part.image };
+          } else if (part.type === 'file') {
+            return {
+              type: 'file' as const,
+              data: part.data,
+              mediaType: part.mediaType ?? 'application/pdf',
+            };
+          }
           throw new Error(
-            `Unsupported message part type: ${(part as { type: string }).type}`
+            `Unsupported user message part type: ${(part as { type: string }).type}`
           );
-        }
-      });
+        });
+        return { role: 'user', content: parts } as ModelMessage;
+      }
 
-      return {
-        role: role,
-        content: parts as ModelMessage['content'],
-      } as ModelMessage;
+      if (msg.role === 'assistant') {
+        const parts = msg.content.map(part => {
+          if (part.type === 'text') {
+            return { type: 'text' as const, text: part.text };
+          } else if (part.type === 'reasoning') {
+            return { type: 'reasoning' as const, text: part.text };
+          } else if (part.type === 'file') {
+            return {
+              type: 'file' as const,
+              data: part.data,
+              mediaType: part.mediaType,
+            };
+          } else if (part.type === 'tool-call') {
+            return {
+              type: 'tool-call' as const,
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              input: part.input,
+            };
+          }
+          throw new Error(
+            `Unsupported assistant message part type: ${(part as { type: string }).type}`
+          );
+        });
+        return { role: 'assistant', content: parts } as ModelMessage;
+      }
+
+      if (msg.role === 'tool') {
+        const parts = msg.content.map(part => ({
+          type: 'tool-result' as const,
+          toolCallId: part.toolCallId,
+          toolName: part.toolName,
+          output: part.output,
+        }));
+        return { role: 'tool', content: parts } as ModelMessage;
+      }
+
+      throw new Error(
+        `Unsupported message role: ${(msg as { role: string }).role}`
+      );
     });
   }
 

@@ -44,18 +44,15 @@ export function doesModelSupportMediaTypes(
 ) {
   const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
 
-  if (!Array.isArray(medias) || medias.length === 0) {
-    // If it's an image generation model without routing capabilities, it shouldn't be used for text-only inputs
-    if (
-      (modelCapabilities?.includes('image-gen') ?? false) &&
-      !(modelCapabilities?.includes('routing') ?? false)
-    ) {
-      return false;
-    }
-    return true;
+if (!Array.isArray(medias) || medias.length === 0) {
+  const isImageGen = modelCapabilities?.includes('image-gen') === true;
+  const hasRouting = modelCapabilities?.includes('routing') === true;
+  if (isImageGen && !hasRouting) {
+    return false;
   }
+  return true;
+}
 
-  // Updated to use capabilities
   if (!modelCapabilities) {
     return false;
   }

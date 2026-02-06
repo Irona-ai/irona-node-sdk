@@ -44,14 +44,14 @@ export function doesModelSupportMediaTypes(
 ) {
   const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
 
-if (!Array.isArray(medias) || medias.length === 0) {
-  const isImageGen = modelCapabilities?.includes('image-gen') === true;
-  const hasRouting = modelCapabilities?.includes('routing') === true;
-  if (isImageGen && !hasRouting) {
-    return false;
+  if (!Array.isArray(medias) || medias.length === 0) {
+    const isImageGen = modelCapabilities?.includes('image-gen') === true;
+    const hasRouting = modelCapabilities?.includes('routing') === true;
+    if (isImageGen && !hasRouting) {
+      return false;
+    }
+    return true;
   }
-  return true;
-}
 
   if (!modelCapabilities) {
     return false;

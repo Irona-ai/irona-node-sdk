@@ -15,6 +15,11 @@ export const setupRouterSuccess = (
 ) => {
   mockRouter.modelSelect.mockResolvedValue({
     providers: [{ provider, model }],
+    fallbackProviders: [],
+    error: null,
+    success: true,
+    message: 'Success',
+    statusCode: 200,
   });
 };
 
@@ -22,7 +27,12 @@ export const setupRouterError = (
   mockRouter: jest.Mocked<IronaRouterClient>
 ) => {
   mockRouter.modelSelect.mockResolvedValue({
+    providers: [],
+    fallbackProviders: [],
     error: 'Router error',
+    success: false,
+    message: 'Router error',
+    statusCode: 500,
   });
 };
 

@@ -9,83 +9,87 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run build
 ```
-
-Builds the SDK using microbundle, outputs to `dist/` directory.
+Builds the SDK using microbundle, outputs CJS/ESM/UMD to `dist/`.
 
 ### Development
 
 ```bash
-npm run devsdk
+npm run devsdk    # Watch mode for SDK development (microbundle)
+npm run dev       # Development server (ts-node-dev)
 ```
-
-Runs microbundle in watch mode for SDK development.
-
-### Start Server
-
-```bash
-npm run dev
-```
-
-Runs the development server with ts-node-dev.
 
 ### Testing
 
 ```bash
-npm test           # Run all tests
-npm run test:watch # Run tests in watch mode
-npm run test:coverage # Run tests with coverage
+npm test                              # Run all tests
+npm test -- single-model.test.ts      # Run specific test file
+npm test -- --testNamePattern="pattern" # Run tests matching name
+npm run test:watch -- single-model.test.ts  # Watch specific file
+npm run test:coverage                 # Coverage report
 ```
 
-Tests are organized in `tests/` directory:
-
-- `unit/completions/` - Completion functionality tests split by scenario
-- `mocks/` - Centralized mock definitions for dependencies
-- `utils/` - Shared test utilities and helpers
-- See `tests/README.md` for detailed testing guidelines
+### Local Integration Testing
+```bash
+npm run eg-test   # Builds, links locally, and tests without publishing
+```
 
 ## Architecture
 
 ### Core Components
 
-**IronaAI** (`src/index.ts`): Main entry point and SDK class that:
+**IronaAI** (`src/index.ts`): Main SDK export. Uses async factory pattern — must be instantiated via `IronaAI.createInstance(config)`, not `new`. Validates API key (must start with `sk_`), loads supported models from external Gist (with retries), resolves optional gateway config. Exposes `modelSelect()` and `completions.create()`.
 
-- Validates API keys (expects `IRONAAI_API_KEY` env var or config)
-- Loads supported models from external Gist URL
-- Provides `modelSelect()` and `completions.create()` APIs
-- Uses factory pattern with async initialization
+**IronaRouterClient** (`src/irona-router-client/`): Calls Irona's routing API to select the optimal model based on criteria (cost, latency, performance). Validates payloads with Zod schemas, filters models by media type support (images, PDFs), returns fallback providers on error.
 
-**IronaRouterClient** (`src/irona-router-client/`): Handles model selection logic:
+**IronaChatClient** (`src/irona-chat-client/IronaChatClient.ts`): Executes LLM calls via Vercel AI SDK. Handles streaming/non-streaming completions, retry logic with fallback chain, web search grounding (Google, OpenAI), reasoning effort config, and function calling/tools. Supports providers: OpenAI, Anthropic, Google, Mistral, Perplexity, TogetherAI, xAI.
 
-- Validates request payloads against Zod schemas
-- Filters models based on media type support (images, PDFs)
-- Calls Irona's routing API to select optimal model
-- Returns fallback providers on error
+### Gateway Support
 
-**IronaChatClient** (`src/irona-chat-client/`): Manages LLM interactions:
+Optional OpenAI-compatible gateway routing (e.g., OpenRouter). When configured, all LLM calls route through a single gateway endpoint instead of individual provider APIs. Config resolved from `config.gateway` object or env vars (`LLM_GATEWAY_*` / `OPENROUTER_*`).
 
-- Converts messages to Vercel AI SDK format
-- Handles streaming and non-streaming completions
-- Implements retry logic with fallback models
-- Supports multiple providers (OpenAI, Anthropic, Google, Mistral, Perplexity, TogetherAI)
-- Manages web search grounding for Google and OpenAI
+### Key Patterns
 
-### Key Design Patterns
+- **Factory initialization**: `IronaAI.createInstance()` — async, loads model data before construction
+- **Fallback chain**: Primary model → fallbacks in sequence on failure
+- **Media filtering**: Models validated for required media type support before routing
+- **Provider abstraction**: Vercel AI SDK (`ai` package) as unified interface across all providers
+- **Path aliases**: `@/*` maps to `src/*` (configured in tsconfig.json)
 
-- **Model Routing**: Dynamically selects best LLM based on criteria (cost, latency, performance)
-- **Fallback Chain**: Attempts primary model, then fallbacks in sequence
-- **Media Support Filtering**: Validates models support required media types before routing
-- **Provider Abstraction**: Uses Vercel AI SDK for unified interface across providers
+### Validation
 
-### Configuration
+Zod schemas in `src/schemas/` validate all request payloads:
+- `completions.schema.ts` — completions requests
+- `modelSelect.schema.ts` — model selection requests
+- `common.schema.ts` — shared types (messages, media)
 
-- API keys loaded from environment variables (`IRONAAI_API_KEY`, `OPENAI_API_KEY`, etc.)
-- Supported models fetched from external Gist (configurable via `SUPPORTED_MODELS_URL`)
-- Base URL configurable, defaults to production API
+### Error Classes (`src/errors.ts`)
 
-### Error Handling
+- `MissingApiKeyError` — invalid or missing API keys
+- `BadRequestError` — schema validation failures
+- `UnsupportedModelError` — unsupported model requested
 
-Custom error classes in `src/errors.ts`:
+## Testing
 
-- `MissingApiKeyError`: Invalid or missing API keys
-- `BadRequestError`: Schema validation failures
-- All methods include retry logic with detailed error messages
+Framework: Jest with ts-jest. Config in `jest.config.js`.
+
+**Critical rule**: Mocks MUST be imported before source code in test files:
+```typescript
+import '../../mocks/ai-sdk.mock';
+import '../../mocks/supported-models.mock';
+import '../../mocks/provider-utils.mock';
+// Then import source code
+```
+
+Test helpers in `tests/utils/test-helpers.ts`: `createTestPayload()`, `createMultiModelPayload()`, `setupTestEnv()`, `mockConsole()`.
+
+Mock utilities provide pre-configured scenarios — see `tests/README.md` for full API.
+
+## Environment Variables
+
+Required: `IRONAAI_API_KEY` (must start with `sk_`)
+
+Provider keys (optional, one per provider used): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `MISTRAL_API_KEY`, `PPLX_API_KEY`, `TOGETHER_API_KEY`
+
+Gateway (optional): `LLM_GATEWAY_BASE_URL`, `LLM_GATEWAY_API_KEY`, `OPENROUTER_API_KEY`, `OPENROUTER_BASE_URL`
+
+See `.env.example` for complete list.

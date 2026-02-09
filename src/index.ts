@@ -1,12 +1,12 @@
-import { MissingApiKeyError } from './errors';
-import type { CompletionsResponse } from './irona-chat-client/IronaChatClient';
-import { IronaChatClient } from './irona-chat-client/IronaChatClient';
-import type { ModelSelectResponse } from './irona-router-client/IronaRouterClient';
-import { IronaRouterClient } from './irona-router-client/IronaRouterClient';
-import type { CompletionsPayload } from './schemas/completions.schema';
-import type { ModelSelectPayload } from './schemas/modelSelect.schema';
-import { updateProvidersFromGist } from './supported_models';
-import type { Config } from './types';
+import { IronaChatClient } from "./irona-chat-client/IronaChatClient";
+import { CompletionsResponse } from "./irona-chat-client/IronaChatClient";
+import { IronaRouterClient } from "./irona-router-client/IronaRouterClient";
+import type { ModelSelectResponse } from "./irona-router-client/IronaRouterClient";
+import { Config, GatewayConfig } from "./types";
+import { ModelSelectPayload } from "./schemas/modelSelect.schema";
+import { CompletionsPayload } from "./schemas/completions.schema";
+import { MissingApiKeyError } from "./errors";
+import { updateProvidersFromGist } from "./supported_models";
 import {
   IRONAAI_API_KEY_PREFIX,
   DEFAULT_BASE_URL,
@@ -35,9 +35,14 @@ export class IronaAI {
       );
     }
 
-    config.baseUrl = config?.baseUrl ?? DEFAULT_BASE_URL;
-    this.ironaRouter = new IronaRouterClient(config);
-    this.llmChatService = new IronaChatClient(config, this.ironaRouter);
+    const normalizedConfig: Config = {
+      ...config,
+      baseUrl: config?.baseUrl || DEFAULT_BASE_URL,
+      gateway: this.resolveGatewayConfig(config.gateway),
+    };
+
+    this.ironaRouter = new IronaRouterClient(normalizedConfig);
+    this.llmChatService = new IronaChatClient(normalizedConfig, this.ironaRouter);
   }
 
   // Static factory method to handle async initialization
@@ -70,6 +75,70 @@ export class IronaAI {
     throw new Error(
       'Cannot instantiate IronaAI as it failed to load Supported Models details from Gist after multiple attempts. Please provide correct value of environment key SUPPORTED_MODELS_URL or leave it undefined.'
     );
+  }
+
+  private resolveGatewayConfig(
+    configuredGateway?: GatewayConfig
+  ): GatewayConfig | undefined {
+    const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+    const defaultOpenRouterBaseUrl =
+      openRouterApiKey ? "https://openrouter.ai/api/v1" : undefined;
+    const gatewayBaseUrl =
+      configuredGateway?.baseUrl ??
+      process.env.LLM_GATEWAY_BASE_URL ??
+      process.env.OPENROUTER_BASE_URL ??
+      defaultOpenRouterBaseUrl;
+    const gatewayApiKey =
+      configuredGateway?.apiKey ??
+      process.env.LLM_GATEWAY_API_KEY ??
+      process.env.OPENROUTER_API_KEY;
+
+    if (gatewayBaseUrl && !gatewayApiKey) {
+      throw new MissingApiKeyError(
+        "Gateway base URL is configured but no gateway API key is set. Provide `config.gateway.apiKey` or set `LLM_GATEWAY_API_KEY`/`OPENROUTER_API_KEY`."
+      );
+    }
+
+    if (!gatewayBaseUrl && gatewayApiKey) {
+      throw new MissingApiKeyError(
+        "Gateway API key is configured but no gateway base URL is set. Provide `config.gateway.baseUrl` or set `LLM_GATEWAY_BASE_URL`/`OPENROUTER_BASE_URL`."
+      );
+    }
+
+    if (!gatewayBaseUrl || !gatewayApiKey) {
+      return undefined;
+    }
+
+    const gatewayHeaders: Record<string, string> = {
+      ...(configuredGateway?.headers ?? {}),
+    };
+
+    if (!gatewayHeaders["HTTP-Referer"] && process.env.OPENROUTER_HTTP_REFERER) {
+      gatewayHeaders["HTTP-Referer"] = process.env.OPENROUTER_HTTP_REFERER;
+    }
+    if (!gatewayHeaders["X-Title"] && process.env.OPENROUTER_X_TITLE) {
+      gatewayHeaders["X-Title"] = process.env.OPENROUTER_X_TITLE;
+    }
+
+    const providerName =
+      configuredGateway?.providerName ?? process.env.LLM_GATEWAY_PROVIDER_NAME;
+    const includeProviderInModelNameEnv =
+      process.env.LLM_GATEWAY_INCLUDE_PROVIDER_IN_MODEL_NAME;
+    const includeProviderInModelName =
+      configuredGateway?.includeProviderInModelName ??
+      (typeof includeProviderInModelNameEnv === "string"
+        ? includeProviderInModelNameEnv.toLowerCase() !== "false"
+        : undefined);
+
+    return {
+      ...configuredGateway,
+      baseUrl: gatewayBaseUrl,
+      apiKey: gatewayApiKey,
+      headers:
+        Object.keys(gatewayHeaders).length > 0 ? gatewayHeaders : undefined,
+      providerName,
+      includeProviderInModelName,
+    };
   }
 
   public modelSelect(body: ModelSelectPayload): Promise<ModelSelectResponse> {

@@ -56,6 +56,39 @@ async function basicExample() {
 basicExample();
 ```
 
+## OpenRouter / Gateway Support
+
+You can configure an OpenAI-compatible gateway (for example OpenRouter) during client initialization.
+
+```typescript
+import { IronaAI } from "ironaai";
+
+const ironaAI = await IronaAI.createInstance({
+  apiKey: process.env.IRONAAI_API_KEY, // Irona routing key
+  gateway: {
+    baseUrl: "https://openrouter.ai/api/v1",
+    apiKey: process.env.OPENROUTER_API_KEY!,
+    headers: {
+      "HTTP-Referer": "https://your-app.example",
+      "X-Title": "Your App Name",
+    },
+  },
+});
+```
+
+Notes:
+- If `gateway` is set, provider-specific API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) are not required for model calls.
+- If `gateway` is not set, the SDK behaves exactly as before and uses provider-specific API keys.
+- OpenRouter-specific env fallbacks are supported:
+  - `OPENROUTER_BASE_URL` (defaults to `https://openrouter.ai/api/v1` if you set it yourself)
+  - `OPENROUTER_API_KEY`
+  - `OPENROUTER_HTTP_REFERER` (optional)
+  - `OPENROUTER_X_TITLE` (optional)
+- Gateway model-name behavior:
+  - `LLM_GATEWAY_INCLUDE_PROVIDER_IN_MODEL_NAME=true|false` (default `true`)
+  - Keep `true` for OpenRouter (`openai/gpt-4o-mini` style model IDs)
+  - Set `false` for gateways that expect raw model names (`gpt-4o-mini`)
+
 ### Build & test Instructions
 
 For local building & testing the package without publishing on npm.
@@ -80,15 +113,30 @@ Ref [blog link](https://medium.com/@oresoftware/node-js-how-to-test-your-new-npm
 
 ### Publish Package to npm
 
+Publishing uses **OIDC trusted publishing** — no npm tokens are needed. The GitHub Actions workflow authenticates directly with npm via OpenID Connect.
+
+#### Prerequisites (one-time setup)
+
+- **npm trusted publisher** configured on [npmjs.com/package/ironaai/access](https://www.npmjs.com/package/ironaai/access) (GitHub org: `Irona-ai`, repo: `irona-node-sdk`, workflow: `publish.yml`, environment: `npm`)
+- **GitHub environment** `npm` created in repo Settings > Environments with branch policy restricted to `main`
+
+#### Publishing steps
+
 1. Update the version in `package.json`
-2. Commit and push changes to GitHub
+2. Commit and push changes to `main`
 3. Create a GitHub Release with tag matching the version:
    ```bash
-   gh release create v0.0.21 --title "v0.0.21" --notes "Release notes here" --target main
+   gh release create v0.0.20 --title "v0.0.20" --notes "Release notes here" --target main
    ```
-   Or via GitHub UI: Go to Releases → "Create a new release" → Enter tag (e.g., `v0.0.21`) → Publish
+   Or via GitHub UI: Go to Releases > "Create a new release" > Enter tag (e.g., `v0.0.20`) > Publish
 
-The release triggers the CI workflow which builds and publishes to npm automatically using OIDC trusted publishing.
+The release triggers the CI workflow (`.github/workflows/publish.yml`) which builds and publishes to npm automatically with provenance.
+
+#### Troubleshooting
+
+- **`NODE_AUTH_TOKEN` must NOT be set** — even an empty string prevents OIDC from working. The workflow intentionally omits it.
+- **`repository.url`** in `package.json` must exactly match the GitHub repo URL (case-sensitive) for provenance validation.
+- **npm version** — OIDC trusted publishing requires npm >= 11.5.1. The workflow upgrades npm automatically before publishing.
 
 ## Key Concepts
 

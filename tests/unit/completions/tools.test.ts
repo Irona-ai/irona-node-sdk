@@ -200,6 +200,11 @@ describe('Tools Support', () => {
       // Mock the router to return a selected model
       mockRouter.modelSelect.mockResolvedValue({
         providers: [{ provider: 'openai', model: 'gpt-4o-mini' }],
+        fallbackProviders: [],
+        error: null,
+        success: true,
+        message: 'OK',
+        statusCode: 200,
       });
 
       // Call modelSelect with tools through the mock router

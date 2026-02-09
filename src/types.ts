@@ -1,4 +1,4 @@
-import { ModelPayload } from "./schemas/common.schema";
+import type { ModelPayload } from './schemas/common.schema';
 
 export type GatewayConfig = {
   baseUrl: string;

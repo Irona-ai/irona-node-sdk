@@ -1,12 +1,12 @@
-import { generateText, streamText, stepCountIs } from 'ai';
-import type { ModelMessage, LanguageModel } from 'ai';
-import { createOpenAI, openai } from "@ai-sdk/openai";
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { mistral } from '@ai-sdk/mistral';
+import { createOpenAI, openai } from '@ai-sdk/openai';
 import { perplexity } from '@ai-sdk/perplexity';
 import { togetherai } from '@ai-sdk/togetherai';
 import { xai } from '@ai-sdk/xai';
+import type { ModelMessage, LanguageModel } from 'ai';
+import { generateText, streamText, stepCountIs } from 'ai';
 
 import { BadRequestError, MissingApiKeyError } from '../errors';
 import type { IronaRouterClient } from '../irona-router-client/IronaRouterClient';
@@ -23,15 +23,14 @@ import {
   doesModelSupportWebSearch,
   getModelPrefix,
   getOpenRouterIdentifier,
-} from "../supported_models";
+} from '../supported_models';
 import type { Config, GatewayConfig } from '../types';
+import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
 import { logger } from '../utils/logger';
 import {
   extractMediaTypeArrayFromMessages,
-  getSupportedProviderAndModelArray,
   validateAndGetProviderAndModel,
-} from "../utils/providerAndModelUtils";
-import { SUPPORTED_MODELS_DEFAULT_URL } from "../utils/constants";
+} from '../utils/providerAndModelUtils';
 import { ReasoningConfig } from '../utils/reasoningConfig';
 import type { ReasoningEffort } from '../utils/reasoningConfig';
 import { validateSchema } from '../utils/requestValidator';
@@ -117,7 +116,7 @@ export class IronaChatClient {
     if (!supportsMediaTypes) {
       throw new BadRequestError(
         `Model ${provider}/${model} does not support required media types: ${mediaInputsArray.join(
-          ", "
+          ', '
         )}. Please choose a model that supports the requested media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
       );
     }
@@ -144,7 +143,7 @@ export class IronaChatClient {
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
       let fullModelName = model;
-      if (!isUsingGateway && provider === "togetherai") {
+      if (!isUsingGateway && provider === 'togetherai') {
         const modelPrefix = getModelPrefix(provider, model);
         if (modelPrefix !== null && modelPrefix !== undefined) {
           fullModelName = `${modelPrefix}/${model}`;
@@ -196,7 +195,12 @@ export class IronaChatClient {
         tools = { ...tools, web_search_preview: openai.tools.webSearch({}) };
       }
 
-      if (!isUsingGateway && provider === "google" && payload.search && supportsWebSearch) {
+      if (
+        !isUsingGateway &&
+        provider === 'google' &&
+        payload.search === true &&
+        supportsWebSearch
+      ) {
         tools = { ...tools, google_search: google.tools.googleSearch({}) };
       }
 
@@ -210,8 +214,13 @@ export class IronaChatClient {
         baseConfig.stopWhen = stepCountIs(5);
       }
 
-      if (!isUsingGateway && provider === "xai" && payload.search && supportsWebSearch) {
-        (baseConfig as any).providerOptions = {
+      if (
+        !isUsingGateway &&
+        provider === 'xai' &&
+        payload.search === true &&
+        supportsWebSearch
+      ) {
+        (baseConfig as Record<string, unknown>).providerOptions = {
           xai: {
             searchParameters: {
               mode: 'on',
@@ -220,7 +229,9 @@ export class IronaChatClient {
         };
       }
       // Helper function to apply reasoning configuration
-      const applyReasoningConfig = (config: any): any => {
+      const applyReasoningConfig = (
+        config: Record<string, unknown>
+      ): Record<string, unknown> => {
         if (isUsingGateway) {
           return config;
         }
@@ -475,7 +486,7 @@ export class IronaChatClient {
       baseURL: gateway.baseUrl,
       apiKey: gateway.apiKey,
       headers: gateway.headers,
-      name: gateway.providerName ?? "gateway",
+      name: gateway.providerName ?? 'gateway',
     });
   }
 
@@ -485,9 +496,9 @@ export class IronaChatClient {
       return model;
     }
 
-    if (gateway.baseUrl.includes("openrouter.ai")) {
+    if (gateway.baseUrl.includes('openrouter.ai')) {
       const openRouterModelName = getOpenRouterIdentifier(provider, model);
-      if (openRouterModelName) {
+      if (openRouterModelName !== null && openRouterModelName !== '') {
         return openRouterModelName;
       }
     }

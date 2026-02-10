@@ -1,5 +1,5 @@
-import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import type { ModelSelectResponse } from '../responseTypes';
+import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 
 /**
  * Router interface — all routing backends implement this single method.

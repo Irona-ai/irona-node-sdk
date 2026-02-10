@@ -7,6 +7,7 @@
  */
 
 import { MissingApiKeyError, BadRequestError } from '../errors';
+import { Base } from '../irona-router-client/base';
 import type { ModelInfo, ModelSelectResponse } from '../responseTypes';
 import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import { ModelSelectSchema } from '../schemas/modelSelect.schema';
@@ -18,7 +19,7 @@ import {
   getSupportedProviderAndModelArray,
 } from '../utils/providerAndModelUtils';
 import { validateSchema } from '../utils/requestValidator';
-import { Base } from '../irona-router-client/base';
+
 import type { Router, APIRouterConfig } from './types';
 
 export class APIRouter extends Base implements Router {
@@ -36,7 +37,7 @@ export class APIRouter extends Base implements Router {
 
     if (!this.routerApiKey) {
       throw new MissingApiKeyError(
-        'API router requires an API key. Provide it via config.router.apiKey or ROUTER_API_KEY env var.',
+        'API router requires an API key. Provide it via config.router.apiKey or ROUTER_API_KEY env var.'
       );
     }
   }
@@ -50,21 +51,21 @@ export class APIRouter extends Base implements Router {
     const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
     const supportedModels = getSupportedProviderAndModelArray(body.models);
     const mediaSupportedModels = supportedModels.filter(({ provider, model }) =>
-      doesModelSupportMediaTypes(provider, model, mediaInputsArray),
+      doesModelSupportMediaTypes(provider, model, mediaInputsArray)
     );
 
     if (mediaSupportedModels.length === 0) {
       throw new BadRequestError(
         `No valid providers found that support the media types ${mediaInputsArray.join(
-          ', ',
-        )}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`,
+          ', '
+        )}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
       );
     }
 
     // Single model optimization
     if (body.models.length === 1) {
       logger.info(
-        `[APIRouter][modelSelect] Single model provided, returning directly: ${body.models[0]}`,
+        `[APIRouter][modelSelect] Single model provided, returning directly: ${body.models[0]}`
       );
       return {
         providers: [mediaSupportedModels[0]],
@@ -86,13 +87,13 @@ export class APIRouter extends Base implements Router {
 
     if (mediaSupportedModels.length === 0) {
       throw new BadRequestError(
-        `No valid providers found in the request. Please ensure that the models are correctly formatted. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`,
+        `No valid providers found in the request. Please ensure that the models are correctly formatted. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
       );
     }
 
     try {
       logger.info(
-        `[APIRouter][modelSelect] Calling ${this.endpoint} with ${mediaSupportedModels.length} models`,
+        `[APIRouter][modelSelect] Calling ${this.endpoint} with ${mediaSupportedModels.length} models`
       );
 
       const result = await this.request<ModelSelectResponse>(this.endpoint, {

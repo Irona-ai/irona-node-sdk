@@ -23,6 +23,7 @@ import {
 } from '../../utils/providerAndModelUtils';
 import { validateSchema } from '../../utils/requestValidator';
 import type { Router, ScoringConfig, Tier } from '../types';
+
 import { classifyByRules } from './classifier';
 import { DEFAULT_SCORING_CONFIG } from './config';
 
@@ -49,21 +50,21 @@ export class LocalRouter implements Router {
     const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
     const supportedModels = getSupportedProviderAndModelArray(body.models);
     const mediaSupportedModels = supportedModels.filter(({ provider, model }) =>
-      doesModelSupportMediaTypes(provider, model, mediaInputsArray),
+      doesModelSupportMediaTypes(provider, model, mediaInputsArray)
     );
 
     if (mediaSupportedModels.length === 0) {
       throw new BadRequestError(
         `No valid providers found that support the media types ${mediaInputsArray.join(
-          ', ',
-        )}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`,
+          ', '
+        )}. Please ensure that the models are correctly formatted and support the required media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
       );
     }
 
     // Single model optimization
     if (body.models.length === 1) {
       logger.info(
-        `[LocalRouter][modelSelect] Single model provided, returning directly: ${body.models[0]}`,
+        `[LocalRouter][modelSelect] Single model provided, returning directly: ${body.models[0]}`
       );
       return {
         providers: [mediaSupportedModels[0]],
@@ -77,14 +78,21 @@ export class LocalRouter implements Router {
 
     // Extract prompt text from messages for classification
     const { prompt, systemPrompt } = this.extractPromptText(body.messages);
-    const estimatedTokens = Math.ceil(`${systemPrompt ?? ''} ${prompt}`.length / 4);
+    const estimatedTokens = Math.ceil(
+      `${systemPrompt ?? ''} ${prompt}`.length / 4
+    );
 
     // Classify request
-    const result = classifyByRules(prompt, systemPrompt, estimatedTokens, this.scoringConfig);
+    const result = classifyByRules(
+      prompt,
+      systemPrompt,
+      estimatedTokens,
+      this.scoringConfig
+    );
     const tier: Tier = result.tier ?? 'MEDIUM'; // Default ambiguous to MEDIUM
 
     logger.info(
-      `[LocalRouter][modelSelect] Classified as ${tier} (confidence: ${result.confidence.toFixed(2)}, score: ${result.score.toFixed(2)}, signals: [${result.signals.join(', ')}])`,
+      `[LocalRouter][modelSelect] Classified as ${tier} (confidence: ${result.confidence.toFixed(2)}, score: ${result.score.toFixed(2)}, signals: [${result.signals.join(', ')}])`
     );
 
     // Map tier to best model from user's candidates
@@ -108,7 +116,10 @@ export class LocalRouter implements Router {
    * - COMPLEX: pick most expensive model (strongest)
    * - REASONING: prefer model with 'reasoning' capability, else most expensive
    */
-  private selectModelForTier(tier: Tier, models: ModelInfo[]): ModelInfo | null {
+  private selectModelForTier(
+    tier: Tier,
+    models: ModelInfo[]
+  ): ModelInfo | null {
     if (models.length === 0) return null;
     if (models.length === 1) return models[0];
 

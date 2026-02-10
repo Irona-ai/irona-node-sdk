@@ -8,17 +8,30 @@
  * Handles requests in <1ms with zero cost, zero external calls.
  */
 
-import type { Tier, ScoringResult, ScoringConfig, DimensionScore } from '../types';
+import type {
+  Tier,
+  ScoringResult,
+  ScoringConfig,
+  DimensionScore,
+} from '../types';
 
 function scoreTokenCount(
   estimatedTokens: number,
-  thresholds: { simple: number; complex: number },
+  thresholds: { simple: number; complex: number }
 ): DimensionScore {
   if (estimatedTokens < thresholds.simple) {
-    return { name: 'tokenCount', score: -1.0, signal: `short (${estimatedTokens} tokens)` };
+    return {
+      name: 'tokenCount',
+      score: -1.0,
+      signal: `short (${estimatedTokens} tokens)`,
+    };
   }
   if (estimatedTokens > thresholds.complex) {
-    return { name: 'tokenCount', score: 1.0, signal: `long (${estimatedTokens} tokens)` };
+    return {
+      name: 'tokenCount',
+      score: 1.0,
+      signal: `long (${estimatedTokens} tokens)`,
+    };
   }
   return { name: 'tokenCount', score: 0, signal: null };
 }
@@ -29,7 +42,7 @@ function scoreKeywordMatch(
   name: string,
   signalLabel: string,
   thresholds: { low: number; high: number },
-  scores: { none: number; low: number; high: number },
+  scores: { none: number; low: number; high: number }
 ): DimensionScore {
   const matches = keywords.filter(kw => text.includes(kw.toLowerCase()));
   if (matches.length >= thresholds.high) {
@@ -59,16 +72,20 @@ function scoreMultiStep(text: string): DimensionScore {
 }
 
 function scoreQuestionComplexity(prompt: string): DimensionScore {
-  const count = (prompt.match(/\?/g) || []).length;
+  const count = (prompt.match(/\?/g) ?? []).length;
   if (count > 3) {
-    return { name: 'questionComplexity', score: 0.5, signal: `${count} questions` };
+    return {
+      name: 'questionComplexity',
+      score: 0.5,
+      signal: `${count} questions`,
+    };
   }
   return { name: 'questionComplexity', score: 0, signal: null };
 }
 
 function scoreAgenticTask(
   text: string,
-  keywords: string[],
+  keywords: string[]
 ): { dimensionScore: DimensionScore; agenticScore: number } {
   let matchCount = 0;
   const signals: string[] = [];
@@ -84,17 +101,29 @@ function scoreAgenticTask(
 
   if (matchCount >= 3) {
     return {
-      dimensionScore: { name: 'agenticTask', score: 1.0, signal: `agentic (${signals.join(', ')})` },
+      dimensionScore: {
+        name: 'agenticTask',
+        score: 1.0,
+        signal: `agentic (${signals.join(', ')})`,
+      },
       agenticScore: 1.0,
     };
   } else if (matchCount >= 2) {
     return {
-      dimensionScore: { name: 'agenticTask', score: 0.6, signal: `agentic (${signals.join(', ')})` },
+      dimensionScore: {
+        name: 'agenticTask',
+        score: 0.6,
+        signal: `agentic (${signals.join(', ')})`,
+      },
       agenticScore: 0.6,
     };
   } else if (matchCount >= 1) {
     return {
-      dimensionScore: { name: 'agenticTask', score: 0.3, signal: `agentic (${signals.join(', ')})` },
+      dimensionScore: {
+        name: 'agenticTask',
+        score: 0.3,
+        signal: `agentic (${signals.join(', ')})`,
+      },
       agenticScore: 0.3,
     };
   }
@@ -120,7 +149,7 @@ export function classifyByRules(
   prompt: string,
   systemPrompt: string | undefined,
   estimatedTokens: number,
-  config: ScoringConfig,
+  config: ScoringConfig
 ): ScoringResult {
   const text = `${systemPrompt ?? ''} ${prompt}`.toLowerCase();
   const userText = prompt.toLowerCase();
@@ -128,50 +157,94 @@ export function classifyByRules(
   const dimensions: DimensionScore[] = [
     scoreTokenCount(estimatedTokens, config.tokenCountThresholds),
     scoreKeywordMatch(
-      text, config.codeKeywords, 'codePresence', 'code',
-      { low: 1, high: 2 }, { none: 0, low: 0.5, high: 1.0 },
+      text,
+      config.codeKeywords,
+      'codePresence',
+      'code',
+      { low: 1, high: 2 },
+      { none: 0, low: 0.5, high: 1.0 }
     ),
     scoreKeywordMatch(
-      userText, config.reasoningKeywords, 'reasoningMarkers', 'reasoning',
-      { low: 1, high: 2 }, { none: 0, low: 0.7, high: 1.0 },
+      userText,
+      config.reasoningKeywords,
+      'reasoningMarkers',
+      'reasoning',
+      { low: 1, high: 2 },
+      { none: 0, low: 0.7, high: 1.0 }
     ),
     scoreKeywordMatch(
-      text, config.technicalKeywords, 'technicalTerms', 'technical',
-      { low: 2, high: 4 }, { none: 0, low: 0.5, high: 1.0 },
+      text,
+      config.technicalKeywords,
+      'technicalTerms',
+      'technical',
+      { low: 2, high: 4 },
+      { none: 0, low: 0.5, high: 1.0 }
     ),
     scoreKeywordMatch(
-      text, config.creativeKeywords, 'creativeMarkers', 'creative',
-      { low: 1, high: 2 }, { none: 0, low: 0.5, high: 0.7 },
+      text,
+      config.creativeKeywords,
+      'creativeMarkers',
+      'creative',
+      { low: 1, high: 2 },
+      { none: 0, low: 0.5, high: 0.7 }
     ),
     scoreKeywordMatch(
-      text, config.simpleKeywords, 'simpleIndicators', 'simple',
-      { low: 1, high: 2 }, { none: 0, low: -1.0, high: -1.0 },
+      text,
+      config.simpleKeywords,
+      'simpleIndicators',
+      'simple',
+      { low: 1, high: 2 },
+      { none: 0, low: -1.0, high: -1.0 }
     ),
     scoreMultiStep(text),
     scoreQuestionComplexity(prompt),
     scoreKeywordMatch(
-      text, config.imperativeVerbs, 'imperativeVerbs', 'imperative',
-      { low: 1, high: 2 }, { none: 0, low: 0.3, high: 0.5 },
+      text,
+      config.imperativeVerbs,
+      'imperativeVerbs',
+      'imperative',
+      { low: 1, high: 2 },
+      { none: 0, low: 0.3, high: 0.5 }
     ),
     scoreKeywordMatch(
-      text, config.constraintIndicators, 'constraintCount', 'constraints',
-      { low: 1, high: 3 }, { none: 0, low: 0.3, high: 0.7 },
+      text,
+      config.constraintIndicators,
+      'constraintCount',
+      'constraints',
+      { low: 1, high: 3 },
+      { none: 0, low: 0.3, high: 0.7 }
     ),
     scoreKeywordMatch(
-      text, config.outputFormatKeywords, 'outputFormat', 'format',
-      { low: 1, high: 2 }, { none: 0, low: 0.4, high: 0.7 },
+      text,
+      config.outputFormatKeywords,
+      'outputFormat',
+      'format',
+      { low: 1, high: 2 },
+      { none: 0, low: 0.4, high: 0.7 }
     ),
     scoreKeywordMatch(
-      text, config.referenceKeywords, 'referenceComplexity', 'references',
-      { low: 1, high: 2 }, { none: 0, low: 0.3, high: 0.5 },
+      text,
+      config.referenceKeywords,
+      'referenceComplexity',
+      'references',
+      { low: 1, high: 2 },
+      { none: 0, low: 0.3, high: 0.5 }
     ),
     scoreKeywordMatch(
-      text, config.negationKeywords, 'negationComplexity', 'negation',
-      { low: 2, high: 3 }, { none: 0, low: 0.3, high: 0.5 },
+      text,
+      config.negationKeywords,
+      'negationComplexity',
+      'negation',
+      { low: 2, high: 3 },
+      { none: 0, low: 0.3, high: 0.5 }
     ),
     scoreKeywordMatch(
-      text, config.domainSpecificKeywords, 'domainSpecificity', 'domain-specific',
-      { low: 1, high: 2 }, { none: 0, low: 0.5, high: 0.8 },
+      text,
+      config.domainSpecificKeywords,
+      'domainSpecificity',
+      'domain-specific',
+      { low: 1, high: 2 },
+      { none: 0, low: 0.5, high: 0.8 }
     ),
   ];
 
@@ -190,12 +263,12 @@ export function classifyByRules(
 
   // Direct reasoning override: 2+ reasoning markers in user prompt
   const reasoningMatches = config.reasoningKeywords.filter(kw =>
-    userText.includes(kw.toLowerCase()),
+    userText.includes(kw.toLowerCase())
   );
   if (reasoningMatches.length >= 2) {
     const confidence = calibrateConfidence(
       Math.max(weightedScore, 0.3),
-      config.confidenceSteepness,
+      config.confidenceSteepness
     );
     return {
       score: weightedScore,
@@ -206,7 +279,8 @@ export function classifyByRules(
     };
   }
 
-  const { simpleMedium, mediumComplex, complexReasoning } = config.tierBoundaries;
+  const { simpleMedium, mediumComplex, complexReasoning } =
+    config.tierBoundaries;
   let tier: Tier;
   let distanceFromBoundary: number;
 
@@ -215,22 +289,34 @@ export function classifyByRules(
     distanceFromBoundary = simpleMedium - weightedScore;
   } else if (weightedScore < mediumComplex) {
     tier = 'MEDIUM';
-    distanceFromBoundary = Math.min(weightedScore - simpleMedium, mediumComplex - weightedScore);
+    distanceFromBoundary = Math.min(
+      weightedScore - simpleMedium,
+      mediumComplex - weightedScore
+    );
   } else if (weightedScore < complexReasoning) {
     tier = 'COMPLEX';
     distanceFromBoundary = Math.min(
       weightedScore - mediumComplex,
-      complexReasoning - weightedScore,
+      complexReasoning - weightedScore
     );
   } else {
     tier = 'REASONING';
     distanceFromBoundary = weightedScore - complexReasoning;
   }
 
-  const confidence = calibrateConfidence(distanceFromBoundary, config.confidenceSteepness);
+  const confidence = calibrateConfidence(
+    distanceFromBoundary,
+    config.confidenceSteepness
+  );
 
   if (confidence < config.confidenceThreshold) {
-    return { score: weightedScore, tier: null, confidence, signals, agenticScore };
+    return {
+      score: weightedScore,
+      tier: null,
+      confidence,
+      signals,
+      agenticScore,
+    };
   }
 
   return { score: weightedScore, tier, confidence, signals, agenticScore };

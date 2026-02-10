@@ -10,11 +10,14 @@
 import { IronaRouterClient } from '../irona-router-client/IronaRouterClient';
 import type { Config } from '../types';
 import { logger } from '../utils/logger';
+
 import { APIRouter } from './api-router';
 import { LocalRouter } from './local';
 import type { Router, RouterConfig } from './types';
 
-export function resolveRouterConfig(configuredRouter?: RouterConfig): RouterConfig {
+export function resolveRouterConfig(
+  configuredRouter?: RouterConfig
+): RouterConfig {
   if (configuredRouter) return configuredRouter;
 
   const routerType = process.env.ROUTER_TYPE?.toLowerCase();
@@ -24,9 +27,9 @@ export function resolveRouterConfig(configuredRouter?: RouterConfig): RouterConf
     const apiKey = process.env.ROUTER_API_KEY;
     const endpoint = process.env.ROUTER_ENDPOINT;
 
-    if (!baseUrl || !apiKey) {
+    if (baseUrl == null || baseUrl === '' || apiKey == null || apiKey === '') {
       throw new Error(
-        'ROUTER_TYPE=api requires ROUTER_BASE_URL and ROUTER_API_KEY environment variables.',
+        'ROUTER_TYPE=api requires ROUTER_BASE_URL and ROUTER_API_KEY environment variables.'
       );
     }
 
@@ -55,11 +58,15 @@ export function createRouter(config: Config): Router {
       return new IronaRouterClient(config);
 
     case 'api':
-      logger.info(`[RouterFactory] Using API router: ${routerConfig.baseUrl}${routerConfig.endpoint ?? ''}`);
+      logger.info(
+        `[RouterFactory] Using API router: ${routerConfig.baseUrl}${routerConfig.endpoint ?? ''}`
+      );
       return new APIRouter(routerConfig);
 
     case 'local':
-      logger.info('[RouterFactory] Using local router (zero-latency classification)');
+      logger.info(
+        '[RouterFactory] Using local router (zero-latency classification)'
+      );
       return new LocalRouter(routerConfig.scoringConfig);
 
     default:

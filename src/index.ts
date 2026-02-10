@@ -1,8 +1,9 @@
 import { MissingApiKeyError } from './errors';
 import { IronaChatClient } from './irona-chat-client/IronaChatClient';
 import type { CompletionsResponse } from './irona-chat-client/IronaChatClient';
-import { IronaRouterClient } from './irona-router-client/IronaRouterClient';
 import type { ModelSelectResponse } from './irona-router-client/IronaRouterClient';
+import { createRouter } from './router/factory';
+import type { Router } from './router/types';
 import type { CompletionsPayload } from './schemas/completions.schema';
 import type { ModelSelectPayload } from './schemas/modelSelect.schema';
 import { updateProvidersFromGist } from './supported_models';
@@ -16,7 +17,7 @@ import { logger } from './utils/logger';
 require('dotenv').config();
 
 export class IronaAI {
-  private ironaRouter: IronaRouterClient;
+  private ironaRouter: Router;
   private llmChatService: IronaChatClient;
   private constructor(config: Config = {}) {
     // Check for API key
@@ -41,7 +42,7 @@ export class IronaAI {
       gateway: this.resolveGatewayConfig(config.gateway),
     };
 
-    this.ironaRouter = new IronaRouterClient(normalizedConfig);
+    this.ironaRouter = createRouter(normalizedConfig);
     this.llmChatService = new IronaChatClient(
       normalizedConfig,
       this.ironaRouter

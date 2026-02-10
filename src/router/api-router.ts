@@ -1,10 +1,17 @@
+/**
+ * Generic API Router — works with any routing endpoint that accepts
+ * {messages, llm_providers} and returns {providers}.
+ *
+ * Supports: NotDiamond, Irona-compatible endpoints, custom routers.
+ * Swap routers by changing baseUrl + apiKey.
+ */
+
 import { MissingApiKeyError, BadRequestError } from '../errors';
-import { ModelInfo, ModelSelectResponse } from '../responseTypes';
-import type { Router } from '../router/types';
+import { Base } from '../irona-router-client/base';
+import type { ModelInfo, ModelSelectResponse } from '../responseTypes';
 import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import { ModelSelectSchema } from '../schemas/modelSelect.schema';
 import { doesModelSupportMediaTypes } from '../supported_models';
-import type { Config } from '../types';
 import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
 import { logger } from '../utils/logger';
 import {
@@ -13,38 +20,41 @@ import {
 } from '../utils/providerAndModelUtils';
 import { validateSchema } from '../utils/requestValidator';
 
-import { Base } from './base';
-export { ModelInfo, ModelSelectResponse };
+import type { Router, APIRouterConfig } from './types';
 
-const resources = '';
+export class APIRouter extends Base implements Router {
+  private readonly routerApiKey: string;
+  private readonly endpoint: string;
+  private readonly extraHeaders: Record<string, string>;
+  private readonly extraBody: Record<string, unknown>;
 
-export class IronaRouterClient extends Base implements Router {
-  constructor(config: Config) {
-    super(config);
+  constructor(routerConfig: APIRouterConfig) {
+    super({ baseUrl: routerConfig.baseUrl });
+    this.routerApiKey = routerConfig.apiKey;
+    this.endpoint = routerConfig.endpoint ?? '';
+    this.extraHeaders = routerConfig.headers ?? {};
+    this.extraBody = routerConfig.extraBody ?? {};
+
+    if (!this.routerApiKey) {
+      throw new MissingApiKeyError(
+        'API router requires an API key. Provide it via config.router.apiKey or ROUTER_API_KEY env var.'
+      );
+    }
   }
 
   async modelSelect(body: ModelSelectPayload): Promise<ModelSelectResponse> {
-    const apiKey = process.env.IRONAAI_API_KEY ?? '';
-    if (!apiKey) {
-      throw new MissingApiKeyError(
-        'The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables.'
-      );
-    }
     const validationResult = validateSchema(ModelSelectSchema, body);
     if (!validationResult.success) {
       throw new BadRequestError(validationResult.errors);
     }
 
     const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
-    const supportedProviderAndModelArray = getSupportedProviderAndModelArray(
-      body.models
+    const supportedModels = getSupportedProviderAndModelArray(body.models);
+    const mediaSupportedModels = supportedModels.filter(({ provider, model }) =>
+      doesModelSupportMediaTypes(provider, model, mediaInputsArray)
     );
-    const mediaSupportedProviderAndModelArray =
-      supportedProviderAndModelArray.filter(({ provider, model }) =>
-        doesModelSupportMediaTypes(provider, model, mediaInputsArray)
-      );
 
-    if (mediaSupportedProviderAndModelArray.length === 0) {
+    if (mediaSupportedModels.length === 0) {
       throw new BadRequestError(
         `No valid providers found that support the media types ${mediaInputsArray.join(
           ', '
@@ -52,45 +62,50 @@ export class IronaRouterClient extends Base implements Router {
       );
     }
 
-    // Single model optimization - skip API call if only one model provided
+    // Single model optimization
     if (body.models.length === 1) {
       logger.info(
-        `[IronaRouterClient][modelSelect] Single model provided, skip-API call, returning directly: ${body.models[0]}`
+        `[APIRouter][modelSelect] Single model provided, returning directly: ${body.models[0]}`
       );
       return {
-        providers: [mediaSupportedProviderAndModelArray[0]],
+        providers: [mediaSupportedModels[0]],
         fallbackProviders: this.getFallbackProviders(body),
         error: null,
         success: true,
-        message: 'Single model optimization - skipped router API call',
+        message: 'Single model optimization - skipped API router call',
         statusCode: 200,
       };
     }
-    const formattedPayload = {
-      topk_models: body?.topk_models,
+
+    const payload = {
       messages: body.messages,
-      llm_providers: mediaSupportedProviderAndModelArray,
+      llm_providers: mediaSupportedModels,
+      topk_models: body?.topk_models,
       kwargs: body?.kwargs,
+      ...this.extraBody,
     };
 
-    // Check if we have any valid providers after filtering
-    if (formattedPayload.llm_providers.length === 0) {
+    if (mediaSupportedModels.length === 0) {
       throw new BadRequestError(
         `No valid providers found in the request. Please ensure that the models are correctly formatted. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
       );
     }
 
     try {
-      const result = await this.request<ModelSelectResponse>(`${resources}`, {
+      logger.info(
+        `[APIRouter][modelSelect] Calling ${this.endpoint} with ${mediaSupportedModels.length} models`
+      );
+
+      const result = await this.request<ModelSelectResponse>(this.endpoint, {
         method: 'POST',
-        data: formattedPayload,
+        data: payload,
         headers: {
-          Authorization: 'Bearer ' + apiKey,
+          Authorization: 'Bearer ' + this.routerApiKey,
           'Content-Type': 'application/json',
+          ...this.extraHeaders,
         },
       });
 
-      // If the API returned an error, add fallback providers
       if (result?.error !== null && result?.error !== undefined) {
         result.fallbackProviders = this.getFallbackProviders(body);
         return result;
@@ -102,15 +117,12 @@ export class IronaRouterClient extends Base implements Router {
     }
   }
 
-  // Helper method to get fallback providers either from the request or defaults
   private getFallbackProviders(body: ModelSelectPayload): ModelInfo[] {
-    // Default fallback_providers
     let fallbackProviders: ModelInfo[] = [
       { provider: 'openai', model: 'gpt-4o-mini' },
       { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
     ];
 
-    // Use fallback_providers if they are provided in the request
     if (body.fallback_models && body.fallback_models.length > 0) {
       try {
         fallbackProviders = body.fallback_models.map(modelPayload => {
@@ -120,7 +132,6 @@ export class IronaRouterClient extends Base implements Router {
         });
       } catch (error) {
         logger.error(`Error parsing fallback models: ${error}`);
-        // Keep the default fallback providers if there's an error
       }
     }
 

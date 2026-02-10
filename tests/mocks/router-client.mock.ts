@@ -18,7 +18,7 @@ export const setupRouterSuccess = (
     fallbackProviders: [],
     error: null,
     success: true,
-    message: 'Success',
+    message: 'OK',
     statusCode: 200,
   });
 };

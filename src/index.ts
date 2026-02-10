@@ -127,6 +127,21 @@ export class IronaAI {
       return undefined;
     }
 
+    // Validate gateway URL is HTTPS to prevent SSRF
+    try {
+      const parsedUrl = new URL(gatewayBaseUrl);
+      if (parsedUrl.protocol !== 'https:') {
+        throw new MissingApiKeyError(
+          `Gateway base URL must use HTTPS. Got: ${parsedUrl.protocol}`
+        );
+      }
+    } catch (error) {
+      if (error instanceof MissingApiKeyError) throw error;
+      throw new MissingApiKeyError(
+        `Invalid gateway base URL: ${gatewayBaseUrl}`
+      );
+    }
+
     const gatewayHeaders: Record<string, string> = {
       ...(configuredGateway?.headers ?? {}),
     };

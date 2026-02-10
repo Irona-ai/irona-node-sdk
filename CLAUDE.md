@@ -28,6 +28,35 @@ npm run test:watch -- single-model.test.ts  # Watch specific file
 npm run test:coverage                 # Coverage report
 ```
 
+### Linting & Formatting (MANDATORY)
+
+**IMPORTANT: Every PR runs ESLint, Prettier, and TypeScript type-check in CI. You MUST run these before committing ANY code changes. Lint failures block merge.**
+
+```bash
+npm run lint          # ESLint — must pass with zero errors
+npm run format:check  # Prettier — must pass with zero errors
+npm run type-check    # TypeScript — must pass with zero errors
+```
+
+To auto-fix most issues:
+```bash
+npm run lint:fix      # Auto-fix ESLint errors (import order, quotes, etc.)
+npm run format:write  # Auto-fix Prettier formatting
+npm run clean         # Runs both lint:fix + format:write
+```
+
+**Key rules enforced by ESLint (see `eslint.config.js`):**
+- `prettier/prettier` — single quotes, trailing commas, 2-space indent, no semicolons omitted
+- `@typescript-eslint/strict-boolean-expressions` — never use nullable strings/booleans in conditionals; always check explicitly (e.g., `x !== undefined && x !== ''` instead of `if (x)`)
+- `@typescript-eslint/prefer-nullish-coalescing` — use `??` instead of `||`
+- `@typescript-eslint/consistent-type-imports` — use `import type` for type-only imports
+- `@typescript-eslint/no-explicit-any` — no `any`; use `Record<string, unknown>` or proper types
+- `import/order` — imports must be alphabetized and grouped (builtin → external → internal → parent → sibling)
+- `unused-imports/no-unused-imports` — remove all unused imports
+- `no-console` — use `logger` from `src/utils/logger.ts` instead of `console.log`
+
+**Workflow: After writing/editing code, ALWAYS run `npm run clean` then `npm run type-check` before staging.**
+
 ### Local Integration Testing
 ```bash
 npm run eg-test   # Builds, links locally, and tests without publishing

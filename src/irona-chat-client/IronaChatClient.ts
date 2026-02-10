@@ -162,7 +162,7 @@ export class IronaChatClient {
       const modelFactory = this.getModelInstance(
         provider,
         fullModelName,
-        payload.reasoningEffort
+        payload.reasoningEffort,
         isUsingGateway
       );
 

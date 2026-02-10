@@ -1,5 +1,7 @@
 // Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
+import '../../mocks/supported-models.mock';
+import '../../mocks/provider-utils.mock';
 import { z } from 'zod';
 
 import { IronaAI } from '../../../src/index';

@@ -1,12 +1,12 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
 import { mistral } from '@ai-sdk/mistral';
-import { openai } from '@ai-sdk/openai';
+import { createOpenAI, openai } from '@ai-sdk/openai';
 import { perplexity } from '@ai-sdk/perplexity';
 import { togetherai } from '@ai-sdk/togetherai';
 import { xai } from '@ai-sdk/xai';
-import { generateText, streamText, stepCountIs } from 'ai';
 import type { ModelMessage, LanguageModel } from 'ai';
+import { generateText, streamText, stepCountIs } from 'ai';
 
 import { BadRequestError, MissingApiKeyError } from '../errors';
 import type { IronaRouterClient } from '../irona-router-client/IronaRouterClient';
@@ -19,22 +19,38 @@ import { ModelSelectSchema } from '../schemas/modelSelect.schema';
 import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import {
   providerApiKeyName,
+  doesModelSupportMediaTypes,
   doesModelSupportWebSearch,
   getModelPrefix,
+  getOpenRouterIdentifier,
 } from '../supported_models';
-import type { Config } from '../types';
+import type { Config, GatewayConfig } from '../types';
+import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
 import { logger } from '../utils/logger';
-import { validateAndGetProviderAndModel } from '../utils/providerAndModelUtils';
+import {
+  extractMediaTypeArrayFromMessages,
+  validateAndGetProviderAndModel,
+} from '../utils/providerAndModelUtils';
 import { ReasoningConfig } from '../utils/reasoningConfig';
 import type { ReasoningEffort } from '../utils/reasoningConfig';
 import { validateSchema } from '../utils/requestValidator';
 export { CompletionsResponse };
 
 export class IronaChatClient {
+  private readonly gatewayProvider?: ReturnType<typeof createOpenAI>;
+  private readonly gatewayHostname?: string;
+
   constructor(
     private readonly config: Config,
     private readonly ironaRouter: IronaRouterClient
-  ) {}
+  ) {
+    this.gatewayProvider = this.createGatewayProvider(this.config.gateway);
+    if (this.config.gateway !== undefined) {
+      this.gatewayHostname = new URL(
+        this.config.gateway.baseUrl
+      ).hostname.toLowerCase();
+    }
+  }
 
   /**
    * Processes a completions request and retries with fallback models if necessary.
@@ -46,8 +62,11 @@ export class IronaChatClient {
       throw new BadRequestError(validationResult.errors);
     }
 
-    // Select the best model
-    const { provider, model } = await this.selectBestModel(payload);
+    const selectedModel =
+      payload.models.length === 1
+        ? this.selectSingleModel(payload)
+        : await this.selectBestModel(payload);
+    const { provider, model } = selectedModel;
 
     // Prepare the model priority queue
     // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
@@ -91,6 +110,26 @@ export class IronaChatClient {
     );
   }
 
+  private selectSingleModel(body: CompletionsPayload) {
+    const { provider, model } = validateAndGetProviderAndModel(body.models[0]);
+    const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
+    const supportsMediaTypes = doesModelSupportMediaTypes(
+      provider,
+      model,
+      mediaInputsArray
+    );
+
+    if (!supportsMediaTypes) {
+      throw new BadRequestError(
+        `Model ${provider}/${model} does not support required media types: ${mediaInputsArray.join(
+          ', '
+        )}. Please choose a model that supports the requested media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+      );
+    }
+
+    return { provider, model };
+  }
+
   /**
    * Handles the invocation of chat completions to a specific provider and model.
    */
@@ -101,23 +140,30 @@ export class IronaChatClient {
     supportsWebSearch: boolean
   ): Promise<CompletionsResponse> {
     try {
-      // const apiKey = this.loadApiKeyForProvider(provider, model);
+      const isUsingGateway = this.gatewayProvider !== undefined;
+      if (!isUsingGateway) {
+        this.loadApiKeyForProvider(provider, model);
+      }
 
       // Convert messages to Vercel AI SDK format
       const vercelMessages = this.convertToVercelMessages(payload.messages);
 
       let fullModelName = model;
-      if (provider === 'togetherai') {
+      if (!isUsingGateway && provider === 'togetherai') {
         const modelPrefix = getModelPrefix(provider, model);
         if (modelPrefix !== null && modelPrefix !== undefined) {
           fullModelName = `${modelPrefix}/${model}`;
         }
       }
+      if (isUsingGateway) {
+        fullModelName = this.resolveGatewayModelName(provider, fullModelName);
+      }
 
       const modelFactory = this.getModelInstance(
         provider,
         fullModelName,
-        payload.reasoning_effort
+        payload.reasoning_effort,
+        isUsingGateway
       );
 
       if (!modelFactory) {
@@ -156,6 +202,7 @@ export class IronaChatClient {
       }
 
       if (
+        !isUsingGateway &&
         provider === 'google' &&
         payload.search === true &&
         supportsWebSearch
@@ -173,7 +220,12 @@ export class IronaChatClient {
         baseConfig.stopWhen = stepCountIs(5);
       }
 
-      if (provider === 'xai' && payload.search === true && supportsWebSearch) {
+      if (
+        !isUsingGateway &&
+        provider === 'xai' &&
+        payload.search === true &&
+        supportsWebSearch
+      ) {
         baseConfig.providerOptions = {
           xai: {
             searchParameters: {
@@ -183,9 +235,12 @@ export class IronaChatClient {
         };
       }
       // Helper function to apply reasoning configuration
-      const applyReasoningConfig = <T extends Record<string, unknown>>(
-        config: T
-      ): T => {
+      const applyReasoningConfig = (
+        config: Record<string, unknown>
+      ): Record<string, unknown> => {
+        if (isUsingGateway) {
+          return config;
+        }
         if (
           provider === 'togetherai' ||
           provider === 'mistral' ||
@@ -407,8 +462,13 @@ export class IronaChatClient {
   private getModelInstance(
     provider: string,
     model: string,
-    reasoningEffort?: ReasoningEffort
+    reasoningEffort?: ReasoningEffort,
+    isUsingGateway = false
   ) {
+    if (isUsingGateway && this.gatewayProvider) {
+      return this.gatewayProvider;
+    }
+
     // Map of provider to their respective model functions
     const providerModels = {
       openai,
@@ -438,6 +498,48 @@ export class IronaChatClient {
       };
     }
     return providerModels[provider as keyof typeof providerModels];
+  }
+
+  private createGatewayProvider(gateway?: GatewayConfig) {
+    if (!gateway) {
+      return undefined;
+    }
+
+    return createOpenAI({
+      baseURL: gateway.baseUrl,
+      apiKey: gateway.apiKey,
+      headers: gateway.headers,
+      name: gateway.providerName ?? 'gateway',
+    });
+  }
+
+  private resolveGatewayModelName(provider: string, model: string): string {
+    const gateway = this.config.gateway;
+    if (!gateway) {
+      return model;
+    }
+
+    if (
+      this.gatewayHostname === 'openrouter.ai' ||
+      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
+    ) {
+      const openRouterModelName = getOpenRouterIdentifier(provider, model);
+      if (openRouterModelName !== null && openRouterModelName !== '') {
+        return openRouterModelName;
+      }
+    }
+
+    const includeProviderInModelName =
+      gateway.includeProviderInModelName ?? true;
+    if (!includeProviderInModelName) {
+      return model;
+    }
+
+    if (model.startsWith(`${provider}/`)) {
+      return model;
+    }
+
+    return `${provider}/${model}`;
   }
 
   private extractModelSelectPayloadFromCompletionsPayload(

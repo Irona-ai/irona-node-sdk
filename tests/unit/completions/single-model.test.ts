@@ -1,5 +1,7 @@
 // Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
+import '../../mocks/supported-models.mock';
+import '../../mocks/provider-utils.mock';
 
 import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
 import type { Config } from '../../../src/types';
@@ -75,7 +77,7 @@ describe('Single Model Completions', () => {
       expect(mockGenerateText).toHaveBeenCalledWith(
         expect.objectContaining({
           temperature: 0.7,
-          maxTokens: 100,
+          maxOutputTokens: 100,
         })
       );
     });

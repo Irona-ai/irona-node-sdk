@@ -3,26 +3,34 @@ jest.mock('../../../src/supported_models', () => ({
   doesModelSupportMediaTypes: jest.fn().mockReturnValue(true),
   doesModelSupportWebSearch: jest.fn().mockReturnValue(false),
   isSupportedModel: jest.fn().mockReturnValue(true),
-  getModelPrice: jest.fn().mockImplementation((provider: string, model: string) => {
-    const prices: Record<string, { input: number; output: number }> = {
-      'openai/gpt-4o-mini': { input: 0.15, output: 0.6 },
-      'openai/gpt-4o': { input: 5, output: 15 },
-      'anthropic/claude-3-haiku-20240307': { input: 0.25, output: 1.25 },
-      'anthropic/claude-sonnet-4-5-20250929': { input: 3, output: 15 },
-      'openai/o3': { input: 10, output: 40 },
-    };
-    return prices[`${provider}/${model}`] ?? null;
-  }),
-  getModelCapabilities: jest.fn().mockImplementation((provider: string, model: string) => {
-    const caps: Record<string, string[]> = {
-      'openai/gpt-4o-mini': ['routing', 'image'],
-      'openai/gpt-4o': ['routing', 'image', 'search'],
-      'anthropic/claude-3-haiku-20240307': ['routing'],
-      'anthropic/claude-sonnet-4-5-20250929': ['routing', 'image', 'reasoning'],
-      'openai/o3': ['routing', 'reasoning'],
-    };
-    return caps[`${provider}/${model}`] ?? null;
-  }),
+  getModelPrice: jest
+    .fn()
+    .mockImplementation((provider: string, model: string) => {
+      const prices: Record<string, { input: number; output: number }> = {
+        'openai/gpt-4o-mini': { input: 0.15, output: 0.6 },
+        'openai/gpt-4o': { input: 5, output: 15 },
+        'anthropic/claude-3-haiku-20240307': { input: 0.25, output: 1.25 },
+        'anthropic/claude-sonnet-4-5-20250929': { input: 3, output: 15 },
+        'openai/o3': { input: 10, output: 40 },
+      };
+      return prices[`${provider}/${model}`] ?? null;
+    }),
+  getModelCapabilities: jest
+    .fn()
+    .mockImplementation((provider: string, model: string) => {
+      const caps: Record<string, string[]> = {
+        'openai/gpt-4o-mini': ['routing', 'image'],
+        'openai/gpt-4o': ['routing', 'image', 'search'],
+        'anthropic/claude-3-haiku-20240307': ['routing'],
+        'anthropic/claude-sonnet-4-5-20250929': [
+          'routing',
+          'image',
+          'reasoning',
+        ],
+        'openai/o3': ['routing', 'reasoning'],
+      };
+      return caps[`${provider}/${model}`] ?? null;
+    }),
   providerApiKeyName: jest.fn().mockReturnValue('API_KEY'),
   getModelPrefix: jest.fn().mockReturnValue(null),
   getOpenRouterIdentifier: jest.fn().mockReturnValue(null),
@@ -41,7 +49,12 @@ describe('classifyByRules', () => {
   const config: ScoringConfig = DEFAULT_SCORING_CONFIG;
 
   it('classifies a simple question as SIMPLE tier', () => {
-    const result = classifyByRules('What is the capital of France?', undefined, 10, config);
+    const result = classifyByRules(
+      'What is the capital of France?',
+      undefined,
+      10,
+      config
+    );
     expect(result.tier).toBe('SIMPLE');
     expect(result.confidence).toBeGreaterThan(0.5);
   });
@@ -49,10 +62,10 @@ describe('classifyByRules', () => {
   it('classifies code prompt with reasoning as high tier', () => {
     const result = classifyByRules(
       'Implement a distributed database with kubernetes microservice architecture. ' +
-      'Optimize the algorithm for infrastructure and design the deployment.',
+        'Optimize the algorithm for infrastructure and design the deployment.',
       undefined,
       40,
-      config,
+      config
     );
     // With code + technical + imperative keywords, should be MEDIUM or higher
     expect(result.score).toBeGreaterThan(0);
@@ -63,20 +76,25 @@ describe('classifyByRules', () => {
       'Prove the theorem step by step using mathematical proof and derive the result logically',
       undefined,
       25,
-      config,
+      config
     );
     expect(result.tier).toBe('REASONING');
     expect(result.confidence).toBeGreaterThan(0.8);
   });
 
   it('scores technical prompts higher than simple ones', () => {
-    const simpleResult = classifyByRules('What is 2 + 2?', undefined, 5, config);
+    const simpleResult = classifyByRules(
+      'What is 2 + 2?',
+      undefined,
+      5,
+      config
+    );
     const complexResult = classifyByRules(
       'Design a distributed microservice architecture with kubernetes ' +
-      'that handles database infrastructure optimization with algorithm analysis.',
+        'that handles database infrastructure optimization with algorithm analysis.',
       undefined,
       30,
-      config,
+      config
     );
     expect(complexResult.score).toBeGreaterThan(simpleResult.score);
   });
@@ -86,7 +104,7 @@ describe('classifyByRules', () => {
       'Read the file, then edit and deploy the code. Run the tests and fix any bugs.',
       undefined,
       30,
-      config,
+      config
     );
     expect(result.agenticScore).toBeDefined();
     expect(result.agenticScore!).toBeGreaterThan(0.5);
@@ -97,7 +115,7 @@ describe('classifyByRules', () => {
       'What is 2 + 2?',
       'Always reason step by step',
       10,
-      config,
+      config
     );
     expect(result.tier).not.toBe('REASONING');
   });
@@ -107,7 +125,7 @@ describe('classifyByRules', () => {
       'Prove the theorem mathematically step by step',
       undefined,
       15,
-      config,
+      config
     );
     expect(result.signals.length).toBeGreaterThan(0);
     expect(result.signals.some(s => s.includes('reasoning'))).toBe(true);
@@ -132,7 +150,11 @@ describe('LocalRouter', () => {
 
   it('selects cheapest model for simple prompts', async () => {
     const result = await router.modelSelect({
-      models: ['openai/gpt-4o-mini', 'openai/gpt-4o', 'anthropic/claude-sonnet-4-5-20250929'],
+      models: [
+        'openai/gpt-4o-mini',
+        'openai/gpt-4o',
+        'anthropic/claude-sonnet-4-5-20250929',
+      ],
       messages: [{ role: 'user', content: 'What is the capital of France?' }],
     });
     expect(result.success).toBe(true);
@@ -142,8 +164,18 @@ describe('LocalRouter', () => {
 
   it('selects reasoning model for reasoning prompts', async () => {
     const result = await router.modelSelect({
-      models: ['openai/gpt-4o-mini', 'openai/o3', 'anthropic/claude-sonnet-4-5-20250929'],
-      messages: [{ role: 'user', content: 'Prove the theorem step by step using mathematical proof and derive the result logically' }],
+      models: [
+        'openai/gpt-4o-mini',
+        'openai/o3',
+        'anthropic/claude-sonnet-4-5-20250929',
+      ],
+      messages: [
+        {
+          role: 'user',
+          content:
+            'Prove the theorem step by step using mathematical proof and derive the result logically',
+        },
+      ],
     });
     expect(result.success).toBe(true);
     // Should pick a reasoning-capable model (o3 or claude-sonnet-4-5)
@@ -173,13 +205,20 @@ describe('LocalRouter', () => {
 
   it('selects most expensive model for COMPLEX tier', async () => {
     const result = await router.modelSelect({
-      models: ['openai/gpt-4o-mini', 'openai/gpt-4o', 'anthropic/claude-sonnet-4-5-20250929'],
-      messages: [{
-        role: 'user',
-        content: 'Design a distributed microservice architecture with kubernetes ' +
-          'that handles database infrastructure optimization. Implement the algorithm ' +
-          'for the distributed system with formal proof and step by step mathematical derivation.',
-      }],
+      models: [
+        'openai/gpt-4o-mini',
+        'openai/gpt-4o',
+        'anthropic/claude-sonnet-4-5-20250929',
+      ],
+      messages: [
+        {
+          role: 'user',
+          content:
+            'Design a distributed microservice architecture with kubernetes ' +
+            'that handles database infrastructure optimization. Implement the algorithm ' +
+            'for the distributed system with formal proof and step by step mathematical derivation.',
+        },
+      ],
     });
     expect(result.success).toBe(true);
     // For COMPLEX/REASONING tier, should pick most expensive or reasoning-capable model
@@ -240,6 +279,8 @@ describe('resolveRouterConfig', () => {
     process.env.ROUTER_BASE_URL = 'https://example.com';
     delete process.env.ROUTER_API_KEY;
 
-    expect(() => resolveRouterConfig()).toThrow('ROUTER_BASE_URL and ROUTER_API_KEY');
+    expect(() => resolveRouterConfig()).toThrow(
+      'ROUTER_BASE_URL and ROUTER_API_KEY'
+    );
   });
 });

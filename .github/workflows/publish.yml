@@ -31,5 +31,8 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Clear stale auth token (OIDC replaces it)
+        run: npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
+
       - name: Publish to npm
         run: npm publish --provenance --access public --tag latest

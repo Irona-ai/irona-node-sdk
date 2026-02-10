@@ -38,12 +38,18 @@ export { CompletionsResponse };
 
 export class IronaChatClient {
   private readonly gatewayProvider?: ReturnType<typeof createOpenAI>;
+  private readonly gatewayHostname?: string;
 
   constructor(
     private readonly config: Config,
     private readonly ironaRouter: IronaRouterClient
   ) {
     this.gatewayProvider = this.createGatewayProvider(this.config.gateway);
+    if (this.config.gateway !== undefined) {
+      this.gatewayHostname = new URL(
+        this.config.gateway.baseUrl
+      ).hostname.toLowerCase();
+    }
   }
 
   /**
@@ -134,7 +140,7 @@ export class IronaChatClient {
     supportsWebSearch: boolean
   ): Promise<CompletionsResponse> {
     try {
-      const isUsingGateway = Boolean(this.gatewayProvider);
+      const isUsingGateway = this.gatewayProvider !== undefined;
       if (!isUsingGateway) {
         this.loadApiKeyForProvider(provider, model);
       }
@@ -220,7 +226,7 @@ export class IronaChatClient {
         payload.search === true &&
         supportsWebSearch
       ) {
-        (baseConfig as Record<string, unknown>).providerOptions = {
+        baseConfig.providerOptions = {
           xai: {
             searchParameters: {
               mode: 'on',
@@ -513,8 +519,10 @@ export class IronaChatClient {
       return model;
     }
 
-    const hostname = new URL(gateway.baseUrl).hostname.toLowerCase();
-    if (hostname === 'openrouter.ai' || hostname.endsWith('.openrouter.ai')) {
+    if (
+      this.gatewayHostname === 'openrouter.ai' ||
+      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
+    ) {
       const openRouterModelName = getOpenRouterIdentifier(provider, model);
       if (openRouterModelName !== null && openRouterModelName !== '') {
         return openRouterModelName;

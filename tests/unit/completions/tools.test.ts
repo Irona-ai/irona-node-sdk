@@ -2,27 +2,32 @@
 import '../../mocks/ai-sdk.mock';
 import '../../mocks/supported-models.mock';
 import '../../mocks/provider-utils.mock';
+import { z } from 'zod';
 
-import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
 import { IronaAI } from '../../../src/index';
-import { Config } from '../../../src/types';
+import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
+import type { Config } from '../../../src/types';
 import {
-  mockGenerateText,
-  mockStreamText,
   setupSuccessfulGeneration,
   setupSuccessfulStream,
   getLastGenerateTextCall,
-  getLastStreamTextCall
+  getLastStreamTextCall,
 } from '../../mocks/ai-sdk.mock';
-import { createMockRouterClient, setupRouterSuccess } from '../../mocks/router-client.mock';
-import { createTestPayload, setupTestEnv, mockConsole } from '../../utils/test-helpers';
+import { resetProviderUtilsMocks } from '../../mocks/provider-utils.mock';
+import {
+  createMockRouterClient,
+  setupRouterSuccess,
+} from '../../mocks/router-client.mock';
 import {
   mockDoesModelSupportMediaTypes,
   mockDoesModelSupportWebSearch,
-  resetSupportedModelsMocks
+  resetSupportedModelsMocks,
 } from '../../mocks/supported-models.mock';
-import { resetProviderUtilsMocks } from '../../mocks/provider-utils.mock';
-import { z } from 'zod';
+import {
+  createTestPayload,
+  setupTestEnv,
+  mockConsole,
+} from '../../utils/test-helpers';
 
 describe('Tools Support', () => {
   let client: IronaChatClient;
@@ -57,7 +62,9 @@ describe('Tools Support', () => {
       calculator: {
         description: 'Perform a calculation',
         inputSchema: z.object({
-          expression: z.string().describe('The mathematical expression to evaluate'),
+          expression: z
+            .string()
+            .describe('The mathematical expression to evaluate'),
         }),
         execute: async ({ expression }: { expression: string }) => ({
           result: eval(expression),
@@ -83,7 +90,11 @@ describe('Tools Support', () => {
     });
 
     it('passes tools to streamText when streaming', async () => {
-      const mockStream = setupSuccessfulStream(['Tool ', 'streaming ', 'response']);
+      const mockStream = setupSuccessfulStream([
+        'Tool ',
+        'streaming ',
+        'response',
+      ]);
       setupRouterSuccess(mockRouter);
       mockDoesModelSupportMediaTypes.mockReturnValue(true);
 
@@ -191,6 +202,11 @@ describe('Tools Support', () => {
       // Mock the router to return a selected model
       mockRouter.modelSelect.mockResolvedValue({
         providers: [{ provider: 'openai', model: 'gpt-4o-mini' }],
+        fallbackProviders: [],
+        error: null,
+        success: true,
+        message: 'OK',
+        statusCode: 200,
       });
 
       // Call modelSelect with tools through the mock router

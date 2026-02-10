@@ -1,84 +1,29 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-// Base Utilities
-const urlField = z.string().url();
-const optionalFilename = z.string().optional();
+import { AssistantMessageSchema } from './assistanceMessage.schema';
+import { ToolMessageSchema } from './toolMessage.schema';
+import { UserMessageSchema } from './userMessage.schema';
 
-// Content Schemas
-
-// Text content
-const TextContent = z.object({
-  type: z.literal("text"),
-  text: z.string(),
+export const SystemMessageSchema = z.object({
+  role: z.literal('system'),
+  content: z.string(),
 });
 
-// Reasoning content
-const ReasoningContent = z.object({
-  type: z.literal("reasoning"),
-  text: z.string(),
-});
-
-// Image URL content
-const ImageUrlContent = z.object({
-  type: z.literal("image_url"),
-  image_url: z.object({
-    url: urlField,
-  }),
-  filename: optionalFilename,
-});
-
-// Document content
-const DocumentContent = z.object({
-  type: z.literal("document"),
-  source: z.object({
-    type: z.literal("url"),
-    url: urlField,
-  }),
-  filename: optionalFilename,
-});
-
-// Tool call result content
-const ResultContent = z.object({
-  type: z.literal("tool-result"),
-  toolCallId: z.string(),
-  toolName: z.string(),
-  result: z.any(),
-});
-
-// Tool call request content
-const ToolCallContent = z.object({
-  type: z.literal("tool-call"),
-  toolCallId: z.string(),
-  toolName: z.string(),
-  toolInput: z.any(),
-});
-
-export type DocumentContentPayload = z.infer<typeof DocumentContent>;
-
-//  Discriminated Content Union
-const ContentItem = z.discriminatedUnion("type", [
-  TextContent,
-  ReasoningContent,
-  ImageUrlContent,
-  DocumentContent,
-  ResultContent,
-  ToolCallContent,
+export const MessageSchema = z.union([
+  SystemMessageSchema,
+  UserMessageSchema,
+  AssistantMessageSchema,
+  ToolMessageSchema,
 ]);
-
-// Message Schema
-export const MessageSchema = z.object({
-  role: z.enum(["system", "assistant", "user", "tool"]),
-  content: z.union([
-    z.string(), // legacy
-    z.array(ContentItem), // modern
-  ]),
-});
 
 export type MessagePayload = z.infer<typeof MessageSchema>;
 
 //  Model Schema
 export const ModelSchema = z
   .string()
-  .regex(/^[^/]+\/[^/]+$/, "Model must contain a '/' separating provider and model");
+  .regex(
+    /^[^/]+\/[^/]+$/,
+    "Model must contain a '/' separating provider and model"
+  );
 
 export type ModelPayload = z.infer<typeof ModelSchema>;

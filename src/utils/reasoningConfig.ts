@@ -1,6 +1,10 @@
-import { doesModelSupportReasoning } from "../supported_models";
-import { AnthropicProviderOptions } from "@ai-sdk/anthropic";
+import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import type { LanguageModel } from 'ai';
 import { wrapLanguageModel, extractReasoningMiddleware } from 'ai';
+
+import { doesModelSupportReasoning } from '../supported_models';
+
+import { logger } from './logger';
 
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
 
@@ -15,7 +19,7 @@ export interface OpenAIReasoningConfig {
 }
 
 export interface AnthropicThinkingConfig {
-  type: "enabled" | "disabled";
+  type: 'enabled' | 'disabled';
   budgetTokens?: number;
 }
 export interface TogetherAIReasoningConfig {
@@ -30,7 +34,14 @@ export interface PerplexityReasoningConfig {
 export interface XAIReasoningConfig {
   reasoningEffort: ReasoningEffort;
 }
-type ProviderName = 'google' | 'openai' | 'anthropic' | 'togetherai' | 'mistral' | 'perplexity' | "xai";
+type ProviderName =
+  | 'google'
+  | 'openai'
+  | 'anthropic'
+  | 'togetherai'
+  | 'mistral'
+  | 'perplexity'
+  | 'xai';
 
 export interface ProviderReasoningOptions {
   google?: { thinkingConfig: GoogleThinkingConfig };
@@ -48,9 +59,8 @@ export class ReasoningConfig {
     low: 0.25,
     medium: 0.5,
     high: 0.85,
-    max: 1.0
+    max: 1.0,
   };
-
 
   static getReasoningConfig(
     provider: ProviderName,
@@ -62,12 +72,12 @@ export class ReasoningConfig {
 
     switch (provider) {
       case 'google':
-        if (model.includes("gemini")) {
+        if (model.includes('gemini')) {
           let thinkingBudget: number;
           let includeThoughts: boolean;
 
           // Special handling for gemini-2.5-pro
-          if (model.includes("2.5-pro")) {
+          if (model.includes('2.5-pro')) {
             // Gemini 2.5-pro cannot disable thinking, minimum is 128 tokens
             thinkingBudget = isOff ? 128 : Math.floor(32768 * multiplier);
             includeThoughts = true; // Always include thoughts for this model
@@ -82,9 +92,9 @@ export class ReasoningConfig {
             google: {
               thinkingConfig: {
                 thinkingBudget,
-                includeThoughts
-              }
-            }
+                includeThoughts,
+              },
+            },
           };
         }
         break;
@@ -97,13 +107,13 @@ export class ReasoningConfig {
           openai: {
             effort: reasoningEffort,
             reasoningSummary: 'auto',
-          }
+          },
         };
 
       case 'anthropic':
-        if (model.includes("claude")) {
+        if (model.includes('claude')) {
           let maxBudget: number;
-          if (model.includes("opus")) {
+          if (model.includes('opus')) {
             maxBudget = 32000;
           } else {
             maxBudget = 64000;
@@ -111,8 +121,10 @@ export class ReasoningConfig {
           return {
             anthropic: {
               thinking: {
-                type: isOff ? "disabled" : "enabled",
-                budgetTokens: isOff ? undefined : Math.floor(maxBudget * multiplier),
+                type: isOff ? 'disabled' : 'enabled',
+                budgetTokens: isOff
+                  ? undefined
+                  : Math.floor(maxBudget * multiplier),
               },
             } satisfies AnthropicProviderOptions,
           };
@@ -120,11 +132,11 @@ export class ReasoningConfig {
         break;
 
       case 'togetherai':
-        if (model.includes("DeepSeek-R1")) {
+        if (model.includes('DeepSeek-R1')) {
           return {
             togetherai: {
-              reasoning: { includeReasoning: !isOff }
-            }
+              reasoning: { includeReasoning: !isOff },
+            },
           };
         }
         break;
@@ -132,25 +144,26 @@ export class ReasoningConfig {
       case 'mistral':
         return {
           mistral: {
-            reasoning: { includeReasoning: !isOff }
-          }
+            reasoning: { includeReasoning: !isOff },
+          },
         };
 
       case 'perplexity':
         return {
           perplexity: {
-            reasoning: { effort: reasoningEffort }
-          }
+            reasoning: { effort: reasoningEffort },
+          },
         };
       case 'xai':
-        if (model.includes("grok")) {
+        if (model.includes('grok')) {
           // xAI doesn't support 'medium' effort level - map to 'low'
-          const mappedReasoningEffort = reasoningEffort === 'medium' ? 'low' : reasoningEffort;
+          const mappedReasoningEffort =
+            reasoningEffort === 'medium' ? 'low' : reasoningEffort;
 
           return {
             xai: {
-              reasoningEffort: mappedReasoningEffort
-            }
+              reasoningEffort: mappedReasoningEffort,
+            },
           };
         }
         break;
@@ -159,31 +172,40 @@ export class ReasoningConfig {
     return null;
   }
 
-  static applyReasoningConfig(
-    config: any,
+  static applyReasoningConfig<T extends { providerOptions?: unknown }>(
+    config: T,
     provider: string,
     model: string,
     reasoningEffort?: ReasoningEffort
-  ): any {
+  ): T {
     const effectiveReasoningEffort = reasoningEffort ?? 'off';
 
     if (!doesModelSupportReasoning(provider, model)) {
       if (reasoningEffort !== undefined && reasoningEffort !== 'off') {
-        console.warn(`[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`);
+        logger.warn(
+          `[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`
+        );
       }
       return config;
     }
 
-    const reasoningConfig = this.getReasoningConfig(provider as ProviderName, model, effectiveReasoningEffort);
+    const reasoningConfig = this.getReasoningConfig(
+      provider as ProviderName,
+      model,
+      effectiveReasoningEffort
+    );
     if (reasoningConfig) {
-      config.providerOptions = reasoningConfig;
+      config.providerOptions =
+        reasoningConfig as unknown as T['providerOptions'];
     }
 
     return config;
   }
 
-
-  static supportsReasoningMiddleware(provider: ProviderName, model: string): boolean {
+  static supportsReasoningMiddleware(
+    provider: ProviderName,
+    model: string
+  ): boolean {
     const providersWithMiddleware = ['togetherai', 'mistral', 'perplexity'];
 
     // Check if provider supports middleware
@@ -194,19 +216,28 @@ export class ReasoningConfig {
     const supportsReasoning = doesModelSupportReasoning(provider, modelName);
 
     if (!supportsReasoning) {
-      console.warn(`[ReasoningConfig] Reasoning middleware not supported for ${provider}/${model}. The model does not support reasoning capabilities.`);
+      logger.warn(
+        `[ReasoningConfig] Reasoning middleware not supported for ${provider}/${model}. The model does not support reasoning capabilities.`
+      );
     }
     return supportsReasoning;
   }
 
   static createEnhancedModelWithReasoning(
-    baseModel: any,
+    baseModel: LanguageModel,
     reasoningEffort?: ReasoningEffort
   ) {
-    const shouldIncludeReasoning = reasoningEffort !== undefined && reasoningEffort !== 'off';
+    const shouldIncludeReasoning =
+      reasoningEffort !== undefined && reasoningEffort !== 'off';
 
     if (!shouldIncludeReasoning) {
       return baseModel;
+    }
+
+    if (typeof baseModel === 'string') {
+      throw new Error(
+        `[ReasoningConfig] baseModel cannot be a string when applying reasoning middleware. Received: ${baseModel}`
+      );
     }
 
     return wrapLanguageModel({

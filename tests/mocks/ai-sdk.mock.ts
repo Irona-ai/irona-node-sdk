@@ -2,21 +2,28 @@
 jest.mock('ai', () => ({
   generateText: jest.fn(),
   streamText: jest.fn(),
+  stepCountIs: jest.fn().mockImplementation((count: number) => ({ count })),
 }));
 
 export const mockGenerateText = require('ai').generateText as jest.Mock;
 export const mockStreamText = require('ai').streamText as jest.Mock;
+export const mockStepCountIs = require('ai').stepCountIs as jest.Mock;
 
 export const resetAiMocks = () => {
   mockGenerateText.mockReset();
   mockStreamText.mockReset();
+  mockStepCountIs
+    .mockReset()
+    .mockImplementation((count: number) => ({ count }));
 };
 
 export const setupSuccessfulGeneration = (text: string = 'Test response') => {
   mockGenerateText.mockResolvedValue({ text });
 };
 
-export const setupSuccessfulStream = (chunks: string[] = ['Hello', ' world']) => {
+export const setupSuccessfulStream = (
+  chunks: string[] = ['Hello', ' world']
+) => {
   const mockStream = {
     fullStream: {
       [Symbol.asyncIterator]: async function* () {

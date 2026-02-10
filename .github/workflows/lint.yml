@@ -1,0 +1,36 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main, development ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ESLint – shows errors & warnings
+      - name: Run ESLint
+        run: npm run lint
+
+      # Prettier – check only (NO write)
+      - name: Run Prettier check
+        run: npm run format:check
+
+      # TypeScript
+      - name: Run TypeScript type check
+        run: npm run type-check

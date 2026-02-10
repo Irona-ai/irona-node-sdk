@@ -7,7 +7,7 @@ beforeEach(() => {
 afterEach(() => {
   // Clear all mocks after each test
   jest.clearAllMocks();
-  
+
   // Restore console methods if they were mocked
   if ((console.log as any).mockRestore) {
     (console.log as any).mockRestore();

@@ -9,6 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run build
 ```
+
 Builds the SDK using microbundle, outputs CJS/ESM/UMD to `dist/`.
 
 ### Development
@@ -39,6 +40,7 @@ npm run type-check    # TypeScript — must pass with zero errors
 ```
 
 To auto-fix most issues:
+
 ```bash
 npm run lint:fix      # Auto-fix ESLint errors (import order, quotes, etc.)
 npm run format:write  # Auto-fix Prettier formatting
@@ -46,6 +48,7 @@ npm run clean         # Runs both lint:fix + format:write
 ```
 
 **Key rules enforced by ESLint (see `eslint.config.js`):**
+
 - `prettier/prettier` — single quotes, trailing commas, 2-space indent, no semicolons omitted
 - `@typescript-eslint/strict-boolean-expressions` — never use nullable strings/booleans in conditionals; always check explicitly (e.g., `x !== undefined && x !== ''` instead of `if (x)`)
 - `@typescript-eslint/prefer-nullish-coalescing` — use `??` instead of `||`
@@ -58,6 +61,7 @@ npm run clean         # Runs both lint:fix + format:write
 **Workflow: After writing/editing code, ALWAYS run `npm run clean` then `npm run type-check` before staging.**
 
 ### Local Integration Testing
+
 ```bash
 npm run eg-test   # Builds, links locally, and tests without publishing
 ```
@@ -87,6 +91,7 @@ Optional OpenAI-compatible gateway routing (e.g., OpenRouter). When configured, 
 ### Validation
 
 Zod schemas in `src/schemas/` validate all request payloads:
+
 - `completions.schema.ts` — completions requests
 - `modelSelect.schema.ts` — model selection requests
 - `common.schema.ts` — shared types (messages, media)
@@ -102,6 +107,7 @@ Zod schemas in `src/schemas/` validate all request payloads:
 Framework: Jest with ts-jest. Config in `jest.config.js`.
 
 **Critical rule**: Mocks MUST be imported before source code in test files:
+
 ```typescript
 import '../../mocks/ai-sdk.mock';
 import '../../mocks/supported-models.mock';

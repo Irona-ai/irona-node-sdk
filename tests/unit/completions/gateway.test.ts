@@ -15,7 +15,11 @@ import {
 } from '../../mocks/supported-models.mock';
 import { resetProviderUtilsMocks } from '../../mocks/provider-utils.mock';
 import { createMockRouterClient } from '../../mocks/router-client.mock';
-import { createTestPayload, mockConsole, setupTestEnv } from '../../utils/test-helpers';
+import {
+  createTestPayload,
+  mockConsole,
+  setupTestEnv,
+} from '../../utils/test-helpers';
 
 describe('Gateway Completions', () => {
   beforeEach(() => {

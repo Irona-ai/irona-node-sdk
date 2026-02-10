@@ -12,7 +12,9 @@ export const mockStepCountIs = require('ai').stepCountIs as jest.Mock;
 export const resetAiMocks = () => {
   mockGenerateText.mockReset();
   mockStreamText.mockReset();
-  mockStepCountIs.mockReset().mockImplementation((count: number) => ({ count }));
+  mockStepCountIs
+    .mockReset()
+    .mockImplementation((count: number) => ({ count }));
 };
 
 export const setupSuccessfulGeneration = (text: string = 'Test response') => {

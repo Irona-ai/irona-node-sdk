@@ -62,17 +62,18 @@ IronaAI works with any OpenAI-compatible gateway. When a gateway is configured, 
 
 ### Supported Gateways
 
-| Gateway | Base URL | Model format | `includeProviderInModelName` |
-|---|---|---|---|
-| [OpenRouter](https://openrouter.ai) | `https://openrouter.ai/api/v1` | `provider/model` | `true` (default) |
-| [Requesty](https://requesty.ai) | `https://router.requesty.ai/v1` | `provider/model` | `true` (default) |
-| [LLM Gateway](https://llmgateway.io) | `https://api.llmgateway.io/v1` | raw model name | `false` |
+| Gateway                              | Base URL                        | Model format     | `includeProviderInModelName` |
+| ------------------------------------ | ------------------------------- | ---------------- | ---------------------------- |
+| [OpenRouter](https://openrouter.ai)  | `https://openrouter.ai/api/v1`  | `provider/model` | `true` (default)             |
+| [Requesty](https://requesty.ai)      | `https://router.requesty.ai/v1` | `provider/model` | `true` (default)             |
+| [LLM Gateway](https://llmgateway.io) | `https://api.llmgateway.io/v1`  | raw model name   | `false`                      |
 
 Any other OpenAI-compatible gateway works the same way — just set the base URL and API key.
 
 ### Configuration
 
 **Via environment variables** (simplest):
+
 ```bash
 LLM_GATEWAY_BASE_URL='https://router.requesty.ai/v1'
 LLM_GATEWAY_API_KEY='your-gateway-api-key'
@@ -80,6 +81,7 @@ LLM_GATEWAY_INCLUDE_PROVIDER_IN_MODEL_NAME='true'  # set 'false' for gateways th
 ```
 
 **Via config object**:
+
 ```typescript
 import { IronaAI } from 'ironaai';
 
@@ -93,6 +95,7 @@ const ironaAI = await IronaAI.createInstance({
 ```
 
 **OpenRouter with optional headers**:
+
 ```typescript
 const ironaAI = await IronaAI.createInstance({
   apiKey: process.env.IRONAAI_API_KEY,
@@ -108,6 +111,7 @@ const ironaAI = await IronaAI.createInstance({
 ```
 
 ### Notes
+
 - If `gateway` is set, provider-specific API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) are not required.
 - If `gateway` is not set, the SDK uses provider-specific API keys as before.
 - OpenRouter-specific env fallbacks are also supported: `OPENROUTER_BASE_URL`, `OPENROUTER_API_KEY`, `OPENROUTER_HTTP_REFERER`, `OPENROUTER_X_TITLE`.

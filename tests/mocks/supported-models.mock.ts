@@ -23,7 +23,8 @@ export const mockDoesModelSupportWebSearch =
   require('../../src/supported_models').doesModelSupportWebSearch as jest.Mock;
 export const mockProviderApiKeyName = require('../../src/supported_models')
   .providerApiKeyName as jest.Mock;
-export const mockGetOpenRouterIdentifier = require('../../src/supported_models').getOpenRouterIdentifier as jest.Mock;
+export const mockGetOpenRouterIdentifier = require('../../src/supported_models')
+  .getOpenRouterIdentifier as jest.Mock;
 
 export const resetSupportedModelsMocks = () => {
   mockDoesModelSupportMediaTypes.mockReset().mockReturnValue(true);

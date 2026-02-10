@@ -1,4 +1,5 @@
 import type { ModelPayload } from './schemas/common.schema';
+import type { RouterConfig } from './router/types';
 
 export type GatewayConfig = {
   baseUrl: string;
@@ -13,6 +14,7 @@ export type Config = {
   apiKey?: string;
   fallback_models?: ModelPayload[];
   gateway?: GatewayConfig;
+  router?: RouterConfig;
 };
 export type ChatModelConfig = {
   apiKey: string;

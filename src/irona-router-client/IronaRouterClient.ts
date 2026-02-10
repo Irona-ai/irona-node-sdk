@@ -12,12 +12,13 @@ import {
 } from '../utils/providerAndModelUtils';
 import { validateSchema } from '../utils/requestValidator';
 
+import type { Router } from '../router/types';
 import { Base } from './base';
 export { ModelInfo, ModelSelectResponse };
 
 const resources = '';
 
-export class IronaRouterClient extends Base {
+export class IronaRouterClient extends Base implements Router {
   constructor(config: Config) {
     super(config);
   }

@@ -104,3 +104,19 @@ export function getOpenRouterIdentifier(
 
   return openRouterIdentifiers[model] || null;
 }
+
+export function getModelPrice(
+  provider: string,
+  model: string
+): { input: number; output: number } | null {
+  const price = PROVIDERS[provider]?.price?.[model];
+  if (!price) return null;
+  return { input: price.input ?? 0, output: price.output ?? 0 };
+}
+
+export function getModelCapabilities(
+  provider: string,
+  model: string
+): string[] | null {
+  return PROVIDERS[provider]?.capabilities?.[model] ?? null;
+}

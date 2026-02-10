@@ -9,7 +9,7 @@ import type { ModelMessage, LanguageModel } from 'ai';
 import { generateText, streamText, stepCountIs } from 'ai';
 
 import { BadRequestError, MissingApiKeyError } from '../errors';
-import type { IronaRouterClient } from '../irona-router-client/IronaRouterClient';
+import type { Router } from '../router/types';
 import type { ProviderName } from '../responseTypes';
 import { CompletionsResponse } from '../responseTypes';
 import type { MessagePayload } from '../schemas/common.schema';
@@ -42,7 +42,7 @@ export class IronaChatClient {
 
   constructor(
     private readonly config: Config,
-    private readonly ironaRouter: IronaRouterClient
+    private readonly ironaRouter: Router
   ) {
     this.gatewayProvider = this.createGatewayProvider(this.config.gateway);
     if (this.config.gateway !== undefined) {

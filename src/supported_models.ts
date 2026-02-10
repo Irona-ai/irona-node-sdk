@@ -110,7 +110,7 @@ export function getModelPrice(
   model: string
 ): { input: number; output: number } | null {
   const price = PROVIDERS[provider]?.price?.[model];
-  if (!price) return null;
+  if (price == null) return null;
   return { input: price.input ?? 0, output: price.output ?? 0 };
 }
 

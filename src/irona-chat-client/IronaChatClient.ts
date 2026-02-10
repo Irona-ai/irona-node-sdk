@@ -9,9 +9,9 @@ import type { ModelMessage, LanguageModel } from 'ai';
 import { generateText, streamText, stepCountIs } from 'ai';
 
 import { BadRequestError, MissingApiKeyError } from '../errors';
-import type { Router } from '../router/types';
 import type { ProviderName } from '../responseTypes';
 import { CompletionsResponse } from '../responseTypes';
+import type { Router } from '../router/types';
 import type { MessagePayload } from '../schemas/common.schema';
 import { CompletionsSchema } from '../schemas/completions.schema';
 import type { CompletionsPayload } from '../schemas/completions.schema';

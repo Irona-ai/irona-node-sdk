@@ -1,5 +1,6 @@
 import { MissingApiKeyError, BadRequestError } from '../errors';
 import { ModelInfo, ModelSelectResponse } from '../responseTypes';
+import type { Router } from '../router/types';
 import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import { ModelSelectSchema } from '../schemas/modelSelect.schema';
 import { doesModelSupportMediaTypes } from '../supported_models';
@@ -12,7 +13,6 @@ import {
 } from '../utils/providerAndModelUtils';
 import { validateSchema } from '../utils/requestValidator';
 
-import type { Router } from '../router/types';
 import { Base } from './base';
 export { ModelInfo, ModelSelectResponse };
 

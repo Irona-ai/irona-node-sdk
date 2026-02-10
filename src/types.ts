@@ -1,5 +1,5 @@
-import type { ModelPayload } from './schemas/common.schema';
 import type { RouterConfig } from './router/types';
+import type { ModelPayload } from './schemas/common.schema';
 
 export type GatewayConfig = {
   baseUrl: string;

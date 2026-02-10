@@ -20,7 +20,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          # Note: registry-url intentionally omitted to avoid .npmrc
+          # token binding that conflicts with OIDC trusted publishing
 
       - name: Upgrade npm
         run: npm install -g npm@11.5.1
@@ -31,8 +32,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Clear stale auth token (OIDC replaces it)
-        run: npm config delete //registry.npmjs.org/:_authToken 2>/dev/null || true
-
-      - name: Publish to npm
-        run: npm publish --provenance --access public --tag latest
+      - name: Publish to npm (OIDC trusted publishing)
+        run: npm publish --provenance --access public --tag latest --registry https://registry.npmjs.org/

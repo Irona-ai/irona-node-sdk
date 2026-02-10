@@ -56,38 +56,64 @@ async function basicExample() {
 basicExample();
 ```
 
-## OpenRouter / Gateway Support
+## Gateway Support
 
-You can configure an OpenAI-compatible gateway (for example OpenRouter) during client initialization.
+IronaAI works with any OpenAI-compatible gateway. When a gateway is configured, all LLM calls route through it instead of individual provider APIs — no provider-specific API keys needed.
 
+### Supported Gateways
+
+| Gateway | Base URL | Model format | `includeProviderInModelName` |
+|---|---|---|---|
+| [OpenRouter](https://openrouter.ai) | `https://openrouter.ai/api/v1` | `provider/model` | `true` (default) |
+| [Requesty](https://requesty.ai) | `https://router.requesty.ai/v1` | `provider/model` | `true` (default) |
+| [LLM Gateway](https://llmgateway.io) | `https://api.llmgateway.io/v1` | raw model name | `false` |
+
+Any other OpenAI-compatible gateway works the same way — just set the base URL and API key.
+
+### Configuration
+
+**Via environment variables** (simplest):
+```bash
+LLM_GATEWAY_BASE_URL='https://router.requesty.ai/v1'
+LLM_GATEWAY_API_KEY='your-gateway-api-key'
+LLM_GATEWAY_INCLUDE_PROVIDER_IN_MODEL_NAME='true'  # set 'false' for gateways that expect raw model names
+```
+
+**Via config object**:
 ```typescript
-import { IronaAI } from "ironaai";
+import { IronaAI } from 'ironaai';
 
 const ironaAI = await IronaAI.createInstance({
-  apiKey: process.env.IRONAAI_API_KEY, // Irona routing key
+  apiKey: process.env.IRONAAI_API_KEY,
   gateway: {
-    baseUrl: "https://openrouter.ai/api/v1",
+    baseUrl: 'https://router.requesty.ai/v1',
+    apiKey: process.env.LLM_GATEWAY_API_KEY!,
+  },
+});
+```
+
+**OpenRouter with optional headers**:
+```typescript
+const ironaAI = await IronaAI.createInstance({
+  apiKey: process.env.IRONAAI_API_KEY,
+  gateway: {
+    baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: process.env.OPENROUTER_API_KEY!,
     headers: {
-      "HTTP-Referer": "https://your-app.example",
-      "X-Title": "Your App Name",
+      'HTTP-Referer': 'https://your-app.example',
+      'X-Title': 'Your App Name',
     },
   },
 });
 ```
 
-Notes:
-- If `gateway` is set, provider-specific API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) are not required for model calls.
-- If `gateway` is not set, the SDK behaves exactly as before and uses provider-specific API keys.
-- OpenRouter-specific env fallbacks are supported:
-  - `OPENROUTER_BASE_URL` (defaults to `https://openrouter.ai/api/v1` if you set it yourself)
-  - `OPENROUTER_API_KEY`
-  - `OPENROUTER_HTTP_REFERER` (optional)
-  - `OPENROUTER_X_TITLE` (optional)
-- Gateway model-name behavior:
-  - `LLM_GATEWAY_INCLUDE_PROVIDER_IN_MODEL_NAME=true|false` (default `true`)
-  - Keep `true` for OpenRouter (`openai/gpt-4o-mini` style model IDs)
-  - Set `false` for gateways that expect raw model names (`gpt-4o-mini`)
+### Notes
+- If `gateway` is set, provider-specific API keys (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) are not required.
+- If `gateway` is not set, the SDK uses provider-specific API keys as before.
+- OpenRouter-specific env fallbacks are also supported: `OPENROUTER_BASE_URL`, `OPENROUTER_API_KEY`, `OPENROUTER_HTTP_REFERER`, `OPENROUTER_X_TITLE`.
+- Model name format:
+  - `LLM_GATEWAY_INCLUDE_PROVIDER_IN_MODEL_NAME=true` (default) — sends `openai/gpt-4o-mini` (works for OpenRouter, Requesty)
+  - `LLM_GATEWAY_INCLUDE_PROVIDER_IN_MODEL_NAME=false` — sends `gpt-4o-mini` (works for LLM Gateway and gateways expecting raw model names)
 
 ### Build & test Instructions
 

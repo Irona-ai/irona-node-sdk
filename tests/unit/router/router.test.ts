@@ -201,27 +201,29 @@ describe('resolveRouterConfig', () => {
     process.env = originalEnv;
   });
 
-  it('returns irona config by default', () => {
+  it('returns null (Irona default) when no config provided', () => {
     const config = resolveRouterConfig();
-    expect(config.type).toBe('irona');
+    expect(config).toBeNull();
   });
 
   it('returns explicit config when provided', () => {
     const config = resolveRouterConfig({ type: 'local' });
-    expect(config.type).toBe('local');
+    expect(config).not.toBeNull();
+    expect(config!.type).toBe('local');
   });
 
   it('resolves API router from env vars', () => {
     process.env.ROUTER_TYPE = 'api';
-    process.env.ROUTER_BASE_URL = 'https://api.notdiamond.ai/v2/modelRouter';
-    process.env.ROUTER_API_KEY = 'nd_test_key';
+    process.env.ROUTER_BASE_URL = 'https://example.com/v2/router';
+    process.env.ROUTER_API_KEY = 'test_key';
     process.env.ROUTER_ENDPOINT = '/modelSelect';
 
     const config = resolveRouterConfig();
-    expect(config.type).toBe('api');
-    if (config.type === 'api') {
-      expect(config.baseUrl).toBe('https://api.notdiamond.ai/v2/modelRouter');
-      expect(config.apiKey).toBe('nd_test_key');
+    expect(config).not.toBeNull();
+    expect(config!.type).toBe('api');
+    if (config?.type === 'api') {
+      expect(config.baseUrl).toBe('https://example.com/v2/router');
+      expect(config.apiKey).toBe('test_key');
       expect(config.endpoint).toBe('/modelSelect');
     }
   });
@@ -229,7 +231,8 @@ describe('resolveRouterConfig', () => {
   it('resolves local router from env var', () => {
     process.env.ROUTER_TYPE = 'local';
     const config = resolveRouterConfig();
-    expect(config.type).toBe('local');
+    expect(config).not.toBeNull();
+    expect(config!.type).toBe('local');
   });
 
   it('throws if API router env vars are incomplete', () => {

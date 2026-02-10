@@ -1,10 +1,16 @@
 /**
  * Router Factory — creates the appropriate router based on config.
  *
+ * Two router types:
+ *   api   — HTTP-based routing (any compatible endpoint)
+ *   local — zero-latency, zero-cost classification (ClawRouter port)
+ *
+ * When no router config is provided, defaults to Irona's API router.
+ *
  * Resolution order:
  * 1. config.router (explicit config)
  * 2. ROUTER_TYPE env var
- * 3. Default: IronaRouterClient
+ * 3. Default: Irona API router
  */
 
 import { IronaRouterClient } from '../irona-router-client/IronaRouterClient';
@@ -17,7 +23,7 @@ import type { Router, RouterConfig } from './types';
 
 export function resolveRouterConfig(
   configuredRouter?: RouterConfig
-): RouterConfig {
+): RouterConfig | null {
   if (configuredRouter) return configuredRouter;
 
   const routerType = process.env.ROUTER_TYPE?.toLowerCase();
@@ -45,18 +51,19 @@ export function resolveRouterConfig(
     return { type: 'local' };
   }
 
-  // Default: Irona router
-  return { type: 'irona' };
+  // Default: Irona API router (null signals "use built-in default")
+  return null;
 }
 
 export function createRouter(config: Config): Router {
   const routerConfig = resolveRouterConfig(config.router);
 
-  switch (routerConfig.type) {
-    case 'irona':
-      logger.info('[RouterFactory] Using Irona router');
-      return new IronaRouterClient(config);
+  if (routerConfig == null) {
+    logger.info('[RouterFactory] Using default Irona API router');
+    return new IronaRouterClient(config);
+  }
 
+  switch (routerConfig.type) {
     case 'api':
       logger.info(
         `[RouterFactory] Using API router: ${routerConfig.baseUrl}${routerConfig.endpoint ?? ''}`
@@ -70,7 +77,7 @@ export function createRouter(config: Config): Router {
       return new LocalRouter(routerConfig.scoringConfig);
 
     default:
-      logger.info('[RouterFactory] Falling back to Irona router');
+      logger.info('[RouterFactory] Falling back to default Irona API router');
       return new IronaRouterClient(config);
   }
 }

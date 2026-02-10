@@ -10,10 +10,6 @@ export interface Router {
 
 // ── Router Config ────────────────────────────────────────────────────────────
 
-export type IronaRouterConfig = {
-  type: 'irona';
-};
-
 export type APIRouterConfig = {
   type: 'api';
   baseUrl: string;
@@ -28,10 +24,7 @@ export type LocalRouterConfig = {
   scoringConfig?: Partial<ScoringConfig>;
 };
 
-export type RouterConfig =
-  | IronaRouterConfig
-  | APIRouterConfig
-  | LocalRouterConfig;
+export type RouterConfig = APIRouterConfig | LocalRouterConfig;
 
 // ── Local Router Types (ported from ClawRouter) ──────────────────────────────
 

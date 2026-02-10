@@ -1,8 +1,18 @@
 import type { ModelPayload } from './schemas/common.schema';
+
+export type GatewayConfig = {
+  baseUrl: string;
+  apiKey: string;
+  headers?: Record<string, string>;
+  providerName?: string;
+  includeProviderInModelName?: boolean;
+};
+
 export type Config = {
   baseUrl?: string;
   apiKey?: string;
   fallback_models?: ModelPayload[];
+  gateway?: GatewayConfig;
 };
 export type ChatModelConfig = {
   apiKey: string;

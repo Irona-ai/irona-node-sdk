@@ -1,5 +1,7 @@
 // Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
+import '../../mocks/supported-models.mock';
+import '../../mocks/provider-utils.mock';
 import { z } from 'zod';
 
 import { IronaAI } from '../../../src/index';
@@ -200,6 +202,11 @@ describe('Tools Support', () => {
       // Mock the router to return a selected model
       mockRouter.modelSelect.mockResolvedValue({
         providers: [{ provider: 'openai', model: 'gpt-4o-mini' }],
+        fallbackProviders: [],
+        error: null,
+        success: true,
+        message: 'OK',
+        statusCode: 200,
       });
 
       // Call modelSelect with tools through the mock router

@@ -27,10 +27,10 @@ export function extractMediaTypeArrayFromMessages(
   for (const message of messages) {
     if (Array.isArray(message.content)) {
       for (const item of message.content) {
-        if (item.type === 'image_url') {
+        if (item.type === 'image') {
           mediaTypes.add('image');
         }
-        if (item.type === 'document') {
+        if (item.type === 'file') {
           mediaTypes.add('pdf');
         }
       }

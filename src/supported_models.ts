@@ -100,3 +100,13 @@ export function getModelPrefix(provider: string, model: string): string | null {
 
   return modelPrefixes[model] || null;
 }
+
+export function getOpenRouterIdentifier(
+  provider: string,
+  model: string
+): string | null {
+  const openRouterIdentifiers = PROVIDERS[provider]?.openrouter_identifier;
+  if (!openRouterIdentifiers) return null;
+
+  return openRouterIdentifiers[model] || null;
+}

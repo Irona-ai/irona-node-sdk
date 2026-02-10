@@ -111,10 +111,14 @@ export class LocalRouter implements Router {
   /**
    * Select the best model for a given tier from the user's candidate list.
    *
-   * Strategy:
-   * - SIMPLE/MEDIUM: pick cheapest model
-   * - COMPLEX: pick most expensive model (strongest)
-   * - REASONING: prefer model with 'reasoning' capability, else most expensive
+   * Models are sorted by cost ascending, then mapped to tiers:
+   *
+   * With 2 models:  SIMPLE/MEDIUM → cheapest, COMPLEX/REASONING → most expensive
+   * With 3 models:  SIMPLE → cheapest, MEDIUM → middle, COMPLEX → most expensive,
+   *                 REASONING → most expensive with reasoning capability
+   * With 4+ models: SIMPLE → cheapest, MEDIUM → 2nd cheapest,
+   *                 COMPLEX → 2nd most expensive,
+   *                 REASONING → most expensive with reasoning capability
    */
   private selectModelForTier(
     tier: Tier,
@@ -135,20 +139,30 @@ export class LocalRouter implements Router {
     // Sort by cost ascending
     modelsWithCost.sort((a, b) => a.cost - b.cost);
 
+    const n = modelsWithCost.length;
+
     switch (tier) {
       case 'SIMPLE':
-      case 'MEDIUM':
-        // Cheapest model
+        // Always cheapest
         return modelsWithCost[0];
 
+      case 'MEDIUM':
+        // For ≤2 models: same as cheapest; for 3+: second cheapest
+        return n <= 2 ? modelsWithCost[0] : modelsWithCost[1];
+
       case 'COMPLEX':
-        // Most expensive (strongest)
-        return modelsWithCost[modelsWithCost.length - 1];
+        // For ≤2 models: most expensive; for 3+: second most expensive
+        return n <= 2
+          ? modelsWithCost[n - 1]
+          : modelsWithCost[n - 2];
 
       case 'REASONING': {
-        // Prefer reasoning-capable model, else most expensive
-        const reasoningModel = modelsWithCost.find(m => m.hasReasoning);
-        return reasoningModel ?? modelsWithCost[modelsWithCost.length - 1];
+        // Most expensive model with reasoning capability (search from top)
+        for (let i = n - 1; i >= 0; i--) {
+          if (modelsWithCost[i].hasReasoning) return modelsWithCost[i];
+        }
+        // Fallback: most expensive
+        return modelsWithCost[n - 1];
       }
 
       default:

@@ -569,8 +569,8 @@ export const DEFAULT_SCORING_CONFIG: ScoringConfig = {
 
   tierBoundaries: {
     simpleMedium: 0.0,
-    mediumComplex: 0.15,
-    complexReasoning: 0.25,
+    mediumComplex: 0.30,
+    complexReasoning: 0.50,
   },
 
   confidenceSteepness: 12,

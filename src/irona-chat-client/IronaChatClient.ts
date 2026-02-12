@@ -1,10 +1,10 @@
-import { anthropic } from '@ai-sdk/anthropic';
-import { google } from '@ai-sdk/google';
-import { mistral } from '@ai-sdk/mistral';
+import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
+import { createMistral, mistral } from '@ai-sdk/mistral';
 import { createOpenAI, openai } from '@ai-sdk/openai';
-import { perplexity } from '@ai-sdk/perplexity';
-import { togetherai } from '@ai-sdk/togetherai';
-import { xai } from '@ai-sdk/xai';
+import { createPerplexity, perplexity } from '@ai-sdk/perplexity';
+import { createTogetherAI, togetherai } from '@ai-sdk/togetherai';
+import { createXai, xai } from '@ai-sdk/xai';
 import type { ModelMessage, LanguageModel } from 'ai';
 import { generateText, streamText, stepCountIs } from 'ai';
 
@@ -24,7 +24,7 @@ import {
   getModelPrefix,
   getOpenRouterIdentifier,
 } from '../supported_models';
-import type { Config, GatewayConfig } from '../types';
+import type { Config, GatewayConfig, ProviderConfig } from '../types';
 import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
 import { logger } from '../utils/logger';
 import {
@@ -140,7 +140,10 @@ export class IronaChatClient {
     supportsWebSearch: boolean
   ): Promise<CompletionsResponse> {
     try {
-      const isUsingGateway = this.gatewayProvider !== undefined;
+      // Per-provider gateway decision: providers with direct API keys bypass the gateway
+      const isUsingGateway =
+        this.gatewayProvider !== undefined &&
+        !this.hasDirectProviderKey(provider);
       if (!isUsingGateway) {
         this.loadApiKeyForProvider(provider, model);
       }
@@ -469,7 +472,27 @@ export class IronaChatClient {
       return this.gatewayProvider;
     }
 
-    // Map of provider to their respective model functions
+    // Check for programmatic provider config → create custom SDK instance
+    const customInstance = this.createCustomProviderInstance(provider);
+    if (customInstance !== undefined) {
+      if (
+        ReasoningConfig.supportsReasoningMiddleware(
+          provider as ProviderName,
+          model
+        )
+      ) {
+        return (modelName: string) => {
+          const baseModel = customInstance(modelName);
+          return ReasoningConfig.createEnhancedModelWithReasoning(
+            baseModel,
+            reasoningEffort
+          );
+        };
+      }
+      return customInstance;
+    }
+
+    // Default provider instances (read API keys from env vars)
     const providerModels = {
       openai,
       anthropic,
@@ -598,7 +621,69 @@ export class IronaChatClient {
     }
   }
 
+  /**
+   * Checks if a provider has a direct API key (programmatic config or env var).
+   * When true, the provider bypasses the gateway and calls the LLM directly.
+   */
+  private hasDirectProviderKey(provider: string): boolean {
+    const providerConf = this.config.providers?.[provider];
+    if (providerConf?.apiKey !== undefined && providerConf.apiKey !== '') {
+      return true;
+    }
+    const envKeyName = providerApiKeyName(provider);
+    if (envKeyName === undefined) {
+      return false;
+    }
+    const envVal = process.env[envKeyName];
+    return envVal !== undefined && envVal !== '';
+  }
+
+  /**
+   * Creates a custom provider SDK instance when programmatic config (apiKey/baseUrl)
+   * is provided. This avoids mutating process.env — each provider gets its own
+   * SDK instance with the key baked in.
+   */
+  private createCustomProviderInstance(provider: string) {
+    const providerConf: ProviderConfig | undefined =
+      this.config.providers?.[provider];
+    if (providerConf === undefined) {
+      return undefined;
+    }
+
+    const opts: { apiKey: string; baseURL?: string } = {
+      apiKey: providerConf.apiKey,
+    };
+    if (providerConf.baseUrl !== undefined && providerConf.baseUrl !== '') {
+      opts.baseURL = providerConf.baseUrl;
+    }
+
+    switch (provider) {
+      case 'openai':
+        return createOpenAI(opts);
+      case 'anthropic':
+        return createAnthropic(opts);
+      case 'google':
+        return createGoogleGenerativeAI(opts);
+      case 'mistral':
+        return createMistral(opts);
+      case 'perplexity':
+        return createPerplexity(opts);
+      case 'togetherai':
+        return createTogetherAI(opts);
+      case 'xai':
+        return createXai(opts);
+      default:
+        return undefined;
+    }
+  }
+
   private loadApiKeyForProvider(provider: string, model: string) {
+    // Check programmatic config first
+    const providerConf = this.config.providers?.[provider];
+    if (providerConf?.apiKey !== undefined && providerConf.apiKey !== '') {
+      return providerConf.apiKey;
+    }
+    // Fall back to env var
     const apiKeyName = providerApiKeyName(provider);
     const apiKey = process.env[apiKeyName];
     if (apiKey === undefined || apiKey === '') {

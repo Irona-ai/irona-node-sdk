@@ -152,9 +152,7 @@ export class LocalRouter implements Router {
 
       case 'COMPLEX':
         // For ≤2 models: most expensive; for 3+: second most expensive
-        return n <= 2
-          ? modelsWithCost[n - 1]
-          : modelsWithCost[n - 2];
+        return n <= 2 ? modelsWithCost[n - 1] : modelsWithCost[n - 2];
 
       case 'REASONING': {
         // Most expensive model with reasoning capability (search from top)

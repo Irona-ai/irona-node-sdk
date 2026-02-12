@@ -39,12 +39,7 @@ jest.mock('../../../src/supported_models', () => ({
           'search',
           'reasoning',
         ],
-        'openai/gpt-5.2-chat-latest': [
-          'reasoning',
-          'image',
-          'search',
-          'mcp',
-        ],
+        'openai/gpt-5.2-chat-latest': ['reasoning', 'image', 'search', 'mcp'],
         'anthropic/claude-sonnet-4-5-20250929': [
           'image',
           'pdf',

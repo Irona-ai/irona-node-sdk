@@ -162,7 +162,7 @@ export class IronaChatClient {
       const modelFactory = this.getModelInstance(
         provider,
         fullModelName,
-        payload.reasoning_effort,
+        payload.reasoningEffort,
         isUsingGateway
       );
 
@@ -253,13 +253,13 @@ export class IronaChatClient {
           config,
           provider,
           model,
-          payload.reasoning_effort
+          payload.reasoningEffort
         );
       };
 
       if (payload.stream === true) {
         const streamConfig = (
-          payload.reasoning_effort
+          payload.reasoningEffort
             ? applyReasoningConfig({
                 ...baseConfig,
               })
@@ -346,7 +346,7 @@ export class IronaChatClient {
         };
       } else {
         const generateConfig = (
-          payload.reasoning_effort
+          payload.reasoningEffort
             ? applyReasoningConfig({
                 ...baseConfig,
               })

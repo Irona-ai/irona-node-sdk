@@ -36,17 +36,23 @@ export async function updateProvidersFromGist(
 export function isSupportedModel(provider: string, model: string) {
   return PROVIDERS[provider]?.models.includes(model) ?? false;
 }
+
 export function doesModelSupportMediaTypes(
   provider: string,
   model: string,
   medias: string[]
 ) {
+  const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
+
   if (!Array.isArray(medias) || medias.length === 0) {
+    const isImageGen = modelCapabilities?.includes('image-gen') === true;
+    const hasRouting = modelCapabilities?.includes('routing') === true;
+    if (isImageGen && !hasRouting) {
+      return false;
+    }
     return true;
   }
 
-  // Updated to use capabilities
-  const modelCapabilities = PROVIDERS[provider]?.capabilities?.[model];
   if (!modelCapabilities) {
     return false;
   }

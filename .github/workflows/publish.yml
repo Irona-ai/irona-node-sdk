@@ -8,7 +8,7 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    environment: npm # Optional: adds deployment protection rules
+    # environment: npm — disabled: stale NODE_AUTH_TOKEN secret blocks OIDC
     permissions:
       contents: read
       id-token: write # Required for OIDC trusted publishing
@@ -20,7 +20,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          # Note: registry-url intentionally omitted to avoid .npmrc
+          # token binding that conflicts with OIDC trusted publishing
 
       - name: Upgrade npm
         run: npm install -g npm@11.5.1
@@ -31,5 +32,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
+      - name: Publish to npm (OIDC trusted publishing)
+        run: npm publish --provenance --access public --tag latest --registry https://registry.npmjs.org/

@@ -9,8 +9,9 @@ import { logger } from './logger';
 export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
 
 export interface GoogleThinkingConfig {
-  thinkingBudget: number;
+  thinkingBudget?: number;
   includeThoughts: boolean;
+  thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
 export interface OpenAIReasoningConfig {
@@ -73,6 +74,52 @@ export class ReasoningConfig {
     switch (provider) {
       case 'google':
         if (model.includes('gemini')) {
+          // Special handling for gemini-3
+          if (model.includes('gemini-3')) {
+            if (isOff) {
+              return null;
+            }
+
+            let thinkingLevel: 'minimal' | 'low' | 'medium' | 'high';
+
+            if (model.includes('gemini-3-flash')) {
+              // Gemini 3 Flash supports: 'minimal', 'low', 'medium', 'high'
+              switch (reasoningEffort) {
+                case 'low':
+                  thinkingLevel = 'low';
+                  break;
+                case 'medium':
+                  thinkingLevel = 'medium';
+                  break;
+                case 'high':
+                case 'max':
+                  thinkingLevel = 'high';
+                  break;
+                default:
+                  thinkingLevel = 'low';
+              }
+            } else {
+              // Other Gemini 3 models support: 'low', 'high'
+              switch (reasoningEffort) {
+                case 'high':
+                case 'max':
+                  thinkingLevel = 'high';
+                  break;
+                default:
+                  thinkingLevel = 'low';
+              }
+            }
+
+            return {
+              google: {
+                thinkingConfig: {
+                  includeThoughts: true,
+                  thinkingLevel,
+                },
+              },
+            };
+          }
+
           let thinkingBudget: number;
           let includeThoughts: boolean;
 
@@ -183,7 +230,7 @@ export class ReasoningConfig {
     if (!doesModelSupportReasoning(provider, model)) {
       if (reasoningEffort !== undefined && reasoningEffort !== 'off') {
         logger.warn(
-          `[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoning_effort`
+          `[ReasoningConfig] Reasoning not supported for ${provider}/${model}, ignoring reasoningEffort`
         );
       }
       return config;

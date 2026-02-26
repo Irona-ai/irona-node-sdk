@@ -48,10 +48,9 @@ describe('mapSearchToOpenRouter', () => {
     expect(mapSearchToOpenRouter(true, false)).toBeUndefined();
   });
 
-  it('returns plugins and web_search_options when search is true and supported', () => {
+  it('returns plugins when search is true and supported', () => {
     expect(mapSearchToOpenRouter(true, true)).toEqual({
       plugins: [{ id: 'web' }],
-      web_search_options: { search_context_size: 'medium' },
     });
   });
 });
@@ -94,7 +93,6 @@ describe('buildOpenRouterExtraBody', () => {
       })
     ).toEqual({
       plugins: [{ id: 'web' }],
-      web_search_options: { search_context_size: 'medium' },
     });
   });
 
@@ -108,7 +106,6 @@ describe('buildOpenRouterExtraBody', () => {
     ).toEqual({
       reasoning: { effort: 'xhigh' },
       plugins: [{ id: 'web' }],
-      web_search_options: { search_context_size: 'medium' },
     });
   });
 
@@ -219,7 +216,6 @@ describe('createOpenRouterFetchWrapper', () => {
       {
         reasoning: { effort: 'xhigh' },
         plugins: [{ id: 'web' }],
-        web_search_options: { search_context_size: 'medium' },
       },
       mockFetch
     );
@@ -237,7 +233,6 @@ describe('createOpenRouterFetchWrapper', () => {
       messages: [],
       reasoning: { effort: 'xhigh' },
       plugins: [{ id: 'web' }],
-      web_search_options: { search_context_size: 'medium' },
     });
   });
 

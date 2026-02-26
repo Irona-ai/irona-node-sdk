@@ -11,13 +11,11 @@ export interface OpenRouterReasoningConfig {
 
 export interface OpenRouterSearchConfig {
   plugins: Array<{ id: string }>;
-  web_search_options: { search_context_size: 'low' | 'medium' | 'high' };
 }
 
 export interface OpenRouterExtraBody {
   reasoning?: OpenRouterReasoningConfig;
   plugins?: Array<{ id: string }>;
-  web_search_options?: { search_context_size: string };
 }
 
 export interface BuildOpenRouterExtraBodyInput {
@@ -53,7 +51,7 @@ export function mapReasoningToOpenRouter(
 }
 
 /**
- * Maps SDK `search` boolean to OpenRouter's plugin + web_search_options format.
+ * Maps SDK `search` boolean to OpenRouter's plugin format.
  * Returns `undefined` when search is not requested or unsupported.
  */
 export function mapSearchToOpenRouter(
@@ -65,7 +63,6 @@ export function mapSearchToOpenRouter(
   }
   return {
     plugins: [{ id: 'web' }],
-    web_search_options: { search_context_size: 'medium' },
   };
 }
 
@@ -89,7 +86,6 @@ export function buildOpenRouterExtraBody(
   }
   if (search !== undefined) {
     extra.plugins = search.plugins;
-    extra.web_search_options = search.web_search_options;
   }
   return extra;
 }

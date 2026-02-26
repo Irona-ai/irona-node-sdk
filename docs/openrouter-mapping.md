@@ -19,11 +19,11 @@ The SDK's `reasoning_effort` field maps to OpenRouter's `reasoning` body paramet
 
 The SDK's `search` boolean maps to OpenRouter's plugin system:
 
-| SDK `search`                               | OpenRouter                                                                    |
-| ------------------------------------------ | ----------------------------------------------------------------------------- |
-| `undefined` / `false`                      | _(omitted)_                                                                   |
-| `true` (model supports search)             | `plugins: [{id: 'web'}], web_search_options: {search_context_size: 'medium'}` |
-| `true` (model does **not** support search) | _(omitted)_                                                                   |
+| SDK `search`                               | OpenRouter               |
+| ------------------------------------------ | ------------------------ |
+| `undefined` / `false`                      | _(omitted)_              |
+| `true` (model supports search)             | `plugins: [{id: 'web'}]` |
+| `true` (model does **not** support search) | _(omitted)_              |
 
 ## How It Works
 

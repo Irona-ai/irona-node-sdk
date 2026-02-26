@@ -40,7 +40,7 @@ import { validateSchema } from '../utils/requestValidator';
 export { CompletionsResponse };
 
 export class IronaChatClient {
-  private readonly gatewayProvider?: ReturnType<typeof createOpenAI>;
+  private readonly gatewayProvider?: ReturnType<typeof createOpenAI>['chat'];
   private readonly gatewayHostname?: string;
 
   constructor(
@@ -217,8 +217,10 @@ export class IronaChatClient {
       // Handle tools from payload
       let tools = payload.tools ? { ...payload.tools } : {};
 
-      // Add search tools if search is enabled
+      // Add search tools if search is enabled (skip for gateways — OpenRouter
+      // handles search via plugins in the request body, not native tools)
       if (
+        !isUsingGateway &&
         provider === 'openai' &&
         payload.search === true &&
         supportsWebSearch
@@ -550,12 +552,16 @@ export class IronaChatClient {
       return undefined;
     }
 
-    return createOpenAI({
+    const provider = createOpenAI({
       baseURL: gateway.baseUrl,
       apiKey: gateway.apiKey,
       headers: gateway.headers,
       name: gateway.providerName ?? 'gateway',
     });
+    // Use .chat to force the Chat Completions API (/chat/completions).
+    // The default call uses the Responses API (/responses) which most
+    // gateways (OpenRouter, etc.) do not support.
+    return provider.chat;
   }
 
   private isOpenRouterGateway(): boolean {
@@ -572,7 +578,7 @@ export class IronaChatClient {
    */
   private getGatewayModelFactory(
     extraBody: OpenRouterExtraBody | undefined
-  ): ReturnType<typeof createOpenAI> | undefined {
+  ): ReturnType<typeof createOpenAI>['chat'] | undefined {
     if (
       this.gatewayProvider === undefined ||
       this.config.gateway === undefined
@@ -588,7 +594,7 @@ export class IronaChatClient {
       headers: this.config.gateway.headers,
       name: this.config.gateway.providerName ?? 'gateway',
       fetch: createOpenRouterFetchWrapper(extraBody),
-    });
+    }).chat;
   }
 
   private resolveGatewayModelName(provider: string, model: string): string {

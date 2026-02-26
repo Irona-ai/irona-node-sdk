@@ -234,7 +234,6 @@ describe('Gateway Completions', () => {
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           plugins: [{ id: 'web' }],
-          web_search_options: { search_context_size: 'medium' },
         })
       );
     });
@@ -262,7 +261,6 @@ describe('Gateway Completions', () => {
         expect.objectContaining({
           reasoning: { effort: 'xhigh' },
           plugins: [{ id: 'web' }],
-          web_search_options: { search_context_size: 'medium' },
         })
       );
     });

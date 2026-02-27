@@ -8,7 +8,7 @@ on:
 jobs:
   publish:
     runs-on: depot-ubuntu-latest
-    # environment: npm — disabled: stale NODE_AUTH_TOKEN secret blocks OIDC
+    environment: npm
     permissions:
       contents: read
       id-token: write # Required for OIDC trusted publishing

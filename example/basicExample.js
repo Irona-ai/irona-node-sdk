@@ -17,20 +17,20 @@ const commonBody = {
     'google/gemini-1.0-pro-latest',
     'google/gemini-2.0-flash',
   ],
-  fallback_models: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
+  fallbackModels: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
 };
 
 async function modelSelectTest() {
   let body = {
     ...commonBody,
-    topk_models: 2,
+    topkModels: 2,
   };
   const sdkClient = await IronaAI.createInstance();
   try {
     // Select a model
     const modelResponse = await sdkClient.modelSelect({
       ...body,
-      topk_models: 2,
+      topkModels: 2,
     });
     console.info(
       '[basicExample] Model selected:' + JSON.stringify(modelResponse)
@@ -48,7 +48,7 @@ async function CompletionsTest() {
     temperature: 0.2,
   };
   const sdkClient = await IronaAI.createInstance({
-    fallback_models: ['openai/gpt-4o-mini'],
+    fallbackModels: ['openai/gpt-4o-mini'],
   });
   try {
     const { provider, model, response, error } =

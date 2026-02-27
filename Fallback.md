@@ -15,7 +15,7 @@ async function basicExample() {
       { provider: 'google', model: 'gemini-1.5-pro-latest' },
     ],
     // use either of the falling params:
-    // fallback_models: ['openai/gpt-4o-mini', 'anthropic/claude-3-5-turbo'],
+    // fallbackModels: ['openai/gpt-4o-mini', 'anthropic/claude-3-5-turbo'],
     // or use
     fallbackProviders: [
       { provider: 'openai', model: 'gpt-3.5-turbo-20230111' },

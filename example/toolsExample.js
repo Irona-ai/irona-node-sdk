@@ -86,7 +86,7 @@ async function modelSelectWithTools() {
       ],
       models: ['openai/gpt-4o-mini', 'anthropic/claude-3-haiku-20240307'],
       tools: tools, // Note: modelSelect accepts tools but doesn't execute them (as per requirements)
-      topk_models: 1,
+      topkModels: 1,
     });
 
     console.log(
@@ -247,7 +247,7 @@ async function toolsWithFallbacks() {
         },
       ],
       models: ['openai/gpt-4-turbo'], // Primary model
-      fallback_models: [
+      fallbackModels: [
         'openai/gpt-4o-mini',
         'anthropic/claude-3-haiku-20240307',
       ], // Fallbacks

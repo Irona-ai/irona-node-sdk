@@ -80,7 +80,7 @@ export class APIRouter extends Base implements Router {
     const payload = {
       messages: body.messages,
       llm_providers: mediaSupportedModels,
-      topk_models: body?.topk_models,
+      topk_models: body?.topkModels,
       kwargs: body?.kwargs,
       ...this.extraBody,
     };
@@ -123,9 +123,9 @@ export class APIRouter extends Base implements Router {
       { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
     ];
 
-    if (body.fallback_models && body.fallback_models.length > 0) {
+    if (body.fallbackModels && body.fallbackModels.length > 0) {
       try {
-        fallbackProviders = body.fallback_models.map(modelPayload => {
+        fallbackProviders = body.fallbackModels.map(modelPayload => {
           const [provider, ...modelParts] = modelPayload.split('/');
           const model = modelParts.join('/');
           return { provider, model };

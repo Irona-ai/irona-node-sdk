@@ -9,12 +9,18 @@ export type GatewayConfig = {
   includeProviderInModelName?: boolean;
 };
 
+export type ProviderConfig = {
+  apiKey: string;
+  baseUrl?: string;
+};
+
 export type Config = {
   baseUrl?: string;
   apiKey?: string;
-  fallback_models?: ModelPayload[];
+  fallbackModels?: ModelPayload[];
   gateway?: GatewayConfig;
   router?: RouterConfig;
+  providers?: Partial<Record<string, ProviderConfig>>;
 };
 export type ChatModelConfig = {
   apiKey: string;
@@ -32,6 +38,6 @@ export type ErrorTrace = {
 
 export interface ErrorResponse {
   error: string;
-  error_trace: ErrorTrace;
+  errorTrace: ErrorTrace;
   recovered?: boolean;
 }

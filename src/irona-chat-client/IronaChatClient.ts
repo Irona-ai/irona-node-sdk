@@ -1,10 +1,10 @@
-import { anthropic } from '@ai-sdk/anthropic';
-import { google } from '@ai-sdk/google';
-import { mistral } from '@ai-sdk/mistral';
+import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
+import { createMistral, mistral } from '@ai-sdk/mistral';
 import { createOpenAI, openai } from '@ai-sdk/openai';
-import { perplexity } from '@ai-sdk/perplexity';
-import { togetherai } from '@ai-sdk/togetherai';
-import { xai } from '@ai-sdk/xai';
+import { createPerplexity, perplexity } from '@ai-sdk/perplexity';
+import { createTogetherAI, togetherai } from '@ai-sdk/togetherai';
+import { createXai, xai } from '@ai-sdk/xai';
 import type { ModelMessage, LanguageModel } from 'ai';
 import { generateText, streamText, stepCountIs } from 'ai';
 
@@ -24,9 +24,12 @@ import {
   getModelPrefix,
   getOpenRouterIdentifier,
 } from '../supported_models';
-import type { Config, GatewayConfig } from '../types';
+import type { Config, GatewayConfig, ProviderConfig } from '../types';
 import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
 import { logger } from '../utils/logger';
+import { createOpenRouterFetchWrapper } from '../utils/openRouterFetchWrapper';
+import { buildOpenRouterExtraBody } from '../utils/openRouterMapper';
+import type { OpenRouterExtraBody } from '../utils/openRouterMapper';
 import {
   extractMediaTypeArrayFromMessages,
   validateAndGetProviderAndModel,
@@ -37,7 +40,7 @@ import { validateSchema } from '../utils/requestValidator';
 export { CompletionsResponse };
 
 export class IronaChatClient {
-  private readonly gatewayProvider?: ReturnType<typeof createOpenAI>;
+  private readonly gatewayProvider?: ReturnType<typeof createOpenAI>['chat'];
   private readonly gatewayHostname?: string;
 
   constructor(
@@ -69,10 +72,10 @@ export class IronaChatClient {
     const { provider, model } = selectedModel;
 
     // Prepare the model priority queue
-    // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
+    // If `fallbackModels` is provided in the `completions()` function payload, they will take precedence over `config.fallbackModels` for model prioritization.
     const modelPriorityQueue = [
       ...(provider !== null && model !== null ? [{ provider, model }] : []),
-      ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
+      ...(payload.fallbackModels ?? this.config.fallbackModels ?? []).map(
         fallback => validateAndGetProviderAndModel(fallback)
       ),
     ];
@@ -140,7 +143,10 @@ export class IronaChatClient {
     supportsWebSearch: boolean
   ): Promise<CompletionsResponse> {
     try {
-      const isUsingGateway = this.gatewayProvider !== undefined;
+      // Per-provider gateway decision: providers with direct API keys bypass the gateway
+      const isUsingGateway =
+        this.gatewayProvider !== undefined &&
+        !this.hasDirectProviderKey(provider);
       if (!isUsingGateway) {
         this.loadApiKeyForProvider(provider, model);
       }
@@ -159,12 +165,31 @@ export class IronaChatClient {
         fullModelName = this.resolveGatewayModelName(provider, fullModelName);
       }
 
-      const modelFactory = this.getModelInstance(
-        provider,
-        fullModelName,
-        payload.reasoningEffort,
-        isUsingGateway
-      );
+      // Build OpenRouter-specific extra body when routing through OpenRouter
+      const isOpenRouter = isUsingGateway && this.isOpenRouterGateway();
+      let openRouterExtra: OpenRouterExtraBody | undefined;
+      if (isOpenRouter) {
+        openRouterExtra = buildOpenRouterExtraBody({
+          reasoningEffort: payload.reasoningEffort,
+          search: payload.search,
+          supportsWebSearch,
+        });
+      }
+
+      const modelFactory = isOpenRouter
+        ? (this.getGatewayModelFactory(openRouterExtra) ??
+          this.getModelInstance(
+            provider,
+            fullModelName,
+            payload.reasoningEffort,
+            isUsingGateway
+          ))
+        : this.getModelInstance(
+            provider,
+            fullModelName,
+            payload.reasoningEffort,
+            isUsingGateway
+          );
 
       if (!modelFactory) {
         throw new Error(`No model factory found for provider: ${provider}`);
@@ -192,8 +217,10 @@ export class IronaChatClient {
       // Handle tools from payload
       let tools = payload.tools ? { ...payload.tools } : {};
 
-      // Add search tools if search is enabled
+      // Add search tools if search is enabled (skip for gateways — OpenRouter
+      // handles search via plugins in the request body, not native tools)
       if (
+        !isUsingGateway &&
         provider === 'openai' &&
         payload.search === true &&
         supportsWebSearch
@@ -469,7 +496,27 @@ export class IronaChatClient {
       return this.gatewayProvider;
     }
 
-    // Map of provider to their respective model functions
+    // Check for programmatic provider config → create custom SDK instance
+    const customInstance = this.createCustomProviderInstance(provider);
+    if (customInstance !== undefined) {
+      if (
+        ReasoningConfig.supportsReasoningMiddleware(
+          provider as ProviderName,
+          model
+        )
+      ) {
+        return (modelName: string) => {
+          const baseModel = customInstance(modelName);
+          return ReasoningConfig.createEnhancedModelWithReasoning(
+            baseModel,
+            reasoningEffort
+          );
+        };
+      }
+      return customInstance;
+    }
+
+    // Default provider instances (read API keys from env vars)
     const providerModels = {
       openai,
       anthropic,
@@ -505,12 +552,49 @@ export class IronaChatClient {
       return undefined;
     }
 
-    return createOpenAI({
+    const provider = createOpenAI({
       baseURL: gateway.baseUrl,
       apiKey: gateway.apiKey,
       headers: gateway.headers,
       name: gateway.providerName ?? 'gateway',
     });
+    // Use .chat to force the Chat Completions API (/chat/completions).
+    // The default call uses the Responses API (/responses) which most
+    // gateways (OpenRouter, etc.) do not support.
+    return provider.chat;
+  }
+
+  private isOpenRouterGateway(): boolean {
+    return (
+      this.gatewayHostname === 'openrouter.ai' ||
+      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
+    );
+  }
+
+  /**
+   * Returns the gateway model factory, optionally with a custom fetch wrapper
+   * that merges OpenRouter-specific params into the request body.
+   * When no extra body is needed, reuses the singleton gateway provider.
+   */
+  private getGatewayModelFactory(
+    extraBody: OpenRouterExtraBody | undefined
+  ): ReturnType<typeof createOpenAI>['chat'] | undefined {
+    if (
+      this.gatewayProvider === undefined ||
+      this.config.gateway === undefined
+    ) {
+      return undefined;
+    }
+    if (extraBody === undefined) {
+      return this.gatewayProvider;
+    }
+    return createOpenAI({
+      baseURL: this.config.gateway.baseUrl,
+      apiKey: this.config.gateway.apiKey,
+      headers: this.config.gateway.headers,
+      name: this.config.gateway.providerName ?? 'gateway',
+      fetch: createOpenRouterFetchWrapper(extraBody),
+    }).chat;
   }
 
   private resolveGatewayModelName(provider: string, model: string): string {
@@ -598,7 +682,69 @@ export class IronaChatClient {
     }
   }
 
+  /**
+   * Checks if a provider has a direct API key (programmatic config or env var).
+   * When true, the provider bypasses the gateway and calls the LLM directly.
+   */
+  private hasDirectProviderKey(provider: string): boolean {
+    const providerConf = this.config.providers?.[provider];
+    if (providerConf?.apiKey !== undefined && providerConf.apiKey !== '') {
+      return true;
+    }
+    const envKeyName = providerApiKeyName(provider);
+    if (envKeyName === undefined) {
+      return false;
+    }
+    const envVal = process.env[envKeyName];
+    return envVal !== undefined && envVal !== '';
+  }
+
+  /**
+   * Creates a custom provider SDK instance when programmatic config (apiKey/baseUrl)
+   * is provided. This avoids mutating process.env — each provider gets its own
+   * SDK instance with the key baked in.
+   */
+  private createCustomProviderInstance(provider: string) {
+    const providerConf: ProviderConfig | undefined =
+      this.config.providers?.[provider];
+    if (providerConf === undefined) {
+      return undefined;
+    }
+
+    const opts: { apiKey: string; baseURL?: string } = {
+      apiKey: providerConf.apiKey,
+    };
+    if (providerConf.baseUrl !== undefined && providerConf.baseUrl !== '') {
+      opts.baseURL = providerConf.baseUrl;
+    }
+
+    switch (provider) {
+      case 'openai':
+        return createOpenAI(opts);
+      case 'anthropic':
+        return createAnthropic(opts);
+      case 'google':
+        return createGoogleGenerativeAI(opts);
+      case 'mistral':
+        return createMistral(opts);
+      case 'perplexity':
+        return createPerplexity(opts);
+      case 'togetherai':
+        return createTogetherAI(opts);
+      case 'xai':
+        return createXai(opts);
+      default:
+        return undefined;
+    }
+  }
+
   private loadApiKeyForProvider(provider: string, model: string) {
+    // Check programmatic config first
+    const providerConf = this.config.providers?.[provider];
+    if (providerConf?.apiKey !== undefined && providerConf.apiKey !== '') {
+      return providerConf.apiKey;
+    }
+    // Fall back to env var
     const apiKeyName = providerApiKeyName(provider);
     const apiKey = process.env[apiKeyName];
     if (apiKey === undefined || apiKey === '') {

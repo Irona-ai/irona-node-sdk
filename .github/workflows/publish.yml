@@ -19,12 +19,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          # Note: registry-url intentionally omitted to avoid .npmrc
-          # token binding that conflicts with OIDC trusted publishing
-
-      - name: Upgrade npm
-        run: npm install -g npm@11.5.1
+          node-version: '22'
+          # Note: registry-url intentionally omitted — npm OIDC trusted
+          # publishing handles auth via id-token, not .npmrc token binding
 
       - name: Install dependencies
         run: npm ci
@@ -33,4 +30,4 @@ jobs:
         run: npm run build
 
       - name: Publish to npm (OIDC trusted publishing)
-        run: npm publish --provenance --access public --tag latest --registry https://registry.npmjs.org/
+        run: npm publish --provenance --access public --tag latest

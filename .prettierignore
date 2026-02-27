@@ -1,0 +1,3 @@
+# Engineering docs contain markdown tables that Prettier reformats
+# inconsistently across environments (Node versions, Prettier versions).
+engineering-docs/

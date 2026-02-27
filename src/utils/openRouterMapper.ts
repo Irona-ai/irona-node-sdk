@@ -38,7 +38,7 @@ const REASONING_EFFORT_MAP: Record<
 };
 
 /**
- * Maps SDK reasoning_effort to OpenRouter's `reasoning` config.
+ * Maps SDK reasoningEffort to OpenRouter's `reasoning` config.
  * Returns `undefined` when no reasoning key should be sent.
  */
 export function mapReasoningToOpenRouter(

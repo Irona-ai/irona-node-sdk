@@ -32,7 +32,7 @@ const commonBody = {
     'mistral/open-mixtral-8x22b',
     'google/gemini-1.0-pro-latest',
   ],
-  fallback_models: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
+  fallbackModels: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
 };
 
 async function CompletionsTest() {
@@ -42,7 +42,7 @@ async function CompletionsTest() {
     temperature: 0.2,
   };
   const sdkClient = await IronaAI.createInstance({
-    fallback_models: ['openai/gpt-4o-mini'],
+    fallbackModels: ['openai/gpt-4o-mini'],
   });
   try {
     const { provider, model, response, error } =

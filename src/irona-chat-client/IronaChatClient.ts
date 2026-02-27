@@ -72,10 +72,10 @@ export class IronaChatClient {
     const { provider, model } = selectedModel;
 
     // Prepare the model priority queue
-    // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
+    // If `fallbackModels` is provided in the `completions()` function payload, they will take precedence over `config.fallbackModels` for model prioritization.
     const modelPriorityQueue = [
       ...(provider !== null && model !== null ? [{ provider, model }] : []),
-      ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
+      ...(payload.fallbackModels ?? this.config.fallbackModels ?? []).map(
         fallback => validateAndGetProviderAndModel(fallback)
       ),
     ];
@@ -170,7 +170,7 @@ export class IronaChatClient {
       let openRouterExtra: OpenRouterExtraBody | undefined;
       if (isOpenRouter) {
         openRouterExtra = buildOpenRouterExtraBody({
-          reasoningEffort: payload.reasoning_effort,
+          reasoningEffort: payload.reasoningEffort,
           search: payload.search,
           supportsWebSearch,
         });
@@ -181,13 +181,13 @@ export class IronaChatClient {
           this.getModelInstance(
             provider,
             fullModelName,
-            payload.reasoning_effort,
+            payload.reasoningEffort,
             isUsingGateway
           ))
         : this.getModelInstance(
             provider,
             fullModelName,
-            payload.reasoning_effort,
+            payload.reasoningEffort,
             isUsingGateway
           );
 
@@ -280,13 +280,13 @@ export class IronaChatClient {
           config,
           provider,
           model,
-          payload.reasoning_effort
+          payload.reasoningEffort
         );
       };
 
       if (payload.stream === true) {
         const streamConfig = (
-          payload.reasoning_effort
+          payload.reasoningEffort
             ? applyReasoningConfig({
                 ...baseConfig,
               })
@@ -373,7 +373,7 @@ export class IronaChatClient {
         };
       } else {
         const generateConfig = (
-          payload.reasoning_effort
+          payload.reasoningEffort
             ? applyReasoningConfig({
                 ...baseConfig,
               })

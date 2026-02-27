@@ -197,7 +197,7 @@ describe('LocalRouter', () => {
     const result = await router.modelSelect({
       models: ['openai/gpt-4o-mini', 'openai/gpt-4o'],
       messages: [{ role: 'user', content: 'Hello' }],
-      fallback_models: ['anthropic/claude-3-haiku-20240307'],
+      fallbackModels: ['anthropic/claude-3-haiku-20240307'],
     });
     expect(result.fallbackProviders[0].provider).toBe('anthropic');
     expect(result.fallbackProviders[0].model).toBe('claude-3-haiku-20240307');

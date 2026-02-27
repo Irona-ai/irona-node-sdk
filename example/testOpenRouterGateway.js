@@ -1,7 +1,7 @@
 /**
  * Integration test: OpenRouter Gateway Payload Mapping
  *
- * Validates that reasoning_effort, search, and standard payloads
+ * Validates that reasoningEffort, search, and standard payloads
  * are correctly mapped and sent through the OpenRouter gateway.
  *
  * Requires: OPENROUTER_API_KEY set in environment or .env
@@ -87,7 +87,7 @@ async function testReasoningEffort() {
       ],
       models: ['openai/gpt-4o-mini'],
       stream: false,
-      reasoning_effort: 'high',
+      reasoningEffort: 'high',
       maxTokens: 500,
     });
 
@@ -122,7 +122,7 @@ async function testReasoningMax() {
       ],
       models: ['anthropic/claude-sonnet-4-20250514'],
       stream: false,
-      reasoning_effort: 'max',
+      reasoningEffort: 'max',
       maxTokens: 500,
     });
 
@@ -154,7 +154,7 @@ async function testReasoningOff() {
       messages: [{ role: 'user', content: 'What is 2+2? Just the number.' }],
       models: ['openai/gpt-4o-mini'],
       stream: false,
-      reasoning_effort: 'off',
+      reasoningEffort: 'off',
       maxTokens: 20,
     });
 
@@ -221,7 +221,7 @@ async function testReasoningAndSearch() {
       ],
       models: ['openai/gpt-4o-mini'],
       stream: false,
-      reasoning_effort: 'medium',
+      reasoningEffort: 'medium',
       search: true,
       maxTokens: 500,
     });
@@ -256,7 +256,7 @@ async function testStreamingWithReasoning() {
       ],
       models: ['openai/gpt-4o-mini'],
       stream: true,
-      reasoning_effort: 'low',
+      reasoningEffort: 'low',
       maxTokens: 300,
     });
 
@@ -352,7 +352,7 @@ async function testNonOpenAIModelReasoning() {
       ],
       models: ['anthropic/claude-sonnet-4-20250514'],
       stream: false,
-      reasoning_effort: 'low',
+      reasoningEffort: 'low',
       maxTokens: 300,
     });
 

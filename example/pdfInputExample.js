@@ -22,7 +22,7 @@ const body = {
     },
   ],
   models: ['openai/gpt-4o'],
-  fallback_models: ['openai/gpt-4o-mini', 'openai/chatgpt-4o-latest'],
+  fallbackModels: ['openai/gpt-4o-mini', 'openai/chatgpt-4o-latest'],
   stream: true,
 };
 

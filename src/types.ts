@@ -17,7 +17,7 @@ export type ProviderConfig = {
 export type Config = {
   baseUrl?: string;
   apiKey?: string;
-  fallback_models?: ModelPayload[];
+  fallbackModels?: ModelPayload[];
   gateway?: GatewayConfig;
   router?: RouterConfig;
   providers?: Partial<Record<string, ProviderConfig>>;
@@ -38,6 +38,6 @@ export type ErrorTrace = {
 
 export interface ErrorResponse {
   error: string;
-  error_trace: ErrorTrace;
+  errorTrace: ErrorTrace;
   recovered?: boolean;
 }

@@ -196,7 +196,7 @@ describe('Gateway Completions', () => {
       delete process.env.OPENAI_API_KEY;
       setupSuccessfulGeneration('Reasoning response');
 
-      await client.completions(createTestPayload({ reasoning_effort: 'high' }));
+      await client.completions(createTestPayload({ reasoningEffort: 'high' }));
 
       expect(buildExtraBodySpy).toHaveBeenCalledWith(
         expect.objectContaining({ reasoningEffort: 'high' })
@@ -254,7 +254,7 @@ describe('Gateway Completions', () => {
       setupSuccessfulGeneration('Combined response');
 
       await client.completions(
-        createTestPayload({ reasoning_effort: 'max', search: true })
+        createTestPayload({ reasoningEffort: 'max', search: true })
       );
 
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
@@ -302,7 +302,7 @@ describe('Gateway Completions', () => {
       delete process.env.OPENAI_API_KEY;
       setupSuccessfulGeneration('Non-OpenRouter response');
 
-      await client.completions(createTestPayload({ reasoning_effort: 'high' }));
+      await client.completions(createTestPayload({ reasoningEffort: 'high' }));
 
       // buildOpenRouterExtraBody should NOT be called for non-OpenRouter gateways
       expect(buildExtraBodySpy).not.toHaveBeenCalled();
@@ -345,7 +345,7 @@ describe('Gateway Completions', () => {
       setupSuccessfulGeneration('Subdomain response');
 
       await client.completions(
-        createTestPayload({ reasoning_effort: 'medium' })
+        createTestPayload({ reasoningEffort: 'medium' })
       );
 
       expect(buildExtraBodySpy).toHaveBeenCalledWith(

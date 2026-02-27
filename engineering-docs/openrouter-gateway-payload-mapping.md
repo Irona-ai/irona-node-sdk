@@ -6,24 +6,24 @@ Previously, when the SDK routed through OpenRouter as a gateway, all advanced fe
 
 **What now works through OpenRouter gateway:**
 
-| Feature            | Before | After                                                     |
-| ------------------ | ------ | --------------------------------------------------------- |
-| Reasoning effort   | Dropped | Mapped to `reasoning` body param                         |
-| Web search         | Dropped | Mapped to `plugins: [{id: 'web'}]`                      |
-| Streaming + above  | N/A    | Both work in streaming and non-streaming modes            |
-| Non-OpenRouter GWs | N/A    | Completely unaffected (hostname check gates all mappings) |
+| Feature            | Before  | After                                                     |
+| ------------------ | ------- | --------------------------------------------------------- |
+| Reasoning effort   | Dropped | Mapped to `reasoning` body param                          |
+| Web search         | Dropped | Mapped to `plugins: [{id: 'web'}]`                        |
+| Streaming + above  | N/A     | Both work in streaming and non-streaming modes            |
+| Non-OpenRouter GWs | N/A     | Completely unaffected (hostname check gates all mappings) |
 
 ## Files Changed
 
-| File                                         | Change                                                         |
-| -------------------------------------------- | -------------------------------------------------------------- |
-| `src/utils/openRouterMapper.ts`              | New — pure mapper functions                                    |
-| `src/utils/openRouterFetchWrapper.ts`        | New — custom fetch wrapper with request/response interception  |
-| `src/irona-chat-client/IronaChatClient.ts`   | Wires up mapper + fetch wrapper; forces `.chat` API on gateway |
-| `docs/openrouter-mapping.md`                 | New — user-facing mapping reference                            |
-| `tests/unit/utils/openRouterMapper.test.ts`  | New — unit tests for mappers and fetch wrapper                 |
-| `tests/unit/completions/gateway.test.ts`     | Added 7 OpenRouter payload mapping tests                       |
-| `example/testOpenRouterGateway.js`           | New — 9 integration tests against real OpenRouter              |
+| File                                        | Change                                                         |
+| ------------------------------------------- | -------------------------------------------------------------- |
+| `src/utils/openRouterMapper.ts`             | New — pure mapper functions                                    |
+| `src/utils/openRouterFetchWrapper.ts`       | New — custom fetch wrapper with request/response interception  |
+| `src/irona-chat-client/IronaChatClient.ts`  | Wires up mapper + fetch wrapper; forces `.chat` API on gateway |
+| `docs/openrouter-mapping.md`                | New — user-facing mapping reference                            |
+| `tests/unit/utils/openRouterMapper.test.ts` | New — unit tests for mappers and fetch wrapper                 |
+| `tests/unit/completions/gateway.test.ts`    | Added 7 OpenRouter payload mapping tests                       |
+| `example/testOpenRouterGateway.js`          | New — 9 integration tests against real OpenRouter              |
 
 ## Key Technical Decisions
 
@@ -73,6 +73,7 @@ When the web search plugin is active, OpenRouter adds `annotations` (URL citatio
 `@ai-sdk/openai` strictly validates the response schema and rejects `annotations` as an unexpected field, causing `AI_TypeValidationError` (streaming) or `AI_APICallError: Invalid JSON response` (non-streaming).
 
 The fetch wrapper intercepts responses and strips `annotations` from both:
+
 - **Non-streaming:** Proxies `response.body` through a `TransformStream` that buffers, strips, and re-emits
 - **Streaming (SSE):** Processes each `data: {...}` line, strips annotations from the JSON, and re-emits
 
@@ -107,7 +108,7 @@ Pure functions with zero side effects:
 | `'low'`                | `{ effort: 'low' }`                 |
 | `'medium'`             | `{ effort: 'medium' }`              |
 | `'high'`               | `{ effort: 'high' }`                |
-| `'max'`                | `{ effort: 'xhigh' }`              |
+| `'max'`                | `{ effort: 'xhigh' }`               |
 
 **Search mapping:**
 

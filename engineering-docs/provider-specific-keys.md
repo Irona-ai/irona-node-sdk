@@ -16,12 +16,12 @@ Previously, gateway routing was all-or-nothing: when a gateway (e.g., OpenRouter
 
 ## Files Changed
 
-| File                                       | Change                                                              |
-| ------------------------------------------ | ------------------------------------------------------------------- |
-| `src/types.ts`                             | Added `ProviderConfig` type, added `providers?` field to `Config`   |
-| `src/irona-chat-client/IronaChatClient.ts` | Core routing logic changes (see below)                              |
-| `.env.example`                             | Documented auto-detection behavior                                  |
-| `tests/unit/completions/gateway.test.ts`   | Updated gateway test + 2 new bypass tests (env var + programmatic)  |
+| File                                       | Change                                                             |
+| ------------------------------------------ | ------------------------------------------------------------------ |
+| `src/types.ts`                             | Added `ProviderConfig` type, added `providers?` field to `Config`  |
+| `src/irona-chat-client/IronaChatClient.ts` | Core routing logic changes (see below)                             |
+| `.env.example`                             | Documented auto-detection behavior                                 |
+| `tests/unit/completions/gateway.test.ts`   | Updated gateway test + 2 new bypass tests (env var + programmatic) |
 
 ## Key Implementation Details
 

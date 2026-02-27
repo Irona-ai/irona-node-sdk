@@ -27,6 +27,9 @@ import {
 import type { Config, GatewayConfig, ProviderConfig } from '../types';
 import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
 import { logger } from '../utils/logger';
+import { createOpenRouterFetchWrapper } from '../utils/openRouterFetchWrapper';
+import { buildOpenRouterExtraBody } from '../utils/openRouterMapper';
+import type { OpenRouterExtraBody } from '../utils/openRouterMapper';
 import {
   extractMediaTypeArrayFromMessages,
   validateAndGetProviderAndModel,
@@ -37,7 +40,7 @@ import { validateSchema } from '../utils/requestValidator';
 export { CompletionsResponse };
 
 export class IronaChatClient {
-  private readonly gatewayProvider?: ReturnType<typeof createOpenAI>;
+  private readonly gatewayProvider?: ReturnType<typeof createOpenAI>['chat'];
   private readonly gatewayHostname?: string;
 
   constructor(
@@ -69,10 +72,10 @@ export class IronaChatClient {
     const { provider, model } = selectedModel;
 
     // Prepare the model priority queue
-    // If `fallback_models` is provided in the `completions()` function payload, they will take precedence over `config.fallback_models` for model prioritization.
+    // If `fallbackModels` is provided in the `completions()` function payload, they will take precedence over `config.fallbackModels` for model prioritization.
     const modelPriorityQueue = [
       ...(provider !== null && model !== null ? [{ provider, model }] : []),
-      ...(payload.fallback_models ?? this.config.fallback_models ?? []).map(
+      ...(payload.fallbackModels ?? this.config.fallbackModels ?? []).map(
         fallback => validateAndGetProviderAndModel(fallback)
       ),
     ];
@@ -162,12 +165,31 @@ export class IronaChatClient {
         fullModelName = this.resolveGatewayModelName(provider, fullModelName);
       }
 
-      const modelFactory = this.getModelInstance(
-        provider,
-        fullModelName,
-        payload.reasoningEffort,
-        isUsingGateway
-      );
+      // Build OpenRouter-specific extra body when routing through OpenRouter
+      const isOpenRouter = isUsingGateway && this.isOpenRouterGateway();
+      let openRouterExtra: OpenRouterExtraBody | undefined;
+      if (isOpenRouter) {
+        openRouterExtra = buildOpenRouterExtraBody({
+          reasoningEffort: payload.reasoningEffort,
+          search: payload.search,
+          supportsWebSearch,
+        });
+      }
+
+      const modelFactory = isOpenRouter
+        ? (this.getGatewayModelFactory(openRouterExtra) ??
+          this.getModelInstance(
+            provider,
+            fullModelName,
+            payload.reasoningEffort,
+            isUsingGateway
+          ))
+        : this.getModelInstance(
+            provider,
+            fullModelName,
+            payload.reasoningEffort,
+            isUsingGateway
+          );
 
       if (!modelFactory) {
         throw new Error(`No model factory found for provider: ${provider}`);
@@ -195,8 +217,10 @@ export class IronaChatClient {
       // Handle tools from payload
       let tools = payload.tools ? { ...payload.tools } : {};
 
-      // Add search tools if search is enabled
+      // Add search tools if search is enabled (skip for gateways — OpenRouter
+      // handles search via plugins in the request body, not native tools)
       if (
+        !isUsingGateway &&
         provider === 'openai' &&
         payload.search === true &&
         supportsWebSearch
@@ -528,12 +552,49 @@ export class IronaChatClient {
       return undefined;
     }
 
-    return createOpenAI({
+    const provider = createOpenAI({
       baseURL: gateway.baseUrl,
       apiKey: gateway.apiKey,
       headers: gateway.headers,
       name: gateway.providerName ?? 'gateway',
     });
+    // Use .chat to force the Chat Completions API (/chat/completions).
+    // The default call uses the Responses API (/responses) which most
+    // gateways (OpenRouter, etc.) do not support.
+    return provider.chat;
+  }
+
+  private isOpenRouterGateway(): boolean {
+    return (
+      this.gatewayHostname === 'openrouter.ai' ||
+      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
+    );
+  }
+
+  /**
+   * Returns the gateway model factory, optionally with a custom fetch wrapper
+   * that merges OpenRouter-specific params into the request body.
+   * When no extra body is needed, reuses the singleton gateway provider.
+   */
+  private getGatewayModelFactory(
+    extraBody: OpenRouterExtraBody | undefined
+  ): ReturnType<typeof createOpenAI>['chat'] | undefined {
+    if (
+      this.gatewayProvider === undefined ||
+      this.config.gateway === undefined
+    ) {
+      return undefined;
+    }
+    if (extraBody === undefined) {
+      return this.gatewayProvider;
+    }
+    return createOpenAI({
+      baseURL: this.config.gateway.baseUrl,
+      apiKey: this.config.gateway.apiKey,
+      headers: this.config.gateway.headers,
+      name: this.config.gateway.providerName ?? 'gateway',
+      fetch: createOpenRouterFetchWrapper(extraBody),
+    }).chat;
   }
 
   private resolveGatewayModelName(provider: string, model: string): string {

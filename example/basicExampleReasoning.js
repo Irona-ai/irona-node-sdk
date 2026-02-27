@@ -24,20 +24,20 @@ const commonBody = {
     'anthropic/claude-sonnet-4-0',
     'openai/o1-mini',
   ],
-  fallback_models: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
+  fallbackModels: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
 };
 
 async function modelSelectTest() {
   let body = {
     ...commonBody,
-    topk_models: 2,
+    topkModels: 2,
   };
   const sdkClient = await IronaAI.createInstance();
   try {
     // Select a model
     const modelResponse = await sdkClient.modelSelect({
       ...body,
-      topk_models: 2,
+      topkModels: 2,
     });
     console.info(
       '[basicExample] Model selected:' + JSON.stringify(modelResponse)
@@ -53,10 +53,10 @@ async function CompletionsTest() {
     ...commonBody,
     stream: true,
     temperature: 0.2,
-    reasoning_effort: 'medium',
+    reasoningEffort: 'medium',
   };
   const sdkClient = await IronaAI.createInstance({
-    fallback_models: ['openai/gpt-4o-mini'],
+    fallbackModels: ['openai/gpt-4o-mini'],
   });
   try {
     const { provider, model, response, error } =

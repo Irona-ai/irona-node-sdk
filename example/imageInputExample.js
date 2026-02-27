@@ -17,7 +17,7 @@ const body = {
     },
   ],
   models: ['anthropic/claude-3-5-sonnet-20240620'],
-  fallback_models: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
+  fallbackModels: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
   stream: true,
 };
 
@@ -48,7 +48,7 @@ async function modelSelectTest() {
 
 async function CompletionsTest(body) {
   const sdkClient = await IronaAI.createInstance({
-    fallback_models: ['openai/gpt-4o-mini'],
+    fallbackModels: ['openai/gpt-4o-mini'],
   });
   try {
     const { provider, model, response } =
@@ -94,7 +94,7 @@ const body2 = {
     },
   ],
   models: ['anthropic/claude-3-5-sonnet-20240620'],
-  fallback_models: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
+  fallbackModels: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
   stream: true,
 };
 

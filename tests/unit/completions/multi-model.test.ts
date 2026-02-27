@@ -62,7 +62,7 @@ describe('Multi-Model Completions', () => {
       setupSuccessfulGeneration('Fallback response');
 
       const payload = createMultiModelPayload({
-        fallback_models: ['openai/gpt-4o-mini'] as [string, ...string[]],
+        fallbackModels: ['openai/gpt-4o-mini'] as [string, ...string[]],
       });
 
       const result = await client.completions(payload);
@@ -76,7 +76,7 @@ describe('Multi-Model Completions', () => {
       setupSuccessfulGeneration('Fallback response');
 
       const payload = createMultiModelPayload({
-        fallback_models: ['openai/gpt-4o-mini'] as [string, ...string[]],
+        fallbackModels: ['openai/gpt-4o-mini'] as [string, ...string[]],
       });
 
       const result = await client.completions(payload);
@@ -96,7 +96,7 @@ describe('Multi-Model Completions', () => {
         .mockResolvedValueOnce({ text: 'Fallback success' });
 
       const payload = createMultiModelPayload({
-        fallback_models: ['anthropic/claude-3-haiku-20240307'] as [
+        fallbackModels: ['anthropic/claude-3-haiku-20240307'] as [
           string,
           ...string[],
         ],
@@ -114,7 +114,7 @@ describe('Multi-Model Completions', () => {
       mockGenerateText.mockRejectedValue(new Error('All models failed'));
 
       const payload = createMultiModelPayload({
-        fallback_models: ['openai/gpt-4o-mini'] as [string, ...string[]],
+        fallbackModels: ['openai/gpt-4o-mini'] as [string, ...string[]],
       });
 
       await expect(client.completions(payload)).rejects.toThrow(

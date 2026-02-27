@@ -17,7 +17,7 @@ const body = {
     'google/gemini-2.0-flash',
     'openai/gpt-4o-mini',
   ],
-  fallback_models: ['openai/gpt-4o-mini'],
+  fallbackModels: ['openai/gpt-4o-mini'],
   stream: false,
   search: true, // <-- This enables useSearchGrounding in the SDK logic
 };
@@ -38,7 +38,7 @@ async function modelSelectTest() {
 
 async function CompletionsTest() {
   const sdkClient = await IronaAI.createInstance({
-    fallback_models: ['openai/gpt-4o-mini'],
+    fallbackModels: ['openai/gpt-4o-mini'],
   });
   try {
     const { provider, model, response, error } =

@@ -200,9 +200,9 @@ export class LocalRouter implements Router {
       { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
     ];
 
-    if (body.fallback_models && body.fallback_models.length > 0) {
+    if (body.fallbackModels && body.fallbackModels.length > 0) {
       try {
-        fallbackProviders = body.fallback_models.map(modelPayload => {
+        fallbackProviders = body.fallbackModels.map(modelPayload => {
           const [provider, ...modelParts] = modelPayload.split('/');
           const model = modelParts.join('/');
           return { provider, model };

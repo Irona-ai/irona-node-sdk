@@ -19,13 +19,13 @@ Image generation responses (DALL-E, gpt-image-1) and user-uploaded images store 
 
 ### Distribution
 
-| Metric   | Value    |
-| -------- | -------- |
-| Total    | 12,187 messages, 678 MB |
-| Median   | 471 bytes |
-| P90      | 2,023 bytes |
-| P99      | 2,076 kB |
-| Max      | 3,535 kB |
+| Metric | Value                   |
+| ------ | ----------------------- |
+| Total  | 12,187 messages, 678 MB |
+| Median | 471 bytes               |
+| P90    | 2,023 bytes             |
+| P99    | 2,076 kB                |
+| Max    | 3,535 kB                |
 
 The top 10% of messages (P90+) consume **99.0%** of total storage. The problem is extremely concentrated: 339 base64 image messages account for nearly all of it.
 
@@ -65,12 +65,12 @@ Image generation service (`generation.service.ts`) now:
 
 ### Expected Impact
 
-| Metric          | Before   | After (est.) |
-| --------------- | -------- | ------------ |
-| Message table   | 708 MB   | ~10 MB       |
-| Per-image cost  | 1-4 MB   | ~200 bytes   |
-| DB backup size  | ~700 MB  | ~10 MB       |
-| Query speed     | Degraded | Normal       |
+| Metric         | Before   | After (est.) |
+| -------------- | -------- | ------------ |
+| Message table  | 708 MB   | ~10 MB       |
+| Per-image cost | 1-4 MB   | ~200 bytes   |
+| DB backup size | ~700 MB  | ~10 MB       |
+| Query speed    | Degraded | Normal       |
 
 ### Storage Provider: UploadThing
 

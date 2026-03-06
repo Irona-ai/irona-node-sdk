@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish:
-    runs-on: depot-ubuntu-latest
+    runs-on: ubuntu-latest
     # environment: npm — disabled: stale NODE_AUTH_TOKEN secret blocks OIDC
     permissions:
       contents: read

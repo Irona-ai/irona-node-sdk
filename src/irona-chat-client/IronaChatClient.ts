@@ -143,10 +143,10 @@ export class IronaChatClient {
     supportsWebSearch: boolean
   ): Promise<CompletionsResponse> {
     try {
-      // Per-provider gateway decision: providers with direct API keys bypass the gateway
-      const isUsingGateway =
-        this.gatewayProvider !== undefined &&
-        !this.hasDirectProviderKey(provider);
+      // When a gateway is configured, ALL providers route through it.
+      // Provider-specific API keys are ignored for routing (BYOK is handled
+      // at the gateway/account level, e.g. OpenRouter dashboard).
+      const isUsingGateway = this.gatewayProvider !== undefined;
       if (!isUsingGateway) {
         this.loadApiKeyForProvider(provider, model);
       }
@@ -320,7 +320,11 @@ export class IronaChatClient {
                 statusCode?: number;
                 message?: string;
               };
-              throw new Error(`${err.name} (status ${err.statusCode})`);
+              const errMsg =
+                err.message ?? err.name ?? JSON.stringify(result.value.error);
+              throw new Error(
+                `${errMsg}${err.statusCode !== undefined ? ` (status ${err.statusCode})` : ''}`
+              );
             }
 
             testResults.push(result.value);
@@ -344,12 +348,16 @@ export class IronaChatClient {
               // Continue with the rest of the stream
               for await (const part of stream.fullStream) {
                 if (part.type === 'error') {
-                  // logger.error(`Stream yielded error for ${provider}/${model}:`, part.error);
                   const err = part.error as {
                     name?: string;
                     statusCode?: number;
+                    message?: string;
                   };
-                  throw new Error(`${err.name} (status ${err.statusCode})`);
+                  const errMsg =
+                    err.message ?? err.name ?? JSON.stringify(part.error);
+                  throw new Error(
+                    `${errMsg}${err.statusCode !== undefined ? ` (status ${err.statusCode})` : ''}`
+                  );
                 }
                 yield part;
               }
@@ -684,7 +692,9 @@ export class IronaChatClient {
 
   /**
    * Checks if a provider has a direct API key (programmatic config or env var).
-   * When true, the provider bypasses the gateway and calls the LLM directly.
+   * @deprecated No longer used for routing decisions. When a gateway is
+   * configured, all providers route through it regardless of direct keys.
+   * Kept for potential diagnostic use.
    */
   private hasDirectProviderKey(provider: string): boolean {
     const providerConf = this.config.providers?.[provider];

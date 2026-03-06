@@ -320,7 +320,11 @@ export class IronaChatClient {
                 statusCode?: number;
                 message?: string;
               };
-              throw new Error(`${err.name} (status ${err.statusCode})`);
+              const errMsg =
+                err.message ?? err.name ?? JSON.stringify(result.value.error);
+              throw new Error(
+                `${errMsg}${err.statusCode !== undefined ? ` (status ${err.statusCode})` : ''}`
+              );
             }
 
             testResults.push(result.value);
@@ -344,12 +348,16 @@ export class IronaChatClient {
               // Continue with the rest of the stream
               for await (const part of stream.fullStream) {
                 if (part.type === 'error') {
-                  // logger.error(`Stream yielded error for ${provider}/${model}:`, part.error);
                   const err = part.error as {
                     name?: string;
                     statusCode?: number;
+                    message?: string;
                   };
-                  throw new Error(`${err.name} (status ${err.statusCode})`);
+                  const errMsg =
+                    err.message ?? err.name ?? JSON.stringify(part.error);
+                  throw new Error(
+                    `${errMsg}${err.statusCode !== undefined ? ` (status ${err.statusCode})` : ''}`
+                  );
                 }
                 yield part;
               }

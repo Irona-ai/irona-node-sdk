@@ -150,15 +150,31 @@ Publishing uses **OIDC trusted publishing** — no npm tokens are needed. The Gi
 - **npm trusted publisher** configured on [npmjs.com/package/ironaai/access](https://www.npmjs.com/package/ironaai/access) (GitHub org: `Irona-ai`, repo: `irona-node-sdk`, workflow: `publish.yml`, environment: `npm`)
 - **GitHub environment** `npm` created in repo Settings > Environments with branch policy restricted to `main`
 
-#### Publishing steps
+#### Option A: Manual publish
+
+1. Update the version in `package.json`
+2. Build the package:
+   ```bash
+   npm run build
+   ```
+3. Verify what will be published:
+   ```bash
+   npm publish --dry-run
+   ```
+4. Publish to npm (must be logged in via `npm login`):
+   ```bash
+   npm publish
+   ```
+
+#### Option B: Automated publish via GitHub Release
 
 1. Update the version in `package.json`
 2. Commit and push changes to `main`
 3. Create a GitHub Release with tag matching the version:
    ```bash
-   gh release create v0.0.20 --title "v0.0.20" --notes "Release notes here" --target main
+   gh release create v0.0.23 --title "v0.0.23" --notes "Release notes here" --target main
    ```
-   Or via GitHub UI: Go to Releases > "Create a new release" > Enter tag (e.g., `v0.0.20`) > Publish
+   Or via GitHub UI: Go to Releases > "Create a new release" > Enter tag (e.g., `v0.0.23`) > Publish
 
 The release triggers the CI workflow (`.github/workflows/publish.yml`) which builds and publishes to npm automatically with provenance.
 

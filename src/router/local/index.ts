@@ -98,8 +98,25 @@ export class LocalRouter implements Router {
     // Map tier to best model from user's candidates
     const selected = this.selectModelForTier(tier, mediaSupportedModels);
 
+    const providers: ModelInfo[] = selected
+      ? [selected]
+      : mediaSupportedModels.slice(0, 1);
+
+    // Arcade mode: select a second model when topkModels >= 2
+    const topK = body.topkModels ?? 1;
+    if (topK >= 2 && providers.length > 0 && mediaSupportedModels.length > 1) {
+      const secondModel = this.selectSecondModel(
+        tier,
+        providers[0],
+        mediaSupportedModels
+      );
+      if (secondModel !== null) {
+        providers.push(secondModel);
+      }
+    }
+
     return {
-      providers: selected ? [selected] : mediaSupportedModels.slice(0, 1),
+      providers,
       fallbackProviders: this.getFallbackProviders(body),
       error: null,
       success: true,
@@ -166,6 +183,39 @@ export class LocalRouter implements Router {
       default:
         return modelsWithCost[0];
     }
+  }
+
+  /**
+   * Select a second model for arcade mode (topkModels >= 2).
+   *
+   * 80% of the time: picks a stronger model (one tier above the first).
+   *   If already at REASONING (highest tier), picks one tier below (COMPLEX).
+   * 20% of the time: picks randomly from remaining candidates.
+   */
+  private selectSecondModel(
+    currentTier: Tier,
+    firstModel: ModelInfo,
+    candidates: ModelInfo[]
+  ): ModelInfo | null {
+    const otherModels = candidates.filter(
+      m => !(m.provider === firstModel.provider && m.model === firstModel.model)
+    );
+    if (otherModels.length === 0) return null;
+
+    // 20% random selection from remaining models
+    if (Math.random() < 0.2) {
+      return otherModels[Math.floor(Math.random() * otherModels.length)];
+    }
+
+    // 80% stronger model — one tier above (or below if at highest)
+    const tierOrder: Tier[] = ['SIMPLE', 'MEDIUM', 'COMPLEX', 'REASONING'];
+    const currentIndex = tierOrder.indexOf(currentTier);
+    const targetTier =
+      currentIndex >= tierOrder.length - 1
+        ? tierOrder[currentIndex - 1] // At REASONING → COMPLEX
+        : tierOrder[currentIndex + 1]; // Go stronger
+
+    return this.selectModelForTier(targetTier, otherModels) ?? otherModels[0];
   }
 
   private extractPromptText(messages: ModelSelectPayload['messages']): {

@@ -227,6 +227,118 @@ describe('LocalRouter', () => {
   });
 });
 
+// ── Arcade Mode (topkModels) Tests ──────────────────────────────────────────
+
+describe('LocalRouter arcade mode (topkModels)', () => {
+  const router = new LocalRouter();
+  const threeModels = [
+    'openai/gpt-4o-mini', // cheapest  (cost: 0.15 + 3*0.6 = 1.95)
+    'openai/gpt-4o', // mid       (cost: 5 + 3*15 = 50)
+    'anthropic/claude-sonnet-4-5-20250929', // expensive (cost: 3 + 3*15 = 48)
+  ];
+  // Note: gpt-4o (50) > claude-sonnet (48) > gpt-4o-mini (1.95) by cost
+
+  it('returns 2 models when topkModels is 2', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5); // 80% path
+    const result = await router.modelSelect({
+      models: threeModels as [string, ...string[]],
+      messages: [{ role: 'user', content: 'What is the capital of France?' }],
+      topkModels: 2,
+    });
+    expect(result.providers.length).toBe(2);
+    jest.restoreAllMocks();
+  });
+
+  it('second model is stronger (higher tier) in the 80% path', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5); // force 80% path
+    const result = await router.modelSelect({
+      models: threeModels as [string, ...string[]],
+      messages: [{ role: 'user', content: 'What is the capital of France?' }],
+      topkModels: 2,
+    });
+    // Simple prompt → first model is cheapest (gpt-4o-mini)
+    expect(result.providers[0].model).toBe('gpt-4o-mini');
+    // Second model should be from MEDIUM tier (one above SIMPLE) — not gpt-4o-mini
+    expect(result.providers[1].model).not.toBe('gpt-4o-mini');
+    jest.restoreAllMocks();
+  });
+
+  it('second model is random in the 20% path', async () => {
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValue(0.5); // first call < 0.2 → random path; second for index
+    const result = await router.modelSelect({
+      models: threeModels as [string, ...string[]],
+      messages: [{ role: 'user', content: 'What is the capital of France?' }],
+      topkModels: 2,
+    });
+    expect(result.providers.length).toBe(2);
+    // Second model should not be the same as first
+    expect(result.providers[1].model).not.toBe(result.providers[0].model);
+    jest.restoreAllMocks();
+  });
+
+  it('at REASONING tier, second model is from COMPLEX (one below)', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5); // 80% path
+    const result = await router.modelSelect({
+      models: [
+        'openai/gpt-4o-mini',
+        'openai/o3',
+        'anthropic/claude-sonnet-4-5-20250929',
+      ] as [string, ...string[]],
+      messages: [
+        {
+          role: 'user',
+          content:
+            'Prove the theorem step by step using mathematical proof and derive the result logically',
+        },
+      ],
+      topkModels: 2,
+    });
+    // REASONING prompt → first should be reasoning-capable (o3 or claude-sonnet)
+    const first = result.providers[0];
+    expect(['o3', 'claude-sonnet-4-5-20250929']).toContain(first.model);
+    // Second model should be different from first
+    expect(result.providers[1].model).not.toBe(first.model);
+    jest.restoreAllMocks();
+  });
+
+  it('returns 1 model with topkModels=2 when only 1 candidate model', async () => {
+    const result = await router.modelSelect({
+      models: ['openai/gpt-4o-mini'],
+      messages: [{ role: 'user', content: 'Hello' }],
+      topkModels: 2,
+    });
+    // Single model optimization — only 1 candidate, can't pick a second
+    expect(result.providers.length).toBe(1);
+  });
+
+  it('returns both models with 2 candidates and topkModels=2', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5); // 80% path
+    const result = await router.modelSelect({
+      models: ['openai/gpt-4o-mini', 'openai/gpt-4o'] as [string, ...string[]],
+      messages: [{ role: 'user', content: 'What is the capital of France?' }],
+      topkModels: 2,
+    });
+    expect(result.providers.length).toBe(2);
+    expect(result.providers[0].model).not.toBe(result.providers[1].model);
+    jest.restoreAllMocks();
+  });
+
+  it('returns 1 model when topkModels is 1 or undefined', async () => {
+    const result1 = await router.modelSelect({
+      models: threeModels as [string, ...string[]],
+      messages: [{ role: 'user', content: 'Hello' }],
+      topkModels: 1,
+    });
+    expect(result1.providers.length).toBe(1);
+
+    const result2 = await router.modelSelect({
+      models: threeModels as [string, ...string[]],
+      messages: [{ role: 'user', content: 'Hello' }],
+    });
+    expect(result2.providers.length).toBe(1);
+  });
+});
+
 // ── Router Config Resolution Tests ───────────────────────────────────────────
 
 describe('resolveRouterConfig', () => {

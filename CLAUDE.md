@@ -5,9 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Git Branching
 
 **Always create new feature/fix branches from `development`:**
+
 ```bash
 git checkout development && git pull && git checkout -b feat/my-feature
 ```
+
 PRs should target `development`. The `main` branch is production-only.
 
 ## Commands

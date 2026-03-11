@@ -301,8 +301,8 @@ export class IronaChatClient {
         const iterator = stream.fullStream[Symbol.asyncIterator]();
         const testResults: unknown[] = [];
         try {
-          // Test the first few chunks to ensure the stream is working
-          for (let i = 0; i < 3; i++) {
+          // Test the first chunk to ensure the stream is working
+          for (let i = 0; i < 1; i++) {
             const result = await iterator.next();
 
             if (result.done === true) {

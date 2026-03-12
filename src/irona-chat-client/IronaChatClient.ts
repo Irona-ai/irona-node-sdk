@@ -302,6 +302,7 @@ export class IronaChatClient {
         // and will propagate up to completions() for fallback retry.
         const fullStream = {
           async *[Symbol.asyncIterator]() {
+            let chunkCount = 0;
             try {
               for await (const part of stream.fullStream) {
                 if (part.type === 'error') {
@@ -316,7 +317,13 @@ export class IronaChatClient {
                     `${errMsg}${err.statusCode !== undefined ? ` (status ${err.statusCode})` : ''}`
                   );
                 }
+                chunkCount++;
                 yield part;
+              }
+              if (chunkCount === 0) {
+                throw new Error(
+                  `Empty stream response from ${provider}/${model}`
+                );
               }
             } catch (err) {
               logger.error(

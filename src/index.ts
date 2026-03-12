@@ -17,6 +17,7 @@ import { logger } from './utils/logger';
 require('dotenv').config();
 
 export class IronaAI {
+  private static providersLoadedPromise: Promise<void> | null = null;
   private ironaRouter: Router;
   private llmChatService: IronaChatClient;
   private constructor(config: Config = {}) {
@@ -51,7 +52,8 @@ export class IronaAI {
 
   // Static factory method to handle async initialization
   public static async createInstance(config: Config = {}): Promise<IronaAI> {
-    await this.ensureProvidersLoaded();
+    IronaAI.providersLoadedPromise ??= this.ensureProvidersLoaded();
+    await IronaAI.providersLoadedPromise;
     return new IronaAI(config);
   }
 

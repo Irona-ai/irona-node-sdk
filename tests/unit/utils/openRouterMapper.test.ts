@@ -58,45 +58,49 @@ describe('mapSearchToOpenRouter', () => {
 // ── buildOpenRouterExtraBody ─────────────────────────────────────────────────
 
 describe('buildOpenRouterExtraBody', () => {
-  it('returns undefined when no features are requested', () => {
-    expect(
-      buildOpenRouterExtraBody({ supportsWebSearch: false })
-    ).toBeUndefined();
+  it('always includes provider sort by latency', () => {
+    expect(buildOpenRouterExtraBody({ supportsWebSearch: false })).toEqual({
+      provider: { sort: 'latency' },
+    });
   });
 
-  it('returns undefined when reasoning is undefined and search is false', () => {
+  it('includes only provider config when reasoning is undefined and search is false', () => {
     expect(
       buildOpenRouterExtraBody({
         reasoningEffort: undefined,
         search: false,
         supportsWebSearch: true,
       })
-    ).toBeUndefined();
+    ).toEqual({
+      provider: { sort: 'latency' },
+    });
   });
 
-  it('returns only reasoning when search is not requested', () => {
+  it('returns reasoning and provider when search is not requested', () => {
     expect(
       buildOpenRouterExtraBody({
         reasoningEffort: 'high',
         supportsWebSearch: false,
       })
     ).toEqual({
+      provider: { sort: 'latency' },
       reasoning: { effort: 'high' },
     });
   });
 
-  it('returns only search params when reasoning is undefined', () => {
+  it('returns search params and provider when reasoning is undefined', () => {
     expect(
       buildOpenRouterExtraBody({
         search: true,
         supportsWebSearch: true,
       })
     ).toEqual({
+      provider: { sort: 'latency' },
       plugins: [{ id: 'web' }],
     });
   });
 
-  it('returns both reasoning and search when both are requested', () => {
+  it('returns reasoning, search, and provider when both are requested', () => {
     expect(
       buildOpenRouterExtraBody({
         reasoningEffort: 'max',
@@ -104,18 +108,20 @@ describe('buildOpenRouterExtraBody', () => {
         supportsWebSearch: true,
       })
     ).toEqual({
+      provider: { sort: 'latency' },
       reasoning: { effort: 'xhigh' },
       plugins: [{ id: 'web' }],
     });
   });
 
-  it('returns only reasoning for "off" effort (enabled: false)', () => {
+  it('returns reasoning and provider for "off" effort (enabled: false)', () => {
     expect(
       buildOpenRouterExtraBody({
         reasoningEffort: 'off',
         supportsWebSearch: false,
       })
     ).toEqual({
+      provider: { sort: 'latency' },
       reasoning: { enabled: false },
     });
   });

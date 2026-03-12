@@ -49,6 +49,18 @@ export const setupStreamError = () => {
   return mockStream;
 };
 
+export const setupEmptyStream = () => {
+  const mockStream = {
+    fullStream: {
+      [Symbol.asyncIterator]: async function* () {
+        // Yields nothing — empty stream
+      },
+    },
+  };
+  mockStreamText.mockResolvedValue(mockStream);
+  return mockStream;
+};
+
 // Helper functions to get the last call arguments
 export const getLastGenerateTextCall = () => {
   if (mockGenerateText.mock.calls.length === 0) return undefined;

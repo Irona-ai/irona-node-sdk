@@ -6,7 +6,7 @@ import '../../mocks/provider-utils.mock';
 import { BadRequestError } from '../../../src/errors';
 import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
 import type { Config } from '../../../src/types';
-import { setupStreamError } from '../../mocks/ai-sdk.mock';
+import { setupStreamError, setupEmptyStream } from '../../mocks/ai-sdk.mock';
 import {
   mockExtractMediaTypeArrayFromMessages,
   mockGetSupportedProviderAndModelArray,
@@ -94,6 +94,21 @@ describe('Edge Cases', () => {
       } catch (error) {
         // If the completion itself fails, that's also valid
         expect(error).toBeTruthy();
+      }
+    });
+
+    it('detects empty streams and throws an error', async () => {
+      setupEmptyStream();
+
+      const payload = createTestPayload({ stream: true });
+
+      try {
+        const result = await client.completions(payload);
+        const iterator = result.response.fullStream![Symbol.asyncIterator]();
+        await expect(iterator.next()).rejects.toThrow('Empty stream response');
+      } catch (error) {
+        // If the completion itself fails, that's also valid
+        expect((error as Error).message).toContain('Empty stream response');
       }
     });
   });

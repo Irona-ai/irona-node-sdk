@@ -13,9 +13,18 @@ export interface OpenRouterSearchConfig {
   plugins: Array<{ id: string }>;
 }
 
+export interface OpenRouterProviderConfig {
+  sort?: string;
+  order?: string[];
+  only?: string[];
+  ignore?: string[];
+  allow_fallbacks?: boolean;
+}
+
 export interface OpenRouterExtraBody {
   reasoning?: OpenRouterReasoningConfig;
   plugins?: Array<{ id: string }>;
+  provider?: OpenRouterProviderConfig;
 }
 
 export interface BuildOpenRouterExtraBodyInput {
@@ -68,19 +77,17 @@ export function mapSearchToOpenRouter(
 
 /**
  * Builds the merged extra body for an OpenRouter request.
- * Returns `undefined` when no extra params are needed (avoids unnecessary fetch wrapper).
+ * Always includes `provider.sort: "latency"` to prefer the lowest-latency provider.
  */
 export function buildOpenRouterExtraBody(
   input: BuildOpenRouterExtraBodyInput
-): OpenRouterExtraBody | undefined {
+): OpenRouterExtraBody {
   const reasoning = mapReasoningToOpenRouter(input.reasoningEffort);
   const search = mapSearchToOpenRouter(input.search, input.supportsWebSearch);
 
-  if (reasoning === undefined && search === undefined) {
-    return undefined;
-  }
-
-  const extra: OpenRouterExtraBody = {};
+  const extra: OpenRouterExtraBody = {
+    provider: { sort: 'latency' },
+  };
   if (reasoning !== undefined) {
     extra.reasoning = reasoning;
   }

@@ -59,9 +59,7 @@ describe('mapSearchToOpenRouter', () => {
 
 describe('buildOpenRouterExtraBody', () => {
   it('always includes provider sort by latency', () => {
-    expect(
-      buildOpenRouterExtraBody({ supportsWebSearch: false })
-    ).toEqual({
+    expect(buildOpenRouterExtraBody({ supportsWebSearch: false })).toEqual({
       provider: { sort: 'latency' },
     });
   });

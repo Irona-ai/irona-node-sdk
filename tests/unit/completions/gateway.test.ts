@@ -300,11 +300,13 @@ describe('Gateway Completions', () => {
 
       await client.completions(createTestPayload());
 
-      // buildOpenRouterExtraBody is called but returns undefined
+      // buildOpenRouterExtraBody always returns provider config (sort by latency)
       expect(buildExtraBodySpy).toHaveBeenCalled();
-      expect(buildExtraBodySpy).toHaveReturnedWith(undefined);
-      // Fetch wrapper should NOT be created
-      expect(fetchWrapperSpy).not.toHaveBeenCalled();
+      expect(buildExtraBodySpy).toHaveReturnedWith({
+        provider: { sort: 'latency' },
+      });
+      // Fetch wrapper is always created for OpenRouter (provider sort is always set)
+      expect(fetchWrapperSpy).toHaveBeenCalled();
     });
 
     it('does not use OpenRouter mapping for non-OpenRouter gateways', async () => {

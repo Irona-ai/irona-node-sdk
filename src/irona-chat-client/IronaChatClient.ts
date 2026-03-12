@@ -295,57 +295,14 @@ export class IronaChatClient {
               }
         ) as Parameters<typeof streamText>[0];
 
-        const stream = await streamText(streamConfig);
+        const stream = streamText(streamConfig);
 
-        // Eagerly test the stream by consuming multiple chunks to catch errors early
-        const iterator = stream.fullStream[Symbol.asyncIterator]();
-        const testResults: unknown[] = [];
-        try {
-          // Test the first few chunks to ensure the stream is working
-          for (let i = 0; i < 3; i++) {
-            const result = await iterator.next();
-
-            if (result.done === true) {
-              if (i === 0) {
-                throw new Error(
-                  `Empty stream response from ${provider}/${model}`
-                );
-              }
-              break;
-            }
-
-            if (result.value?.type === 'error') {
-              const err = result.value.error as {
-                name?: string;
-                statusCode?: number;
-                message?: string;
-              };
-              const errMsg =
-                err.message ?? err.name ?? JSON.stringify(result.value.error);
-              throw new Error(
-                `${errMsg}${err.statusCode !== undefined ? ` (status ${err.statusCode})` : ''}`
-              );
-            }
-
-            testResults.push(result.value);
-          }
-        } catch (error) {
-          // If we get an error during the early test, propagate it up to trigger fallbacks
-          logger.error(
-            `[IronaChatClient] Stream validation failed for ${provider}/${model}: ${error}`
-          );
-          throw error;
-        }
-
-        // Create a new stream that includes the pre-fetched results
+        // Return the stream immediately — no early validation.
+        // Errors are caught inline via the error-handling wrapper below
+        // and will propagate up to completions() for fallback retry.
         const fullStream = {
           async *[Symbol.asyncIterator]() {
             try {
-              // Yield the pre-fetched results first
-              for (const result of testResults) {
-                yield result;
-              }
-              // Continue with the rest of the stream
               for await (const part of stream.fullStream) {
                 if (part.type === 'error') {
                   const err = part.error as {

@@ -120,7 +120,7 @@ export class APIRouter extends Base implements Router {
   private getFallbackProviders(body: ModelSelectPayload): ModelInfo[] {
     let fallbackProviders: ModelInfo[] = [
       { provider: 'openai', model: 'gpt-4o-mini' },
-      { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
+      { provider: 'anthropic', model: 'claude-3-5-haiku-20241022' },
     ];
 
     if (body.fallbackModels && body.fallbackModels.length > 0) {

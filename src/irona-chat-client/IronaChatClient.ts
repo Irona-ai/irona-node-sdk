@@ -143,10 +143,10 @@ export class IronaChatClient {
     supportsWebSearch: boolean
   ): Promise<CompletionsResponse> {
     try {
-      // Per-provider gateway decision: providers with direct API keys bypass the gateway
-      const isUsingGateway =
-        this.gatewayProvider !== undefined &&
-        !this.hasDirectProviderKey(provider);
+      // When a gateway is configured, ALL providers route through it.
+      // Provider-specific API keys are ignored for routing (BYOK is handled
+      // at the gateway/account level, e.g. OpenRouter dashboard).
+      const isUsingGateway = this.gatewayProvider !== undefined;
       if (!isUsingGateway) {
         this.loadApiKeyForProvider(provider, model);
       }
@@ -295,63 +295,35 @@ export class IronaChatClient {
               }
         ) as Parameters<typeof streamText>[0];
 
-        const stream = await streamText(streamConfig);
+        const stream = streamText(streamConfig);
 
-        // Eagerly test the stream by consuming multiple chunks to catch errors early
-        const iterator = stream.fullStream[Symbol.asyncIterator]();
-        const testResults: unknown[] = [];
-        try {
-          // Test the first few chunks to ensure the stream is working
-          for (let i = 0; i < 3; i++) {
-            const result = await iterator.next();
-
-            if (result.done === true) {
-              if (i === 0) {
-                throw new Error(
-                  `Empty stream response from ${provider}/${model}`
-                );
-              }
-              break;
-            }
-
-            if (result.value?.type === 'error') {
-              const err = result.value.error as {
-                name?: string;
-                statusCode?: number;
-                message?: string;
-              };
-              throw new Error(`${err.name} (status ${err.statusCode})`);
-            }
-
-            testResults.push(result.value);
-          }
-        } catch (error) {
-          // If we get an error during the early test, propagate it up to trigger fallbacks
-          logger.error(
-            `[IronaChatClient] Stream validation failed for ${provider}/${model}: ${error}`
-          );
-          throw error;
-        }
-
-        // Create a new stream that includes the pre-fetched results
+        // Return the stream immediately — no early validation.
+        // Errors are caught inline via the error-handling wrapper below
+        // and will propagate up to completions() for fallback retry.
         const fullStream = {
           async *[Symbol.asyncIterator]() {
+            let chunkCount = 0;
             try {
-              // Yield the pre-fetched results first
-              for (const result of testResults) {
-                yield result;
-              }
-              // Continue with the rest of the stream
               for await (const part of stream.fullStream) {
                 if (part.type === 'error') {
-                  // logger.error(`Stream yielded error for ${provider}/${model}:`, part.error);
                   const err = part.error as {
                     name?: string;
                     statusCode?: number;
+                    message?: string;
                   };
-                  throw new Error(`${err.name} (status ${err.statusCode})`);
+                  const errMsg =
+                    err.message ?? err.name ?? JSON.stringify(part.error);
+                  throw new Error(
+                    `${errMsg}${err.statusCode !== undefined ? ` (status ${err.statusCode})` : ''}`
+                  );
                 }
+                chunkCount++;
                 yield part;
+              }
+              if (chunkCount === 0) {
+                throw new Error(
+                  `Empty stream response from ${provider}/${model}`
+                );
               }
             } catch (err) {
               logger.error(
@@ -684,7 +656,9 @@ export class IronaChatClient {
 
   /**
    * Checks if a provider has a direct API key (programmatic config or env var).
-   * When true, the provider bypasses the gateway and calls the LLM directly.
+   * @deprecated No longer used for routing decisions. When a gateway is
+   * configured, all providers route through it regardless of direct keys.
+   * Kept for potential diagnostic use.
    */
   private hasDirectProviderKey(provider: string): boolean {
     const providerConf = this.config.providers?.[provider];

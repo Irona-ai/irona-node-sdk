@@ -82,7 +82,7 @@ describe('Gateway Completions', () => {
     expect(requestConfig.model.modelId).toBe('google/gemini-2.0-flash-001');
   });
 
-  it('bypasses gateway for providers with direct API keys', async () => {
+  it('routes through gateway even when provider env var is set', async () => {
     const mockRouter = createMockRouterClient();
     const config: Config = {
       apiKey: 'test-api-key',
@@ -93,9 +93,9 @@ describe('Gateway Completions', () => {
     };
     const client = new IronaChatClient(config, mockRouter);
 
-    // GOOGLE_API_KEY is set by setupTestEnv() — google should bypass gateway
+    // GOOGLE_API_KEY is set by setupTestEnv() — should still route through gateway
     mockGetOpenRouterIdentifier.mockReturnValue('google/gemini-2.0-flash-001');
-    setupSuccessfulGeneration('Direct response');
+    setupSuccessfulGeneration('Gateway response');
 
     await client.completions(
       createTestPayload({
@@ -106,11 +106,11 @@ describe('Gateway Completions', () => {
     const requestConfig = mockGenerateText.mock.calls[0][0] as {
       model: { modelId: string };
     };
-    // Model name should be raw (direct), NOT the OpenRouter identifier
-    expect(requestConfig.model.modelId).toBe('gemini-1.5-pro-latest');
+    // Model name should be the OpenRouter identifier, NOT raw
+    expect(requestConfig.model.modelId).toBe('google/gemini-2.0-flash-001');
   });
 
-  it('bypasses gateway when programmatic providers config has apiKey', async () => {
+  it('routes through gateway even with programmatic provider config', async () => {
     const mockRouter = createMockRouterClient();
     const config: Config = {
       apiKey: 'test-api-key',
@@ -124,17 +124,36 @@ describe('Gateway Completions', () => {
     };
     const client = new IronaChatClient(config, mockRouter);
 
-    // Delete env var — programmatic config should still bypass gateway
-    delete process.env.OPENAI_API_KEY;
-    setupSuccessfulGeneration('Direct via programmatic config');
+    setupSuccessfulGeneration('Gateway via programmatic config');
 
     const result = await client.completions(createTestPayload());
 
-    expect(result.response.content).toBe('Direct via programmatic config');
-    // Model name should be raw (direct), not gateway-prefixed
+    expect(result.response.content).toBe('Gateway via programmatic config');
+    // Model name should be gateway-prefixed, not raw
     const requestConfig = mockGenerateText.mock.calls[0][0] as {
       model: { modelId: string };
     };
+    expect(requestConfig.model.modelId).toBe('openai/gpt-4o-mini');
+  });
+
+  it('falls back to direct provider when no gateway is configured', async () => {
+    const mockRouter = createMockRouterClient();
+    const config: Config = {
+      apiKey: 'test-api-key',
+      // No gateway configured
+    };
+    const client = new IronaChatClient(config, mockRouter);
+
+    // OPENAI_API_KEY is set by setupTestEnv() — direct provider path
+    setupSuccessfulGeneration('Direct response');
+
+    const result = await client.completions(createTestPayload());
+
+    expect(result.response.content).toBe('Direct response');
+    const requestConfig = mockGenerateText.mock.calls[0][0] as {
+      model: { modelId: string };
+    };
+    // Model name should be raw (direct provider, no gateway prefix)
     expect(requestConfig.model.modelId).toBe('gpt-4o-mini');
   });
 
@@ -281,11 +300,13 @@ describe('Gateway Completions', () => {
 
       await client.completions(createTestPayload());
 
-      // buildOpenRouterExtraBody is called but returns undefined
+      // buildOpenRouterExtraBody always returns provider config (sort by latency)
       expect(buildExtraBodySpy).toHaveBeenCalled();
-      expect(buildExtraBodySpy).toHaveReturnedWith(undefined);
-      // Fetch wrapper should NOT be created
-      expect(fetchWrapperSpy).not.toHaveBeenCalled();
+      expect(buildExtraBodySpy).toHaveReturnedWith({
+        provider: { sort: 'latency' },
+      });
+      // Fetch wrapper is always created for OpenRouter (provider sort is always set)
+      expect(fetchWrapperSpy).toHaveBeenCalled();
     });
 
     it('does not use OpenRouter mapping for non-OpenRouter gateways', async () => {
@@ -309,7 +330,7 @@ describe('Gateway Completions', () => {
       expect(fetchWrapperSpy).not.toHaveBeenCalled();
     });
 
-    it('does not use OpenRouter mapping when provider has direct API key', async () => {
+    it('uses OpenRouter mapping even when provider has direct API key', async () => {
       const mockRouter = createMockRouterClient();
       const config: Config = {
         apiKey: 'test-api-key',
@@ -320,14 +341,13 @@ describe('Gateway Completions', () => {
       };
       const client = new IronaChatClient(config, mockRouter);
 
-      // OPENAI_API_KEY is set by setupTestEnv() — should bypass gateway entirely
-      setupSuccessfulGeneration('Direct response');
+      // OPENAI_API_KEY is set by setupTestEnv() — should still route through gateway
+      setupSuccessfulGeneration('Gateway response');
 
       await client.completions(createTestPayload());
 
-      // When bypassing gateway, OpenRouter mapping is not used
-      expect(buildExtraBodySpy).not.toHaveBeenCalled();
-      expect(fetchWrapperSpy).not.toHaveBeenCalled();
+      // Gateway is always used — OpenRouter mapping is called
+      expect(buildExtraBodySpy).toHaveBeenCalled();
     });
 
     it('works with OpenRouter subdomain gateways', async () => {

@@ -107,7 +107,7 @@ export class IronaRouterClient extends Base implements Router {
     // Default fallback_providers
     let fallbackProviders: ModelInfo[] = [
       { provider: 'openai', model: 'gpt-4o-mini' },
-      { provider: 'anthropic', model: 'claude-3-haiku-20240307' },
+      { provider: 'anthropic', model: 'claude-3-5-haiku-20241022' },
     ];
 
     // Use fallback_providers if they are provided in the request

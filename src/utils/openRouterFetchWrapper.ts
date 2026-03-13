@@ -1,11 +1,46 @@
 import type { OpenRouterExtraBody } from './openRouterMapper';
 
+// ── Annotation normalisation ──────────────────────────────────────────────────
+
 /**
- * Strips `annotations` from OpenRouter chat completion responses.
- * OpenRouter adds `annotations` (URL citations) when the web search plugin
- * is active, but `@ai-sdk/openai` rejects these as unexpected fields.
+ * OpenRouter nests citation fields inside a `url_citation` sub-object:
+ *   { type: "url_citation", url_citation: { url, title, start_index, end_index } }
+ *
+ * `@ai-sdk/openai` v2 expects them flat:
+ *   { type: "url_citation", url, title, start_index, end_index }
+ *
+ * This helper normalises an array of annotations in-place and returns whether
+ * any entry was changed.
  */
-function stripAnnotationsFromJson(json: string): string {
+function normaliseAnnotations(
+  annotations: Array<Record<string, unknown>>
+): boolean {
+  let changed = false;
+  for (const ann of annotations) {
+    const nested = ann.url_citation as Record<string, unknown> | undefined;
+    if (nested === undefined) continue;
+    if (typeof nested.url === 'string') ann.url = nested.url;
+    if (typeof nested.title === 'string') ann.title = nested.title;
+    if (typeof nested.start_index === 'number')
+      ann.start_index = nested.start_index;
+    if (typeof nested.end_index === 'number') ann.end_index = nested.end_index;
+    delete ann.url_citation;
+    changed = true;
+  }
+  return changed;
+}
+
+// ── JSON transform helpers ────────────────────────────────────────────────────
+
+/**
+ * Transforms a non-streaming OpenRouter JSON response body:
+ * - Normalises nested `url_citation` annotations so `@ai-sdk/openai` can parse
+ *   them into `{type:"source"}` content parts.
+ * - Injects `message.reasoning` into `message.content` as `<think>` tags so
+ *   that `extractReasoningMiddleware` can later separate the thinking from the
+ *   final answer.
+ */
+function transformNonStreamingJson(json: string): string {
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(json) as Record<string, unknown>;
@@ -20,16 +55,24 @@ function stripAnnotationsFromJson(json: string): string {
 
   let changed = false;
   for (const choice of choices) {
-    // Non-streaming: choice.message.annotations
     const message = choice.message as Record<string, unknown> | undefined;
-    if (message !== undefined && 'annotations' in message) {
-      delete message.annotations;
-      changed = true;
+    if (message === undefined) continue;
+
+    // Normalise annotations
+    const annotations = message.annotations;
+    if (Array.isArray(annotations)) {
+      if (normaliseAnnotations(annotations as Array<Record<string, unknown>>)) {
+        changed = true;
+      }
     }
-    // Streaming: choice.delta.annotations
-    const delta = choice.delta as Record<string, unknown> | undefined;
-    if (delta !== undefined && 'annotations' in delta) {
-      delete delta.annotations;
+
+    // Inject reasoning as <think> tags
+    const reasoning = message.reasoning;
+    if (typeof reasoning === 'string' && reasoning.length > 0) {
+      const existingContent =
+        typeof message.content === 'string' ? message.content : '';
+      message.content = `<think>${reasoning}</think>${existingContent}`;
+      delete message.reasoning;
       changed = true;
     }
   }
@@ -38,16 +81,68 @@ function stripAnnotationsFromJson(json: string): string {
 }
 
 /**
- * Wraps a non-streaming response to strip annotations from the JSON body.
+ * Transforms a single SSE data chunk:
+ * - Normalises nested `url_citation` annotations in `delta.annotations`.
+ * - Converts `delta.reasoning` into `delta.content` with `<think>` / `</think>`
+ *   wrapping (tracked via `reasoningState`) so that `extractReasoningMiddleware`
+ *   can extract the reasoning tokens.
  */
-function stripAnnotationsFromResponse(response: Response): Response {
-  const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('text/event-stream')) {
-    // Streaming — handled by transforming the SSE stream
-    return stripAnnotationsFromStream(response);
+function transformStreamingChunk(
+  json: string,
+  reasoningState: Map<number, boolean>
+): string {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return json;
   }
 
-  // Non-streaming — intercept the body
+  const choices = parsed.choices as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(choices)) {
+    return json;
+  }
+
+  let changed = false;
+  for (const choice of choices) {
+    const index = typeof choice.index === 'number' ? choice.index : 0;
+    const delta = choice.delta as Record<string, unknown> | undefined;
+    if (delta === undefined) continue;
+
+    // Normalise annotations
+    const annotations = delta.annotations;
+    if (Array.isArray(annotations)) {
+      if (normaliseAnnotations(annotations as Array<Record<string, unknown>>)) {
+        changed = true;
+      }
+    }
+
+    // Inject reasoning as <think> tags
+    const reasoning = delta.reasoning;
+    const content = delta.content;
+
+    if (typeof reasoning === 'string' && reasoning.length > 0) {
+      const alreadyOpen = reasoningState.get(index) ?? false;
+      reasoningState.set(index, true);
+      delta.content = (alreadyOpen ? '' : '<think>') + reasoning;
+      delete delta.reasoning;
+      changed = true;
+    } else if (typeof content === 'string' && content.length > 0) {
+      const wasOpen = reasoningState.get(index) ?? false;
+      if (wasOpen) {
+        reasoningState.set(index, false);
+        delta.content = `</think>${content}`;
+        changed = true;
+      }
+    }
+  }
+
+  return changed ? JSON.stringify(parsed) : json;
+}
+
+// ── Response wrappers ─────────────────────────────────────────────────────────
+
+function transformNonStreamingResponse(response: Response): Response {
   const originalText = response.text.bind(response);
 
   return new Proxy(response, {
@@ -55,23 +150,20 @@ function stripAnnotationsFromResponse(response: Response): Response {
       if (prop === 'json') {
         return async () => {
           const text = await originalText();
-          const cleaned = stripAnnotationsFromJson(text);
-          return JSON.parse(cleaned) as unknown;
+          const transformed = transformNonStreamingJson(text);
+          return JSON.parse(transformed) as unknown;
         };
       }
       if (prop === 'text') {
         return async () => {
           const text = await originalText();
-          return stripAnnotationsFromJson(text);
+          return transformNonStreamingJson(text);
         };
       }
       if (prop === 'body') {
-        // The AI SDK reads the body ReadableStream directly
         const body = target.body;
-        if (body === null) {
-          return null;
-        }
-        return body.pipeThrough(createJsonStripTransform());
+        if (body === null) return null;
+        return body.pipeThrough(createNonStreamingTransform());
       }
       const value = Reflect.get(target, prop, target) as unknown;
       if (typeof value === 'function') {
@@ -82,24 +174,19 @@ function stripAnnotationsFromResponse(response: Response): Response {
   });
 }
 
-/**
- * Creates a TransformStream that strips annotations from non-streaming
- * JSON response bodies.
- */
-function createJsonStripTransform(): TransformStream<Uint8Array, Uint8Array> {
+function createNonStreamingTransform(): TransformStream<
+  Uint8Array,
+  Uint8Array
+> {
   const chunks: Uint8Array[] = [];
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
 
   return new TransformStream({
     transform(chunk, controller) {
-      // Buffer all chunks, then process on flush
       chunks.push(chunk);
-      // Check if this looks like an SSE stream
       const text = decoder.decode(chunk, { stream: true });
       if (text.includes('data: ')) {
-        // This is actually a streaming response — pass through and handle per-line
-        // (shouldn't normally reach here due to content-type check above)
         controller.enqueue(chunk);
         chunks.length = 0;
       }
@@ -107,39 +194,33 @@ function createJsonStripTransform(): TransformStream<Uint8Array, Uint8Array> {
     flush(controller) {
       if (chunks.length === 0) return;
       const fullText = chunks.map(c => decoder.decode(c)).join('');
-      const cleaned = stripAnnotationsFromJson(fullText);
-      controller.enqueue(encoder.encode(cleaned));
+      const transformed = transformNonStreamingJson(fullText);
+      controller.enqueue(encoder.encode(transformed));
     },
   });
 }
 
-/**
- * Wraps a streaming (SSE) response to strip annotations from each chunk.
- */
-function stripAnnotationsFromStream(response: Response): Response {
+function transformStreamingResponse(response: Response): Response {
   const body = response.body;
-  if (body === null) {
-    return response;
-  }
+  if (body === null) return response;
 
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
+  const reasoningState = new Map<number, boolean>();
   let buffer = '';
 
   const transformStream = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
       buffer += decoder.decode(chunk, { stream: true });
 
-      // Process complete SSE lines
       const lines = buffer.split('\n');
-      // Keep the last partial line in buffer
       buffer = lines.pop() ?? '';
 
       for (const line of lines) {
         if (line.startsWith('data: ') && line !== 'data: [DONE]') {
           const jsonStr = line.slice(6);
-          const cleaned = stripAnnotationsFromJson(jsonStr);
-          controller.enqueue(encoder.encode(`data: ${cleaned}\n`));
+          const transformed = transformStreamingChunk(jsonStr, reasoningState);
+          controller.enqueue(encoder.encode(`data: ${transformed}\n`));
         } else {
           controller.enqueue(encoder.encode(`${line}\n`));
         }
@@ -149,8 +230,8 @@ function stripAnnotationsFromStream(response: Response): Response {
       if (buffer.length > 0) {
         if (buffer.startsWith('data: ') && buffer !== 'data: [DONE]') {
           const jsonStr = buffer.slice(6);
-          const cleaned = stripAnnotationsFromJson(jsonStr);
-          controller.enqueue(encoder.encode(`data: ${cleaned}\n`));
+          const transformed = transformStreamingChunk(jsonStr, reasoningState);
+          controller.enqueue(encoder.encode(`data: ${transformed}\n`));
         } else {
           controller.enqueue(encoder.encode(`${buffer}\n`));
         }
@@ -159,7 +240,6 @@ function stripAnnotationsFromStream(response: Response): Response {
   });
 
   const newBody = body.pipeThrough(transformStream);
-
   return new Response(newBody, {
     status: response.status,
     statusText: response.statusText,
@@ -167,19 +247,25 @@ function stripAnnotationsFromStream(response: Response): Response {
   });
 }
 
+// ── Public API ────────────────────────────────────────────────────────────────
+
 /**
- * Creates a custom fetch wrapper that merges OpenRouter-specific params
- * into the JSON body of outgoing POST requests, and strips `annotations`
- * from responses (which @ai-sdk/openai cannot parse).
+ * Creates a custom fetch wrapper that:
+ * 1. Merges OpenRouter-specific params into the JSON body of POST requests.
+ * 2. Normalises nested `url_citation` annotation objects to the flat format
+ *    `@ai-sdk/openai` expects, so web-search citations surface as
+ *    `{type:"source"}` stream/response parts.
+ * 3. Injects `reasoning` content as `<think>…</think>` tags when reasoning is
+ *    requested. Pair with `extractReasoningMiddleware({ tagName: 'think' })`.
  *
- * Non-POST requests and requests without a JSON body pass through unchanged.
+ * The transform is always applied because annotation normalisation is always
+ * needed when OpenRouter's web-search plugin is active, and it is a no-op for
+ * responses that contain neither annotations nor reasoning.
  */
 export function createOpenRouterFetchWrapper(
   extraBody: OpenRouterExtraBody,
   baseFetch: typeof globalThis.fetch = globalThis.fetch
 ): typeof globalThis.fetch {
-  const hasSearchPlugin = extraBody.plugins?.some(p => p.id === 'web') ?? false;
-
   return async (
     input: RequestInfo | URL,
     init?: RequestInit
@@ -195,7 +281,6 @@ export function createOpenRouterFetchWrapper(
     try {
       parsed = JSON.parse(init.body) as Record<string, unknown>;
     } catch {
-      // Not valid JSON — pass through as-is
       return baseFetch(input, init);
     }
 
@@ -206,11 +291,9 @@ export function createOpenRouterFetchWrapper(
       body: JSON.stringify(merged),
     });
 
-    // Strip annotations from responses when web search plugin is active
-    if (hasSearchPlugin) {
-      return stripAnnotationsFromResponse(response);
-    }
-
-    return response;
+    const contentType = response.headers.get('content-type') ?? '';
+    return contentType.includes('text/event-stream')
+      ? transformStreamingResponse(response)
+      : transformNonStreamingResponse(response);
   };
 }

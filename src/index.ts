@@ -9,8 +9,8 @@ import type { ModelSelectPayload } from './schemas/modelSelect.schema';
 import { updateProvidersFromGist } from './supported_models';
 import type { Config, GatewayConfig } from './types';
 import {
-  IRONAAI_API_KEY_PREFIX,
   DEFAULT_BASE_URL,
+  IRONAAI_API_KEY_PREFIX,
   SUPPORTED_MODELS_DEFAULT_URL,
 } from './utils/constants';
 import { logger } from './utils/logger';
@@ -195,3 +195,13 @@ export class IronaAI {
     },
   };
 }
+
+export { RouterTrainer } from './custom-router';
+export type {
+  JobStatusResponse,
+  ModelDetailsResponse,
+  PredictOptions,
+  PredictionResponse,
+  RouterTrainerConfig,
+  TrainingJobResponse,
+} from './custom-router';

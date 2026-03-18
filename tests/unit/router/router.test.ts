@@ -339,6 +339,300 @@ describe('LocalRouter arcade mode (topkModels)', () => {
   });
 });
 
+// ── Arcade Mode E2E: Two distinct models guaranteed ─────────────────────────
+//
+// Uses all 5 mock models to get clean tier separation:
+//   gpt-4o-mini (1.95) → SIMPLE
+//   haiku (4.00)        → MEDIUM
+//   claude-sonnet (48)  → COMPLEX (2nd-most-expensive) [has reasoning]
+//   gpt-4o (50)         → COMPLEX (most-expensive without reasoning)
+//   o3 (130)            → REASONING [has reasoning]
+
+describe('Arcade mode E2E — never returns the same model twice', () => {
+  const router = new LocalRouter();
+
+  const fiveModels: [string, ...string[]] = [
+    'openai/gpt-4o-mini',
+    'anthropic/claude-3-haiku-20240307',
+    'anthropic/claude-sonnet-4-5-20250929',
+    'openai/gpt-4o',
+    'openai/o3',
+  ];
+
+  const SIMPLE_PROMPT = 'What is the capital of France?';
+  const REASONING_PROMPT =
+    'Prove the theorem step by step using mathematical proof and derive the result logically';
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  // ── Helper ────────────────────────────────────────────────────────────────
+
+  function modelKey(m: { provider: string; model: string }): string {
+    return `${m.provider}/${m.model}`;
+  }
+
+  // ── Lowest complexity (SIMPLE tier) ───────────────────────────────────────
+
+  it('SIMPLE tier: returns 2 models and they are different (80% path)', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const result = await router.modelSelect({
+      models: fiveModels,
+      messages: [{ role: 'user', content: SIMPLE_PROMPT }],
+      topkModels: 2,
+    });
+
+    expect(result.providers).toHaveLength(2);
+    expect(modelKey(result.providers[0])).not.toBe(
+      modelKey(result.providers[1])
+    );
+    // First model should be cheapest (SIMPLE tier)
+    expect(result.providers[0].model).toBe('gpt-4o-mini');
+  });
+
+  it('SIMPLE tier: returns 2 models and they are different (20% random path)', async () => {
+    // Force random path: first call < 0.2, second call picks an index
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValue(0);
+    const result = await router.modelSelect({
+      models: fiveModels,
+      messages: [{ role: 'user', content: SIMPLE_PROMPT }],
+      topkModels: 2,
+    });
+
+    expect(result.providers).toHaveLength(2);
+    expect(modelKey(result.providers[0])).not.toBe(
+      modelKey(result.providers[1])
+    );
+  });
+
+  // ── Highest complexity (REASONING tier) ───────────────────────────────────
+
+  it('REASONING tier: returns 2 models and they are different (80% path)', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const result = await router.modelSelect({
+      models: fiveModels,
+      messages: [{ role: 'user', content: REASONING_PROMPT }],
+      topkModels: 2,
+    });
+
+    expect(result.providers).toHaveLength(2);
+    expect(modelKey(result.providers[0])).not.toBe(
+      modelKey(result.providers[1])
+    );
+    // First model should be reasoning-capable (o3 is most expensive with reasoning)
+    expect(result.providers[0].model).toBe('o3');
+  });
+
+  it('REASONING tier: returns 2 models and they are different (20% random path)', async () => {
+    jest.spyOn(Math, 'random').mockReturnValueOnce(0.1).mockReturnValue(0);
+    const result = await router.modelSelect({
+      models: fiveModels,
+      messages: [{ role: 'user', content: REASONING_PROMPT }],
+      topkModels: 2,
+    });
+
+    expect(result.providers).toHaveLength(2);
+    expect(modelKey(result.providers[0])).not.toBe(
+      modelKey(result.providers[1])
+    );
+  });
+
+  // ── REASONING with first = claude-sonnet (not o3) ─────────────────────────
+  // When o3 is excluded, claude-sonnet is the most-expensive reasoning model.
+
+  it('REASONING tier (3 models): second model is never the same as first', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const result = await router.modelSelect({
+      models: [
+        'openai/gpt-4o-mini',
+        'openai/gpt-4o',
+        'anthropic/claude-sonnet-4-5-20250929',
+      ] as [string, ...string[]],
+      messages: [{ role: 'user', content: REASONING_PROMPT }],
+      topkModels: 2,
+    });
+
+    expect(result.providers).toHaveLength(2);
+    expect(modelKey(result.providers[0])).not.toBe(
+      modelKey(result.providers[1])
+    );
+    // First should be reasoning-capable
+    expect(['o3', 'claude-sonnet-4-5-20250929']).toContain(
+      result.providers[0].model
+    );
+  });
+
+  // ── Minimal candidate set (exactly 2 models) ─────────────────────────────
+
+  it('2 candidates: always returns both and they are different (SIMPLE)', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const result = await router.modelSelect({
+      models: ['openai/gpt-4o-mini', 'openai/o3'] as [string, ...string[]],
+      messages: [{ role: 'user', content: SIMPLE_PROMPT }],
+      topkModels: 2,
+    });
+
+    expect(result.providers).toHaveLength(2);
+    expect(modelKey(result.providers[0])).not.toBe(
+      modelKey(result.providers[1])
+    );
+  });
+
+  it('2 candidates: always returns both and they are different (REASONING)', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const result = await router.modelSelect({
+      models: ['openai/gpt-4o-mini', 'openai/o3'] as [string, ...string[]],
+      messages: [{ role: 'user', content: REASONING_PROMPT }],
+      topkModels: 2,
+    });
+
+    expect(result.providers).toHaveLength(2);
+    expect(modelKey(result.providers[0])).not.toBe(
+      modelKey(result.providers[1])
+    );
+  });
+
+  // ── Stress test: sweep across Math.random values ──────────────────────────
+  // Ensures NO value of Math.random can produce duplicate models.
+
+  it('never returns the same model twice across 50 random seeds (SIMPLE)', async () => {
+    for (let i = 0; i < 50; i++) {
+      const seed = i / 50;
+      jest.spyOn(Math, 'random').mockReturnValue(seed);
+
+      const result = await router.modelSelect({
+        models: fiveModels,
+        messages: [{ role: 'user', content: SIMPLE_PROMPT }],
+        topkModels: 2,
+      });
+
+      expect(result.providers).toHaveLength(2);
+      expect(modelKey(result.providers[0])).not.toBe(
+        modelKey(result.providers[1])
+      );
+
+      jest.restoreAllMocks();
+    }
+  });
+
+  it('never returns the same model twice across 50 random seeds (REASONING)', async () => {
+    for (let i = 0; i < 50; i++) {
+      const seed = i / 50;
+      jest.spyOn(Math, 'random').mockReturnValue(seed);
+
+      const result = await router.modelSelect({
+        models: fiveModels,
+        messages: [{ role: 'user', content: REASONING_PROMPT }],
+        topkModels: 2,
+      });
+
+      expect(result.providers).toHaveLength(2);
+      expect(modelKey(result.providers[0])).not.toBe(
+        modelKey(result.providers[1])
+      );
+
+      jest.restoreAllMocks();
+    }
+  });
+
+  // ── Stress test: random path specifically ─────────────────────────────────
+  // The 20% random path picks from `otherModels` which excludes firstModel.
+  // Verify every possible random index still yields a distinct model.
+
+  it('20% random path never picks the first model (all random indices)', async () => {
+    for (let idx = 0; idx < 4; idx++) {
+      // First call: < 0.2 to enter random path
+      // Second call: idx/4 to pick that index from otherModels (4 remaining)
+      jest
+        .spyOn(Math, 'random')
+        .mockReturnValueOnce(0.05)
+        .mockReturnValue(idx / 4);
+
+      const result = await router.modelSelect({
+        models: fiveModels,
+        messages: [{ role: 'user', content: SIMPLE_PROMPT }],
+        topkModels: 2,
+      });
+
+      expect(result.providers).toHaveLength(2);
+      expect(modelKey(result.providers[0])).not.toBe(
+        modelKey(result.providers[1])
+      );
+
+      jest.restoreAllMocks();
+    }
+  });
+
+  // ── Both tiers, both paths, 3–5 model counts ─────────────────────────────
+
+  it.each([
+    {
+      label: 'SIMPLE + 3 models',
+      prompt: SIMPLE_PROMPT,
+      models: [
+        'openai/gpt-4o-mini',
+        'openai/gpt-4o',
+        'openai/o3',
+      ] as [string, ...string[]],
+    },
+    {
+      label: 'SIMPLE + 4 models',
+      prompt: SIMPLE_PROMPT,
+      models: [
+        'openai/gpt-4o-mini',
+        'anthropic/claude-3-haiku-20240307',
+        'openai/gpt-4o',
+        'openai/o3',
+      ] as [string, ...string[]],
+    },
+    {
+      label: 'SIMPLE + 5 models',
+      prompt: SIMPLE_PROMPT,
+      models: fiveModels,
+    },
+    {
+      label: 'REASONING + 3 models',
+      prompt: REASONING_PROMPT,
+      models: [
+        'openai/gpt-4o-mini',
+        'openai/gpt-4o',
+        'openai/o3',
+      ] as [string, ...string[]],
+    },
+    {
+      label: 'REASONING + 4 models',
+      prompt: REASONING_PROMPT,
+      models: [
+        'openai/gpt-4o-mini',
+        'anthropic/claude-3-haiku-20240307',
+        'openai/gpt-4o',
+        'openai/o3',
+      ] as [string, ...string[]],
+    },
+    {
+      label: 'REASONING + 5 models',
+      prompt: REASONING_PROMPT,
+      models: fiveModels,
+    },
+  ])(
+    '$label: topk=2 always returns 2 distinct models',
+    async ({ prompt, models }) => {
+      jest.spyOn(Math, 'random').mockReturnValue(0.5);
+      const result = await router.modelSelect({
+        models,
+        messages: [{ role: 'user', content: prompt }],
+        topkModels: 2,
+      });
+
+      expect(result.providers).toHaveLength(2);
+      expect(modelKey(result.providers[0])).not.toBe(
+        modelKey(result.providers[1])
+      );
+    }
+  );
+});
+
 // ── Router Config Resolution Tests ───────────────────────────────────────────
 
 describe('resolveRouterConfig', () => {

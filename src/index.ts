@@ -205,3 +205,15 @@ export type {
   RouterTrainerConfig,
   TrainingJobResponse,
 } from './custom-router';
+
+export { PromptOptimizer } from './prompt-optimizer';
+export type {
+  FitOptions,
+  OptimizationJobResponse,
+  OptimizationJobStatus,
+  OptimizationResultItem,
+  OptimizationResultMetrics,
+  OptimizationResultsResponse,
+  OptimizationStatusResponse,
+  PromptOptimizerConfig,
+} from './prompt-optimizer';

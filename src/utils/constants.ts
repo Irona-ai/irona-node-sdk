@@ -15,3 +15,12 @@ export const MODELS_ENDPOINT =
 export const INFER_ENDPOINT =
   process.env.CUSTOM_ROUTER_INFER_ENDPOINT ??
   'https://irona-ai--infer.modal.run';
+
+export const OPTIMIZE_ENDPOINT =
+  process.env.OPTIMIZE_ENDPOINT ?? 'https://irona-ai--optimize.modal.run';
+export const OPTIMIZE_STATUS_ENDPOINT =
+  process.env.OPTIMIZE_STATUS_ENDPOINT ??
+  'https://irona-ai--optimize-status.modal.run';
+export const OPTIMIZE_RESULT_ENDPOINT =
+  process.env.OPTIMIZE_RESULT_ENDPOINT ??
+  'https://irona-ai--optimize-result.modal.run';

@@ -64,6 +64,20 @@ describe('buildOpenRouterExtraBody', () => {
     });
   });
 
+  it('never returns undefined (regression: ensures fetch wrapper is always created)', () => {
+    // Bug 4: buildOpenRouterExtraBody used to return undefined when no reasoning
+    // or search was requested, which meant the fetch wrapper was never created
+    // and provider sort preference was never sent.
+    const result = buildOpenRouterExtraBody({
+      reasoningEffort: undefined,
+      search: undefined,
+      supportsWebSearch: false,
+    });
+    expect(result).toBeDefined();
+    expect(result).not.toBeUndefined();
+    expect(result.provider).toEqual({ sort: 'latency' });
+  });
+
   it('includes only provider config when reasoning is undefined and search is false', () => {
     expect(
       buildOpenRouterExtraBody({

@@ -39,7 +39,7 @@ const REASONING_EFFORT_MAP: Record<
   string,
   OpenRouterReasoningConfig | undefined
 > = {
-  off: { enabled: false },
+  off: { effort: 'none' },
   low: { effort: 'low' },
   medium: { effort: 'medium' },
   high: { effort: 'high' },
@@ -53,7 +53,10 @@ const REASONING_EFFORT_MAP: Record<
 export function mapReasoningToOpenRouter(
   effort: ReasoningEffort | undefined
 ): OpenRouterReasoningConfig | undefined {
-  if (effort === undefined) {
+  // 'off' and undefined both mean "don't send a reasoning field" so that models
+  // which mandate reasoning (e.g. gpt-5-nano, gemini-2.5-flash) use their own
+  // default instead of rejecting a { effort: 'none' } payload.
+  if (effort === undefined || effort === 'off') {
     return undefined;
   }
   return REASONING_EFFORT_MAP[effort];

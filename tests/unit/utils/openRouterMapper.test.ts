@@ -12,8 +12,8 @@ describe('mapReasoningToOpenRouter', () => {
     expect(mapReasoningToOpenRouter(undefined)).toBeUndefined();
   });
 
-  it('maps "off" to { enabled: false }', () => {
-    expect(mapReasoningToOpenRouter('off')).toEqual({ enabled: false });
+  it('maps "off" to undefined (omit the field so models use their own default)', () => {
+    expect(mapReasoningToOpenRouter('off')).toBeUndefined();
   });
 
   it('maps "low" to { effort: "low" }', () => {
@@ -128,7 +128,7 @@ describe('buildOpenRouterExtraBody', () => {
     });
   });
 
-  it('returns reasoning and provider for "off" effort (enabled: false)', () => {
+  it('returns only provider for "off" effort (reasoning omitted)', () => {
     expect(
       buildOpenRouterExtraBody({
         reasoningEffort: 'off',
@@ -136,7 +136,6 @@ describe('buildOpenRouterExtraBody', () => {
       })
     ).toEqual({
       provider: { sort: 'latency' },
-      reasoning: { enabled: false },
     });
   });
 });

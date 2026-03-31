@@ -264,21 +264,20 @@ describe('Transforms always applied (not conditional on search)', () => {
     expect(json.choices[0].message.reasoning).toBeUndefined();
   });
 
-  it('transforms response even with empty extraBody', async () => {
+  it('drops reasoning with empty extraBody (injectReasoning=false)', async () => {
     const body = nonStreamingBody({
       content: 'Plain',
       reasoning: 'Some reasoning',
     });
 
-    // Empty extraBody — the old code would return response untouched
+    // Empty extraBody — no reasoning config means reasoning is dropped, not injected
     const response = await callWrapper({}, body);
     const json = (await response.json()) as {
-      choices: Array<{ message: { content: string } }>;
+      choices: Array<{ message: { content: string; reasoning?: string } }>;
     };
 
-    expect(json.choices[0].message.content).toBe(
-      '<think>Some reasoning</think>Plain'
-    );
+    expect(json.choices[0].message.content).toBe('Plain');
+    expect(json.choices[0].message.reasoning).toBeUndefined();
   });
 });
 
@@ -427,10 +426,10 @@ describe('Streaming reasoning injection', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Response transform applied regardless of extraBody contents', () => {
-  it('transforms response body even when extraBody has only provider config', async () => {
-    // This simulates the case where buildOpenRouterExtraBody returns
-    // only { provider: { sort: 'latency' } } (no reasoning, no search)
-    // but the response happens to contain reasoning (e.g. model natively reasons)
+  it('drops reasoning when extraBody has only provider config (no reasoning requested)', async () => {
+    // When buildOpenRouterExtraBody returns only { provider: { sort: 'latency' } }
+    // (no reasoning config), injectReasoning=false — reasoning is dropped, not injected.
+    // This prevents native reasoning tokens from leaking into response text.
     const body = nonStreamingBody({
       content: 'Native reasoning response',
       reasoning: 'The model thought on its own.',
@@ -444,8 +443,8 @@ describe('Response transform applied regardless of extraBody contents', () => {
       choices: Array<{ message: { content: string; reasoning?: string } }>;
     };
 
-    // Even with just provider config, the transform should process reasoning
-    expect(json.choices[0].message.content).toContain('<think>');
+    // No reasoning config → reasoning is silently dropped
+    expect(json.choices[0].message.content).toBe('Native reasoning response');
     expect(json.choices[0].message.reasoning).toBeUndefined();
   });
 });

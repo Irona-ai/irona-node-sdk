@@ -570,11 +570,10 @@ describe('Arcade mode E2E — never returns the same model twice', () => {
     {
       label: 'SIMPLE + 3 models',
       prompt: SIMPLE_PROMPT,
-      models: [
-        'openai/gpt-4o-mini',
-        'openai/gpt-4o',
-        'openai/o3',
-      ] as [string, ...string[]],
+      models: ['openai/gpt-4o-mini', 'openai/gpt-4o', 'openai/o3'] as [
+        string,
+        ...string[],
+      ],
     },
     {
       label: 'SIMPLE + 4 models',
@@ -594,11 +593,10 @@ describe('Arcade mode E2E — never returns the same model twice', () => {
     {
       label: 'REASONING + 3 models',
       prompt: REASONING_PROMPT,
-      models: [
-        'openai/gpt-4o-mini',
-        'openai/gpt-4o',
-        'openai/o3',
-      ] as [string, ...string[]],
+      models: ['openai/gpt-4o-mini', 'openai/gpt-4o', 'openai/o3'] as [
+        string,
+        ...string[],
+      ],
     },
     {
       label: 'REASONING + 4 models',

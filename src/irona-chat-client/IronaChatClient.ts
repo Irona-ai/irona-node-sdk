@@ -203,13 +203,12 @@ export class IronaChatClient {
 
       const baseModel = modelFactory(fullModelName);
 
-      // When using OpenRouter with reasoning enabled, the fetch wrapper injects
-      // reasoning content as <think>…</think> tags. Wrap the model so the AI
-      // SDK can extract those tags into response.reasoning / stream reasoning parts.
+      // When using OpenRouter with reasoning explicitly requested, the fetch wrapper
+      // injects delta.reasoning as <think>…</think> tags. Wrap the model so the AI
+      // SDK extracts those tags into reasoning-delta stream parts.
+      // Mapper omits the reasoning field for 'off'/undefined, so its presence means active.
       const shouldExtractOpenRouterReasoning =
-        isOpenRouter &&
-        openRouterExtra?.reasoning !== undefined &&
-        openRouterExtra.reasoning.enabled !== false;
+        isOpenRouter && openRouterExtra?.reasoning !== undefined;
 
       const finalModel = shouldExtractOpenRouterReasoning
         ? (wrapLanguageModel({

@@ -4,9 +4,7 @@ import type { OpenRouterExtraBody } from '../../../src/utils/openRouterMapper';
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Builds a minimal OpenAI-compatible non-streaming JSON response body. */
-function nonStreamingBody(
-  overrides: Record<string, unknown> = {}
-): string {
+function nonStreamingBody(overrides: Record<string, unknown> = {}): string {
   return JSON.stringify({
     id: 'chatcmpl-test',
     object: 'chat.completion',
@@ -39,9 +37,7 @@ function createMockFetch(
 }
 
 /** Builds SSE lines from an array of JSON chunk objects. */
-function buildSSEBody(
-  chunks: Array<Record<string, unknown>>
-): string {
+function buildSSEBody(chunks: Array<Record<string, unknown>>): string {
   return (
     chunks.map(c => `data: ${JSON.stringify(c)}`).join('\n') +
     '\n\ndata: [DONE]\n'
@@ -59,7 +55,9 @@ function createStreamingMockFetch(sseBody: string): jest.Mock {
 }
 
 /** Reads a ReadableStream body to a string (for SSE responses). */
-async function readStreamToString(body: ReadableStream<Uint8Array>): Promise<string> {
+async function readStreamToString(
+  body: ReadableStream<Uint8Array>
+): Promise<string> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let result = '';
@@ -95,10 +93,7 @@ describe('Non-streaming reasoning injection', () => {
       reasoning: 'Let me calculate 15 * 37 step by step...',
     });
 
-    const response = await callWrapper(
-      { reasoning: { effort: 'high' } },
-      body
-    );
+    const response = await callWrapper({ reasoning: { effort: 'high' } }, body);
     const json = (await response.json()) as {
       choices: Array<{ message: { content: string; reasoning?: string } }>;
     };
@@ -125,9 +120,7 @@ describe('Non-streaming reasoning injection', () => {
       choices: Array<{ message: { content: string } }>;
     };
 
-    expect(json.choices[0].message.content).toBe(
-      '<think>Thinking...</think>'
-    );
+    expect(json.choices[0].message.content).toBe('<think>Thinking...</think>');
   });
 
   it('handles reasoning with no content field', async () => {
@@ -159,10 +152,7 @@ describe('Non-streaming reasoning injection', () => {
   it('does not modify response when no reasoning is present', async () => {
     const body = nonStreamingBody({ content: 'Plain response' });
 
-    const response = await callWrapper(
-      { reasoning: { effort: 'high' } },
-      body
-    );
+    const response = await callWrapper({ reasoning: { effort: 'high' } }, body);
     const json = (await response.json()) as {
       choices: Array<{ message: { content: string } }>;
     };
@@ -192,10 +182,7 @@ describe('Non-streaming annotation normalisation', () => {
       ],
     });
 
-    const response = await callWrapper(
-      { plugins: [{ id: 'web' }] },
-      body
-    );
+    const response = await callWrapper({ plugins: [{ id: 'web' }] }, body);
     const json = (await response.json()) as {
       choices: Array<{
         message: {
@@ -237,10 +224,7 @@ describe('Non-streaming annotation normalisation', () => {
       ],
     });
 
-    const response = await callWrapper(
-      { plugins: [{ id: 'web' }] },
-      body
-    );
+    const response = await callWrapper({ plugins: [{ id: 'web' }] }, body);
     const json = (await response.json()) as {
       choices: Array<{
         message: {
@@ -306,19 +290,13 @@ describe('Streaming reasoning injection', () => {
   it('injects <think> on first reasoning chunk and </think> before first content chunk', async () => {
     const chunks = [
       {
-        choices: [
-          { index: 0, delta: { reasoning: 'Step 1: ' } },
-        ],
+        choices: [{ index: 0, delta: { reasoning: 'Step 1: ' } }],
       },
       {
-        choices: [
-          { index: 0, delta: { reasoning: 'Step 2. ' } },
-        ],
+        choices: [{ index: 0, delta: { reasoning: 'Step 2. ' } }],
       },
       {
-        choices: [
-          { index: 0, delta: { content: 'The answer is 42.' } },
-        ],
+        choices: [{ index: 0, delta: { content: 'The answer is 42.' } }],
       },
     ];
 
@@ -422,7 +400,10 @@ describe('Streaming reasoning injection', () => {
 
     const text = await readStreamToString(response.body!);
     const parsed = JSON.parse(
-      text.split('\n').find(l => l.startsWith('data: {'))!.slice(6)
+      text
+        .split('\n')
+        .find(l => l.startsWith('data: {'))!
+        .slice(6)
     ) as {
       choices: Array<{
         delta: {

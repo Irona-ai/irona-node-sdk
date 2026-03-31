@@ -15,7 +15,6 @@ import type { OpenRouterExtraBody } from './openRouterMapper';
 function normaliseAnnotations(
   annotations: Array<Record<string, unknown>>
 ): boolean {
-  // Track whether any annotation was modified
   let changed = false;
 
   for (const ann of annotations) {
@@ -35,7 +34,6 @@ function normaliseAnnotations(
     // Remove the now-flattened nested sub-object
     delete ann.url_citation;
 
-    // Mark that at least one annotation was changed
     changed = true;
   }
 
@@ -48,11 +46,16 @@ function normaliseAnnotations(
  * Transforms a non-streaming OpenRouter JSON response body:
  * - Normalises nested `url_citation` annotations so `@ai-sdk/openai` can parse
  *   them into `{type:"source"}` content parts.
- * - Injects `message.reasoning` into `message.content` as `<think>` tags so
- *   that `extractReasoningMiddleware` can later separate the thinking from the
- *   final answer.
+ * - When `injectReasoning` is true, injects `message.reasoning` into
+ *   `message.content` as `<think>` tags so `extractReasoningMiddleware` can
+ *   separate thinking from the final answer.
+ * - When `injectReasoning` is false, drops `message.reasoning` entirely so it
+ *   never leaks into response content.
  */
-function transformNonStreamingJson(json: string): string {
+function transformNonStreamingJson(
+  json: string,
+  injectReasoning: boolean
+): string {
   let parsed: Record<string, unknown>;
 
   // Attempt to parse the raw JSON string; return as-is if it is malformed
@@ -70,54 +73,53 @@ function transformNonStreamingJson(json: string): string {
     return json;
   }
 
-  // Track whether anything was modified so we avoid a redundant JSON.stringify
   let changed = false;
 
   for (const choice of choices) {
-    // Each choice contains a `message` object with the model's reply
     const message = choice.message as Record<string, unknown> | undefined;
     if (message === undefined) continue;
 
     // ── Annotation normalisation ──────────────────────────────────────────────
     const annotations = message.annotations;
     if (Array.isArray(annotations)) {
-      // Flatten nested url_citation objects so @ai-sdk/openai can read them
       if (normaliseAnnotations(annotations as Array<Record<string, unknown>>)) {
         changed = true;
       }
     }
 
-    // ── Reasoning injection ───────────────────────────────────────────────────
+    // ── Reasoning handling ────────────────────────────────────────────────────
     const reasoning = message.reasoning;
     if (typeof reasoning === 'string' && reasoning.length > 0) {
-      // Preserve any existing text content; default to empty string if absent
-      const existingContent =
-        typeof message.content === 'string' ? message.content : '';
-
-      // Wrap the reasoning in <think> tags and prepend to the text content
-      message.content = `<think>${reasoning}</think>${existingContent}`;
-
-      // Remove the original `reasoning` field to avoid duplication
+      if (injectReasoning) {
+        // Wrap in <think> tags so extractReasoningMiddleware can extract it
+        const existingContent =
+          typeof message.content === 'string' ? message.content : '';
+        message.content = `<think>${reasoning}</think>${existingContent}`;
+      }
+      // Always remove the raw reasoning field — either it was moved into content
+      // above, or we drop it to prevent it leaking into the response text
       delete message.reasoning;
       changed = true;
     }
   }
 
-  // Only re-serialise if the parsed object was actually modified
   return changed ? JSON.stringify(parsed) : json;
 }
 
 /**
  * Transforms a single SSE data chunk:
  * - Normalises nested `url_citation` annotations in `delta.annotations`.
- * - Converts `delta.reasoning` into `delta.content` with `<think>` / `</think>`
- *   wrapping (tracked via `reasoningState`) so that `extractReasoningMiddleware`
- *   can extract the reasoning tokens.
+ * - When `injectReasoning` is true, converts `delta.reasoning` into
+ *   `delta.content` with `<think>` / `</think>` wrapping (tracked via
+ *   `reasoningState`) so `extractReasoningMiddleware` can extract the tokens.
+ * - When `injectReasoning` is false, drops `delta.reasoning` entirely so it
+ *   never leaks into the streamed content.
  */
 function transformStreamingChunk(
   json: string,
   // Per-choice state: true = currently inside a <think> block
-  reasoningState: Map<number, boolean>
+  reasoningState: Map<number, boolean>,
+  injectReasoning: boolean
 ): string {
   let parsed: Record<string, unknown>;
 
@@ -136,7 +138,6 @@ function transformStreamingChunk(
     return json;
   }
 
-  // Track whether anything was modified to avoid an unnecessary re-serialise
   let changed = false;
 
   for (const choice of choices) {
@@ -150,34 +151,36 @@ function transformStreamingChunk(
     // ── Annotation normalisation ──────────────────────────────────────────────
     const annotations = delta.annotations;
     if (Array.isArray(annotations)) {
-      // Flatten nested url_citation objects in-place
       if (normaliseAnnotations(annotations as Array<Record<string, unknown>>)) {
         changed = true;
       }
     }
 
-    // ── Streaming reasoning injection ─────────────────────────────────────────
+    // ── Reasoning handling ────────────────────────────────────────────────────
     const reasoning = delta.reasoning;
     const content = delta.content;
 
     if (typeof reasoning === 'string' && reasoning.length > 0) {
-      // Check whether a <think> tag has already been opened for this choice index
-      const alreadyOpen = reasoningState.get(index) ?? false;
-
-      // Mark this choice as being in an active reasoning block
-      reasoningState.set(index, true);
-
-      // Prepend the opening <think> tag only on the very first reasoning token
-      delta.content = (alreadyOpen ? '' : '<think>') + reasoning;
-
-      // Remove the `reasoning` field so the SDK only sees `content`
+      if (injectReasoning) {
+        // Prepend opening <think> tag only on the very first reasoning token
+        const alreadyOpen = reasoningState.get(index) ?? false;
+        reasoningState.set(index, true);
+        delta.content = (alreadyOpen ? '' : '<think>') + reasoning;
+      } else {
+        // Drop reasoning — set content to empty string so nothing leaks
+        delta.content = typeof content === 'string' ? content : '';
+      }
+      // Always remove the non-standard reasoning field
       delete delta.reasoning;
       changed = true;
-    } else if (typeof content === 'string' && content.length > 0) {
-      // We received a regular content token — check if a reasoning block is open
+    } else if (
+      injectReasoning &&
+      typeof content === 'string' &&
+      content.length > 0
+    ) {
+      // First regular content token after reasoning — close the <think> block
       const wasOpen = reasoningState.get(index) ?? false;
       if (wasOpen) {
-        // Close the <think> block before the first regular content token
         reasoningState.set(index, false);
         delta.content = `</think>${content}`;
         changed = true;
@@ -185,24 +188,24 @@ function transformStreamingChunk(
     }
   }
 
-  // Only re-serialise if the parsed object was actually modified
   return changed ? JSON.stringify(parsed) : json;
 }
 
 // ── Response wrappers ─────────────────────────────────────────────────────────
 
-function transformNonStreamingResponse(response: Response): Response {
-  // Bind the original `.text()` method so it can be called inside the Proxy
+function transformNonStreamingResponse(
+  response: Response,
+  injectReasoning: boolean
+): Response {
   const originalText = response.text.bind(response);
 
-  // Wrap the response in a Proxy so we can intercept property accesses
   return new Proxy(response, {
     get(target, prop) {
-      // Intercept `.json()` — parse text, transform it, then re-parse as JSON
+      // Intercept `.json()` — transform then re-parse
       if (prop === 'json') {
         return async () => {
           const text = await originalText();
-          const transformed = transformNonStreamingJson(text);
+          const transformed = transformNonStreamingJson(text, injectReasoning);
           return JSON.parse(transformed) as unknown;
         };
       }
@@ -211,23 +214,18 @@ function transformNonStreamingResponse(response: Response): Response {
       if (prop === 'text') {
         return async () => {
           const text = await originalText();
-          return transformNonStreamingJson(text);
+          return transformNonStreamingJson(text, injectReasoning);
         };
       }
 
-      // Intercept `.body` — pipe through a transform stream that buffers the
-      // entire payload and applies the non-streaming JSON transform on flush
+      // Intercept `.body` — pipe through a buffering transform stream
       if (prop === 'body') {
         const body = target.body;
-        // Return null unchanged if the response has no body
         if (body === null) return null;
-        return body.pipeThrough(createNonStreamingTransform());
+        return body.pipeThrough(createNonStreamingTransform(injectReasoning));
       }
 
-      // For all other properties, delegate to the real response object
       const value = Reflect.get(target, prop, target) as unknown;
-
-      // Ensure methods are bound to the original target, not the Proxy
       if (typeof value === 'function') {
         return (value as (...args: unknown[]) => unknown).bind(target);
       }
@@ -236,18 +234,15 @@ function transformNonStreamingResponse(response: Response): Response {
   });
 }
 
-function createNonStreamingTransform(): TransformStream<
-  Uint8Array,
-  Uint8Array
-> {
-  // Accumulate raw chunks until the full response body has arrived
+function createNonStreamingTransform(
+  injectReasoning: boolean
+): TransformStream<Uint8Array, Uint8Array> {
   const chunks: Uint8Array[] = [];
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
 
   return new TransformStream({
     transform(chunk, controller) {
-      // Buffer every incoming chunk
       chunks.push(chunk);
       const text = decoder.decode(chunk, { stream: true });
 
@@ -255,29 +250,23 @@ function createNonStreamingTransform(): TransformStream<
       // pass chunks through immediately and stop buffering
       if (text.includes('data: ')) {
         controller.enqueue(chunk);
-        chunks.length = 0; // Clear the buffer since we're in pass-through mode
+        chunks.length = 0;
       }
     },
     flush(controller) {
-      // Nothing to do if the buffer is empty (streaming pass-through was used)
       if (chunks.length === 0) return;
-
-      // Decode and join all buffered chunks into a single string
       const fullText = chunks.map(c => decoder.decode(c)).join('');
-
-      // Apply the non-streaming JSON transform (annotations + reasoning)
-      const transformed = transformNonStreamingJson(fullText);
-
-      // Re-encode the transformed text and push it downstream
+      const transformed = transformNonStreamingJson(fullText, injectReasoning);
       controller.enqueue(encoder.encode(transformed));
     },
   });
 }
 
-function transformStreamingResponse(response: Response): Response {
+function transformStreamingResponse(
+  response: Response,
+  injectReasoning: boolean
+): Response {
   const body = response.body;
-
-  // Return the response unchanged if it has no body
   if (body === null) return response;
 
   const decoder = new TextDecoder();
@@ -291,52 +280,45 @@ function transformStreamingResponse(response: Response): Response {
 
   const transformStream = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
-      // Append the decoded chunk to the carry-over buffer
       buffer += decoder.decode(chunk, { stream: true });
 
-      // Split on newlines to isolate individual SSE lines
       const lines = buffer.split('\n');
-
       // The last element may be an incomplete line — save it for the next chunk
       buffer = lines.pop() ?? '';
 
       for (const line of lines) {
-        // Process only `data:` lines that are not the terminal [DONE] sentinel
         if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-          // Strip the `data: ` prefix to get the raw JSON payload
           const jsonStr = line.slice(6);
-
-          // Apply the streaming chunk transform (annotations + reasoning tags)
-          const transformed = transformStreamingChunk(jsonStr, reasoningState);
-
-          // Re-emit the transformed line with the `data: ` prefix restored
+          const transformed = transformStreamingChunk(
+            jsonStr,
+            reasoningState,
+            injectReasoning
+          );
           controller.enqueue(encoder.encode(`data: ${transformed}\n`));
         } else {
-          // Pass through comment lines, empty lines, and [DONE] sentinel as-is
           controller.enqueue(encoder.encode(`${line}\n`));
         }
       }
     },
     flush(controller) {
-      // Handle any leftover data in the buffer after the stream ends
       if (buffer.length > 0) {
         if (buffer.startsWith('data: ') && buffer !== 'data: [DONE]') {
-          // Transform and emit any final partial `data:` line
           const jsonStr = buffer.slice(6);
-          const transformed = transformStreamingChunk(jsonStr, reasoningState);
+          const transformed = transformStreamingChunk(
+            jsonStr,
+            reasoningState,
+            injectReasoning
+          );
           controller.enqueue(encoder.encode(`data: ${transformed}\n`));
         } else {
-          // Emit non-data lines (e.g. [DONE]) unchanged
           controller.enqueue(encoder.encode(`${buffer}\n`));
         }
       }
     },
   });
 
-  // Pipe the original response body through the SSE transform stream
   const newBody = body.pipeThrough(transformStream);
 
-  // Reconstruct the Response with the transformed body but original metadata
   return new Response(newBody, {
     status: response.status,
     statusText: response.statusText,
@@ -352,18 +334,24 @@ function transformStreamingResponse(response: Response): Response {
  * 2. Normalises nested `url_citation` annotation objects to the flat format
  *    `@ai-sdk/openai` expects, so web-search citations surface as
  *    `{type:"source"}` stream/response parts.
- * 3. Injects `reasoning` content as `<think>…</think>` tags when reasoning is
- *    requested. Pair with `extractReasoningMiddleware({ tagName: 'think' })`.
+ * 3. When reasoning is active (`extraBody.reasoning` is set), injects
+ *    `delta.reasoning` as `<think>…</think>` tags so
+ *    `extractReasoningMiddleware({ tagName: 'think' })` can extract them.
+ *    When reasoning is off, drops `delta.reasoning` entirely so those tokens
+ *    never appear in the response text.
  *
- * The transform is always applied because annotation normalisation is always
- * needed when OpenRouter's web-search plugin is active, and it is a no-op for
- * responses that contain neither annotations nor reasoning.
+ * The transform is always applied so that `delta.reasoning` is always cleaned
+ * up — models like gpt-5-nano emit it unconditionally even without a reasoning
+ * request, which would otherwise cause tokens to leak into text-delta parts.
  */
 export function createOpenRouterFetchWrapper(
   extraBody: OpenRouterExtraBody,
-  // Default to the global fetch so callers don't need to pass it explicitly
   baseFetch: typeof globalThis.fetch = globalThis.fetch
 ): typeof globalThis.fetch {
+  // Reasoning injection is active only when a reasoning config is present
+  // (mapper omits the field entirely for 'off'/undefined)
+  const injectReasoning = extraBody.reasoning !== undefined;
+
   return async (
     input: RequestInfo | URL,
     init?: RequestInit
@@ -385,20 +373,19 @@ export function createOpenRouterFetchWrapper(
       return baseFetch(input, init);
     }
 
-    // Merge OpenRouter-specific fields (e.g. plugins, provider preferences) into
-    // the request body — extraBody values take precedence over the original body
+    // Merge OpenRouter-specific fields; extraBody values take precedence
     const merged = { ...parsed, ...extraBody };
 
-    // Fire the actual HTTP request with the enriched body
     const response = await baseFetch(input, {
       ...init,
       body: JSON.stringify(merged),
     });
 
-    // Choose the appropriate transform based on whether the response is SSE or plain JSON
+    // Always apply the transform so delta.reasoning is handled (injected or
+    // dropped) — models can emit it even when not explicitly requested
     const contentType = response.headers.get('content-type') ?? '';
     return contentType.includes('text/event-stream')
-      ? transformStreamingResponse(response)
-      : transformNonStreamingResponse(response);
+      ? transformStreamingResponse(response, injectReasoning)
+      : transformNonStreamingResponse(response, injectReasoning);
   };
 }

@@ -14,10 +14,10 @@ build
 dist-ssr
 *.local
 .env
-.env.local
-.env.prod
+.env.*
 # Do not ignore .env.example
 !.env.example
+!**/.env.example
 
 # Editor directories and files
 !.vscode/extensions.json

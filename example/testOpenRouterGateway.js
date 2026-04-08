@@ -8,12 +8,10 @@
  */
 const { IronaAI } = require('ironaai');
 
-const OPENROUTER_API_KEY =
-  process.env.OPENROUTER_API_KEY ||
-  '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';
+// Moved to environment variables for security
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-const IRONAAI_API_KEY =
-  process.env.IRONAAI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji';
+const IRONAAI_API_KEY = process.env.IRONAAI_API_KEY;
 
 const gatewayConfig = {
   apiKey: IRONAAI_API_KEY,

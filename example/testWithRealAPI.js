@@ -10,9 +10,9 @@ async function testSingleModel() {
   console.log('\n========== TEST 1: SINGLE MODEL ==========');
   console.log('Using: openai/gpt-4o-mini\n');
 
+  // Moved to environment variable for security
   const ironaAI = await IronaAI.createInstance({
-    apiKey:
-      process.env.IRONAAI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
+    apiKey: process.env.IRONAAI_API_KEY,
   });
 
   try {
@@ -36,9 +36,9 @@ async function testMultipleModels() {
   console.log('\n========== TEST 2: MULTIPLE MODELS ==========');
   console.log('Using: openai/gpt-4o-mini, anthropic/claude-3-haiku-20240307\n');
 
+  // Moved to environment variable for security
   const ironaAI = await IronaAI.createInstance({
-    apiKey:
-      process.env.IRONAAI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
+    apiKey: process.env.IRONAAI_API_KEY,
   });
 
   try {

@@ -3,11 +3,13 @@ export type {
   JobStatusResponse,
   ModelDetailsResponse,
   ModelPrediction,
-  PredictOptions,
   PredictionResponse,
   PredictionResult,
-  RouterTrainerConfig,
-  TrainingData,
   TrainingJobResponse,
   TrainingJobStatus,
+} from './schemas';
+export type {
+  PredictOptions,
+  RouterTrainerConfig,
+  TrainingData,
 } from './types';

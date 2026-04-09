@@ -186,7 +186,26 @@ describe('RouterTrainer', () => {
       expect(status.model_id).toBe('model_789');
     });
 
-    it('auto-updates model ID when training completes', async () => {
+    it('auto-updates model ID when checking own stored job', async () => {
+      // Seed trainingJobId via fit()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ training_job_id: 'job_456', status: 'queued' }),
+      } as Response);
+      const trainer = new RouterTrainer({ apiKey: validApiKey });
+      await trainer.fit(['https://example.com/data.jsonl']);
+
+      // getStatus() without explicit jobId → should auto-update modelId
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'completed', model_id: 'model_789' }),
+      } as Response);
+      await trainer.getStatus();
+
+      expect(trainer.getModelId()).toBe('model_789');
+    });
+
+    it('does not auto-update model ID when an explicit jobId is passed', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ status: 'completed', model_id: 'model_789' }),
@@ -195,7 +214,7 @@ describe('RouterTrainer', () => {
       const trainer = new RouterTrainer({ apiKey: validApiKey });
       await trainer.getStatus('job_456');
 
-      expect(trainer.getModelId()).toBe('model_789');
+      expect(trainer.getModelId()).toBeUndefined();
     });
 
     it('throws error when no job ID is available', async () => {
@@ -488,7 +507,7 @@ describe('RouterTrainer', () => {
       await expect(trainer.predict(tooManyInputs)).rejects.toThrow();
     });
 
-    it('supports stream option', async () => {
+    it('always sends stream: false in request payload', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ predictions: [] }),
@@ -497,12 +516,12 @@ describe('RouterTrainer', () => {
       const trainer = new RouterTrainer({ apiKey: validApiKey });
       trainer.setModelId('model_789');
 
-      await trainer.predict(['test'], { stream: true });
+      await trainer.predict(['test']);
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
-          body: expect.stringContaining('"stream":true'),
+          body: expect.stringContaining('"stream":false'),
         })
       );
     });
@@ -526,15 +545,21 @@ describe('RouterTrainer', () => {
     });
 
     it('tracks model ID after training completes', async () => {
+      // Seed trainingJobId via fit()
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ training_job_id: 'job_123', status: 'queued' }),
+      } as Response);
+      const trainer = new RouterTrainer({ apiKey: validApiKey });
+      await trainer.fit(['https://example.com/data.jsonl']);
+      expect(trainer.getModelId()).toBeUndefined();
+
+      // getStatus() without explicit jobId → should auto-update modelId
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ status: 'completed', model_id: 'model_789' }),
       } as Response);
-
-      const trainer = new RouterTrainer({ apiKey: validApiKey });
-      expect(trainer.getModelId()).toBeUndefined();
-
-      await trainer.getStatus('job_123');
+      await trainer.getStatus();
 
       expect(trainer.getModelId()).toBe('model_789');
     });

@@ -2,14 +2,14 @@
  * Optimize prompts for specific LLM models using Irona's prompt optimization service.
  */
 
-import { MissingApiKeyError } from '../errors';
 import {
-  IRONAAI_API_KEY_PREFIX,
   OPTIMIZE_ENDPOINT,
   OPTIMIZE_RESULT_ENDPOINT,
   OPTIMIZE_STATUS_ENDPOINT,
 } from '../utils/constants';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { logger } from '../utils/logger';
+import { validateApiKey } from '../utils/validateApiKey';
 
 import {
   FitRequestSchema,
@@ -31,22 +31,7 @@ export class PromptOptimizer {
 
   constructor(config: PromptOptimizerConfig = {}) {
     const apiKey = config.apiKey ?? process.env.IRONAAI_API_KEY ?? '';
-
-    if (apiKey === '') {
-      throw new MissingApiKeyError(
-        "The API key is missing. Please provide the API key either through the 'IRONAAI_API_KEY' environment variable or the 'config.apiKey' property."
-      );
-    }
-
-    if (
-      typeof apiKey !== 'string' ||
-      !apiKey.startsWith(IRONAAI_API_KEY_PREFIX)
-    ) {
-      throw new MissingApiKeyError(
-        "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."
-      );
-    }
-
+    validateApiKey(apiKey);
     this.apiKey = apiKey;
   }
 
@@ -62,7 +47,7 @@ export class PromptOptimizer {
       reflection_model: options.reflectionModel,
     });
 
-    const response = await fetch(OPTIMIZE_ENDPOINT, {
+    const response = await fetchWithTimeout(OPTIMIZE_ENDPOINT, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -99,7 +84,7 @@ export class PromptOptimizer {
 
     const url = `${OPTIMIZE_STATUS_ENDPOINT}?job_id=${encodeURIComponent(targetJobId)}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -137,7 +122,7 @@ export class PromptOptimizer {
 
     const url = `${OPTIMIZE_RESULT_ENDPOINT}?job_id=${encodeURIComponent(targetJobId)}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,

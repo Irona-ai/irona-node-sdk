@@ -10,8 +10,9 @@ async function main() {
 
   console.log('\nStarting prompt optimization job...');
   const jobInfo = await optimizer.fit({
-    promptUrl: 'https://pastebin.com/raw/hrU1ciCB',
-    datasetUrl: 'https://api.npoint.io/a132ebd539fe5a11189d',
+    // Replace with publicly accessible URLs
+    promptUrl: 'https://your-host.example.com/system-prompt.txt',
+    datasetUrl: 'https://your-host.example.com/eval-dataset.json',
     metric: 'exact_match',
     targetModels: ['openai/gpt-4o-mini'],
   });

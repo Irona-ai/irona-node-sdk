@@ -2,32 +2,29 @@
  * Train and manage custom LLM routers that learn which model performs best for different prompts.
  */
 
-import { MissingApiKeyError } from '../errors';
-import { IRONAAI_API_KEY_PREFIX } from '../utils/constants';
 import {
   INFER_ENDPOINT,
   MODELS_ENDPOINT,
   TASK_STATUS_ENDPOINT,
   TRAIN_ENDPOINT,
 } from '../utils/constants';
+import { fetchWithTimeout } from '../utils/fetchWithTimeout';
 import { logger } from '../utils/logger';
+import { validateApiKey } from '../utils/validateApiKey';
 
 import {
   FitRequestSchema,
   JobStatusResponseSchema,
+  type JobStatusResponse,
   ModelDetailsResponseSchema,
+  type ModelDetailsResponse,
   PredictRequestSchema,
   PredictionResponseSchema,
+  type PredictionResponse,
   TrainingJobResponseSchema,
+  type TrainingJobResponse,
 } from './schemas';
-import type {
-  JobStatusResponse,
-  ModelDetailsResponse,
-  PredictOptions,
-  PredictionResponse,
-  RouterTrainerConfig,
-  TrainingJobResponse,
-} from './types';
+import type { PredictOptions, RouterTrainerConfig } from './types';
 
 export class RouterTrainer {
   private readonly apiKey: string;
@@ -36,22 +33,7 @@ export class RouterTrainer {
 
   constructor(config: RouterTrainerConfig = {}) {
     const apiKey = config.apiKey ?? process.env.IRONAAI_API_KEY ?? '';
-
-    if (apiKey === '') {
-      throw new MissingApiKeyError(
-        "The API key is missing. Please provide the API key either through the 'IRONAAI_API_KEY' environment variable or the 'config.apiKey' property."
-      );
-    }
-
-    if (
-      typeof apiKey !== 'string' ||
-      !apiKey.startsWith(IRONAAI_API_KEY_PREFIX)
-    ) {
-      throw new MissingApiKeyError(
-        "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."
-      );
-    }
-
+    validateApiKey(apiKey);
     this.apiKey = apiKey;
   }
 
@@ -61,7 +43,7 @@ export class RouterTrainer {
   public async fit(dataUrls: string[]): Promise<TrainingJobResponse> {
     const payload = FitRequestSchema.parse({ Data_URLs: dataUrls });
 
-    const response = await fetch(TRAIN_ENDPOINT, {
+    const response = await fetchWithTimeout(TRAIN_ENDPOINT, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -102,7 +84,7 @@ export class RouterTrainer {
 
     const url = `${TASK_STATUS_ENDPOINT}?task_id=${encodeURIComponent(targetJobId)}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -120,6 +102,7 @@ export class RouterTrainer {
     const result = JobStatusResponseSchema.parse(data);
 
     if (
+      jobId === undefined &&
       result.status === 'completed' &&
       result.model_id !== undefined &&
       result.model_id !== null
@@ -149,7 +132,7 @@ export class RouterTrainer {
 
     const url = `${MODELS_ENDPOINT}?model_id=${encodeURIComponent(targetModelId)}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
@@ -185,10 +168,10 @@ export class RouterTrainer {
     const payload = PredictRequestSchema.parse({
       model_id: targetModelId,
       inputs,
-      stream: options.stream ?? false,
+      stream: false,
     });
 
-    const response = await fetch(INFER_ENDPOINT, {
+    const response = await fetchWithTimeout(INFER_ENDPOINT, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,

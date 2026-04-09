@@ -60,7 +60,10 @@ export const PredictionResponseSchema = z.object({
 
 export type FitRequest = z.infer<typeof FitRequestSchema>;
 export type PredictRequest = z.infer<typeof PredictRequestSchema>;
+export type TrainingJobStatus = z.infer<typeof TrainingJobStatusSchema>;
 export type TrainingJobResponse = z.infer<typeof TrainingJobResponseSchema>;
 export type JobStatusResponse = z.infer<typeof JobStatusResponseSchema>;
 export type ModelDetailsResponse = z.infer<typeof ModelDetailsResponseSchema>;
+export type ModelPrediction = z.infer<typeof ModelPredictionSchema>;
+export type PredictionResult = z.infer<typeof PredictionResultSchema>;
 export type PredictionResponse = z.infer<typeof PredictionResponseSchema>;

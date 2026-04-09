@@ -9,7 +9,10 @@ async function main() {
   const trainer = new RouterTrainer();
 
   console.log('\nStarting training job...');
-  const trainingDataUrls = ['https://api.npoint.io/1181b4ec6c6333632b49'];
+  // Replace with a publicly accessible URL serving your training data (JSONL format)
+  const trainingDataUrls = [
+    'https://your-host.example.com/training-data.jsonl',
+  ];
 
   const trainingJob = await trainer.fit(trainingDataUrls);
   console.log(`Training job started: ${trainingJob.training_job_id}`);

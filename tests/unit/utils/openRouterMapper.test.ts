@@ -12,8 +12,8 @@ describe('mapReasoningToOpenRouter', () => {
     expect(mapReasoningToOpenRouter(undefined)).toBeUndefined();
   });
 
-  it('maps "off" to { enabled: false }', () => {
-    expect(mapReasoningToOpenRouter('off')).toEqual({ enabled: false });
+  it('maps "off" to undefined (omit the field so models use their own default)', () => {
+    expect(mapReasoningToOpenRouter('off')).toBeUndefined();
   });
 
   it('maps "low" to { effort: "low" }', () => {
@@ -62,6 +62,20 @@ describe('buildOpenRouterExtraBody', () => {
     expect(buildOpenRouterExtraBody({ supportsWebSearch: false })).toEqual({
       provider: { sort: 'latency' },
     });
+  });
+
+  it('never returns undefined (regression: ensures fetch wrapper is always created)', () => {
+    // Bug 4: buildOpenRouterExtraBody used to return undefined when no reasoning
+    // or search was requested, which meant the fetch wrapper was never created
+    // and provider sort preference was never sent.
+    const result = buildOpenRouterExtraBody({
+      reasoningEffort: undefined,
+      search: undefined,
+      supportsWebSearch: false,
+    });
+    expect(result).toBeDefined();
+    expect(result).not.toBeUndefined();
+    expect(result.provider).toEqual({ sort: 'latency' });
   });
 
   it('includes only provider config when reasoning is undefined and search is false', () => {
@@ -114,7 +128,7 @@ describe('buildOpenRouterExtraBody', () => {
     });
   });
 
-  it('returns reasoning and provider for "off" effort (enabled: false)', () => {
+  it('returns only provider for "off" effort (reasoning omitted)', () => {
     expect(
       buildOpenRouterExtraBody({
         reasoningEffort: 'off',
@@ -122,7 +136,6 @@ describe('buildOpenRouterExtraBody', () => {
       })
     ).toEqual({
       provider: { sort: 'latency' },
-      reasoning: { enabled: false },
     });
   });
 });

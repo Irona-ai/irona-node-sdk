@@ -3,6 +3,10 @@ jest.mock('ai', () => ({
   generateText: jest.fn(),
   streamText: jest.fn(),
   stepCountIs: jest.fn().mockImplementation((count: number) => ({ count })),
+  wrapLanguageModel: jest
+    .fn()
+    .mockImplementation(({ model }: { model: unknown }) => model),
+  extractReasoningMiddleware: jest.fn().mockReturnValue({}),
 }));
 
 export const mockGenerateText = require('ai').generateText as jest.Mock;

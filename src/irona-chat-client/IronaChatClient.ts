@@ -5,8 +5,14 @@ import { createOpenAI, openai } from '@ai-sdk/openai';
 import { createPerplexity, perplexity } from '@ai-sdk/perplexity';
 import { createTogetherAI, togetherai } from '@ai-sdk/togetherai';
 import { createXai, xai } from '@ai-sdk/xai';
-import type { ModelMessage, LanguageModel } from 'ai';
-import { generateText, streamText, stepCountIs } from 'ai';
+import type { LanguageModel, ModelMessage } from 'ai';
+import {
+  extractReasoningMiddleware,
+  generateText,
+  stepCountIs,
+  streamText,
+  wrapLanguageModel,
+} from 'ai';
 
 import { BadRequestError, MissingApiKeyError } from '../errors';
 import type { ProviderName } from '../responseTypes';
@@ -196,7 +202,22 @@ export class IronaChatClient {
       }
 
       const baseModel = modelFactory(fullModelName);
-      const finalModel = baseModel;
+
+      // When using OpenRouter with reasoning explicitly requested, the fetch wrapper
+      // injects delta.reasoning as <think>…</think> tags. Wrap the model so the AI
+      // SDK extracts those tags into reasoning-delta stream parts.
+      // Mapper omits the reasoning field for 'off'/undefined, so its presence means active.
+      const shouldExtractOpenRouterReasoning =
+        isOpenRouter && openRouterExtra?.reasoning !== undefined;
+
+      const finalModel = shouldExtractOpenRouterReasoning
+        ? (wrapLanguageModel({
+            model: baseModel as Parameters<
+              typeof wrapLanguageModel
+            >[0]['model'],
+            middleware: extractReasoningMiddleware({ tagName: 'think' }),
+          }) as LanguageModel)
+        : baseModel;
 
       // Prepare base configuration
       const baseConfig: {

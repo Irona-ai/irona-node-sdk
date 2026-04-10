@@ -147,12 +147,9 @@ export class ReasoningConfig {
         break;
 
       case 'openai':
-        if (isOff) {
-          return null;
-        }
         return {
           openai: {
-            effort: reasoningEffort,
+            effort: (isOff ? 'none' : reasoningEffort) as ReasoningEffort,
             reasoningSummary: 'auto',
           },
         };

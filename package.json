@@ -1,6 +1,6 @@
 {
   "name": "ironaai",
-  "version": "0.0.24",
+  "version": "0.0.27",
   "main": "dist/index.js",
   "module": "dist/index.m.js",
   "unpkg": "dist/index.umd.js",
@@ -52,7 +52,7 @@
     "@ai-sdk/anthropic": "^2.0.17",
     "@ai-sdk/google": "^2.0.15",
     "@ai-sdk/mistral": "^2.0.15",
-    "@ai-sdk/openai": "^2.0.32",
+    "@ai-sdk/openai": "^2.0.102",
     "@ai-sdk/perplexity": "^2.0.9",
     "@ai-sdk/togetherai": "^1.0.18",
     "@ai-sdk/xai": "^2.0.23",

@@ -1,56 +1,18 @@
 import type { OpenRouterExtraBody } from './openRouterMapper';
 
-// ── Annotation normalisation ──────────────────────────────────────────────────
-
-/**
- * OpenRouter nests citation fields inside a `url_citation` sub-object:
- *   { type: "url_citation", url_citation: { url, title, start_index, end_index } }
- *
- * `@ai-sdk/openai` v2 expects them flat:
- *   { type: "url_citation", url, title, start_index, end_index }
- *
- * This helper normalises an array of annotations in-place and returns whether
- * any entry was changed.
- */
-function normaliseAnnotations(
-  annotations: Array<Record<string, unknown>>
-): boolean {
-  let changed = false;
-
-  for (const ann of annotations) {
-    // Check if this annotation has a nested `url_citation` sub-object
-    const nested = ann.url_citation as Record<string, unknown> | undefined;
-
-    // Skip annotations that don't have nested citation data
-    if (nested === undefined) continue;
-
-    // Promote each field from the nested object to the top level of the annotation
-    if (typeof nested.url === 'string') ann.url = nested.url;
-    if (typeof nested.title === 'string') ann.title = nested.title;
-    if (typeof nested.start_index === 'number')
-      ann.start_index = nested.start_index;
-    if (typeof nested.end_index === 'number') ann.end_index = nested.end_index;
-
-    // Remove the now-flattened nested sub-object
-    delete ann.url_citation;
-
-    changed = true;
-  }
-
-  return changed;
-}
-
 // ── JSON transform helpers ────────────────────────────────────────────────────
 
 /**
  * Transforms a non-streaming OpenRouter JSON response body:
- * - Normalises nested `url_citation` annotations so `@ai-sdk/openai` can parse
- *   them into `{type:"source"}` content parts.
  * - When `injectReasoning` is true, injects `message.reasoning` into
  *   `message.content` as `<think>` tags so `extractReasoningMiddleware` can
  *   separate thinking from the final answer.
  * - When `injectReasoning` is false, drops `message.reasoning` entirely so it
  *   never leaks into response content.
+ *
+ * Note: `url_citation` annotation normalisation was removed in v0.0.27.
+ * `@ai-sdk/openai` ≥ 2.0.97 natively handles OpenRouter's nested
+ * `{ type: "url_citation", url_citation: { … } }` format.
  */
 function transformNonStreamingJson(
   json: string,
@@ -79,14 +41,6 @@ function transformNonStreamingJson(
     const message = choice.message as Record<string, unknown> | undefined;
     if (message === undefined) continue;
 
-    // ── Annotation normalisation ──────────────────────────────────────────────
-    const annotations = message.annotations;
-    if (Array.isArray(annotations)) {
-      if (normaliseAnnotations(annotations as Array<Record<string, unknown>>)) {
-        changed = true;
-      }
-    }
-
     // ── Reasoning handling ────────────────────────────────────────────────────
     const reasoning = message.reasoning;
     if (typeof reasoning === 'string' && reasoning.length > 0) {
@@ -108,12 +62,14 @@ function transformNonStreamingJson(
 
 /**
  * Transforms a single SSE data chunk:
- * - Normalises nested `url_citation` annotations in `delta.annotations`.
  * - When `injectReasoning` is true, converts `delta.reasoning` into
  *   `delta.content` with `<think>` / `</think>` wrapping (tracked via
  *   `reasoningState`) so `extractReasoningMiddleware` can extract the tokens.
  * - When `injectReasoning` is false, drops `delta.reasoning` entirely so it
  *   never leaks into the streamed content.
+ *
+ * Note: `url_citation` annotation normalisation was removed in v0.0.27.
+ * `@ai-sdk/openai` ≥ 2.0.97 natively handles OpenRouter's nested format.
  */
 function transformStreamingChunk(
   json: string,
@@ -147,14 +103,6 @@ function transformStreamingChunk(
     // `delta` carries the incremental token(s) for this chunk
     const delta = choice.delta as Record<string, unknown> | undefined;
     if (delta === undefined) continue;
-
-    // ── Annotation normalisation ──────────────────────────────────────────────
-    const annotations = delta.annotations;
-    if (Array.isArray(annotations)) {
-      if (normaliseAnnotations(annotations as Array<Record<string, unknown>>)) {
-        changed = true;
-      }
-    }
 
     // ── Reasoning handling ────────────────────────────────────────────────────
     const reasoning = delta.reasoning;
@@ -331,14 +279,14 @@ function transformStreamingResponse(
 /**
  * Creates a custom fetch wrapper that:
  * 1. Merges OpenRouter-specific params into the JSON body of POST requests.
- * 2. Normalises nested `url_citation` annotation objects to the flat format
- *    `@ai-sdk/openai` expects, so web-search citations surface as
- *    `{type:"source"}` stream/response parts.
- * 3. When reasoning is active (`extraBody.reasoning` is set), injects
+ * 2. When reasoning is active (`extraBody.reasoning` is set), injects
  *    `delta.reasoning` as `<think>…</think>` tags so
  *    `extractReasoningMiddleware({ tagName: 'think' })` can extract them.
  *    When reasoning is off, drops `delta.reasoning` entirely so those tokens
  *    never appear in the response text.
+ *
+ * `url_citation` annotation normalisation is intentionally absent: `@ai-sdk/openai`
+ * ≥ 2.0.97 natively parses OpenRouter's nested format into `{type:"source"}` parts.
  *
  * The transform is always applied so that `delta.reasoning` is always cleaned
  * up — models like gpt-5-nano emit it unconditionally even without a reasoning

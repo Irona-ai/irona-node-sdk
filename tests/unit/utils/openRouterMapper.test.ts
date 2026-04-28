@@ -1,164 +1,149 @@
 import {
-  mapReasoningToOpenRouter,
-  mapSearchToOpenRouter,
-  buildOpenRouterExtraBody,
-} from '../../../src/utils/openRouterMapper';
-import { createOpenRouterFetchWrapper } from '../../../src/utils/openRouterFetchWrapper';
+  mapReasoningToLLMGateway,
+  mapSearchToLLMGateway,
+  buildLLMGatewayExtraBody,
+} from '../../../src/utils/llmGatewayMapper';
+import { createLLMGatewayFetchWrapper } from '../../../src/utils/llmGatewayFetchWrapper';
 
-// ── mapReasoningToOpenRouter ─────────────────────────────────────────────────
+// ── mapReasoningToLLMGateway ─────────────────────────────────────────────────
 
-describe('mapReasoningToOpenRouter', () => {
+describe('mapReasoningToLLMGateway', () => {
   it('returns undefined when effort is undefined', () => {
-    expect(mapReasoningToOpenRouter(undefined)).toBeUndefined();
+    expect(mapReasoningToLLMGateway(undefined)).toBeUndefined();
   });
 
   it('maps "off" to undefined (omit the field so models use their own default)', () => {
-    expect(mapReasoningToOpenRouter('off')).toBeUndefined();
+    expect(mapReasoningToLLMGateway('off')).toBeUndefined();
   });
 
   it('maps "low" to { effort: "low" }', () => {
-    expect(mapReasoningToOpenRouter('low')).toEqual({ effort: 'low' });
+    expect(mapReasoningToLLMGateway('low')).toEqual({ effort: 'low' });
   });
 
   it('maps "medium" to { effort: "medium" }', () => {
-    expect(mapReasoningToOpenRouter('medium')).toEqual({ effort: 'medium' });
+    expect(mapReasoningToLLMGateway('medium')).toEqual({ effort: 'medium' });
   });
 
   it('maps "high" to { effort: "high" }', () => {
-    expect(mapReasoningToOpenRouter('high')).toEqual({ effort: 'high' });
+    expect(mapReasoningToLLMGateway('high')).toEqual({ effort: 'high' });
   });
 
   it('maps "max" to { effort: "xhigh" }', () => {
-    expect(mapReasoningToOpenRouter('max')).toEqual({ effort: 'xhigh' });
+    expect(mapReasoningToLLMGateway('max')).toEqual({ effort: 'xhigh' });
   });
 });
 
-// ── mapSearchToOpenRouter ────────────────────────────────────────────────────
+// ── mapSearchToLLMGateway ────────────────────────────────────────────────────
 
-describe('mapSearchToOpenRouter', () => {
+describe('mapSearchToLLMGateway', () => {
   it('returns undefined when search is undefined', () => {
-    expect(mapSearchToOpenRouter(undefined, true)).toBeUndefined();
+    expect(mapSearchToLLMGateway(undefined, true)).toBeUndefined();
   });
 
   it('returns undefined when search is false', () => {
-    expect(mapSearchToOpenRouter(false, true)).toBeUndefined();
+    expect(mapSearchToLLMGateway(false, true)).toBeUndefined();
   });
 
   it('returns undefined when model does not support web search', () => {
-    expect(mapSearchToOpenRouter(true, false)).toBeUndefined();
+    expect(mapSearchToLLMGateway(true, false)).toBeUndefined();
   });
 
-  it('returns plugins when search is true and supported', () => {
-    expect(mapSearchToOpenRouter(true, true)).toEqual({
-      plugins: [{ id: 'web' }],
-    });
+  it('returns web_search tool when search is true and supported', () => {
+    expect(mapSearchToLLMGateway(true, true)).toEqual([{ type: 'web_search' }]);
   });
 });
 
-// ── buildOpenRouterExtraBody ─────────────────────────────────────────────────
+// ── buildLLMGatewayExtraBody ─────────────────────────────────────────────────
 
-describe('buildOpenRouterExtraBody', () => {
-  it('always includes provider sort by latency', () => {
-    expect(buildOpenRouterExtraBody({ supportsWebSearch: false })).toEqual({
-      provider: { sort: 'latency' },
-    });
+describe('buildLLMGatewayExtraBody', () => {
+  it('returns empty object when no features are requested', () => {
+    expect(buildLLMGatewayExtraBody({ supportsWebSearch: false })).toEqual({});
   });
 
-  it('never returns undefined (regression: ensures fetch wrapper is always created)', () => {
-    // Bug 4: buildOpenRouterExtraBody used to return undefined when no reasoning
-    // or search was requested, which meant the fetch wrapper was never created
-    // and provider sort preference was never sent.
-    const result = buildOpenRouterExtraBody({
+  it('never returns undefined', () => {
+    const result = buildLLMGatewayExtraBody({
       reasoningEffort: undefined,
       search: undefined,
       supportsWebSearch: false,
     });
     expect(result).toBeDefined();
     expect(result).not.toBeUndefined();
-    expect(result.provider).toEqual({ sort: 'latency' });
   });
 
-  it('includes only provider config when reasoning is undefined and search is false', () => {
+  it('returns empty object when reasoning is undefined and search is false', () => {
     expect(
-      buildOpenRouterExtraBody({
+      buildLLMGatewayExtraBody({
         reasoningEffort: undefined,
         search: false,
         supportsWebSearch: true,
       })
-    ).toEqual({
-      provider: { sort: 'latency' },
-    });
+    ).toEqual({});
   });
 
-  it('returns reasoning and provider when search is not requested', () => {
+  it('returns reasoning when search is not requested', () => {
     expect(
-      buildOpenRouterExtraBody({
+      buildLLMGatewayExtraBody({
         reasoningEffort: 'high',
         supportsWebSearch: false,
       })
     ).toEqual({
-      provider: { sort: 'latency' },
       reasoning: { effort: 'high' },
     });
   });
 
-  it('returns search params and provider when reasoning is undefined', () => {
+  it('returns tools when search is requested', () => {
     expect(
-      buildOpenRouterExtraBody({
+      buildLLMGatewayExtraBody({
         search: true,
         supportsWebSearch: true,
       })
     ).toEqual({
-      provider: { sort: 'latency' },
-      plugins: [{ id: 'web' }],
+      tools: [{ type: 'web_search' }],
     });
   });
 
-  it('returns reasoning, search, and provider when both are requested', () => {
+  it('returns reasoning and tools when both are requested', () => {
     expect(
-      buildOpenRouterExtraBody({
+      buildLLMGatewayExtraBody({
         reasoningEffort: 'max',
         search: true,
         supportsWebSearch: true,
       })
     ).toEqual({
-      provider: { sort: 'latency' },
       reasoning: { effort: 'xhigh' },
-      plugins: [{ id: 'web' }],
+      tools: [{ type: 'web_search' }],
     });
   });
 
-  it('returns only provider for "off" effort (reasoning omitted)', () => {
+  it('returns empty object for "off" effort (reasoning omitted)', () => {
     expect(
-      buildOpenRouterExtraBody({
+      buildLLMGatewayExtraBody({
         reasoningEffort: 'off',
         supportsWebSearch: false,
       })
-    ).toEqual({
-      provider: { sort: 'latency' },
-    });
+    ).toEqual({});
   });
 });
 
-// ── createOpenRouterFetchWrapper ─────────────────────────────────────────────
+// ── createLLMGatewayFetchWrapper ─────────────────────────────────────────────
 
-describe('createOpenRouterFetchWrapper', () => {
+describe('createLLMGatewayFetchWrapper', () => {
   it('merges extra body into POST JSON requests', async () => {
     const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
-    const wrapper = createOpenRouterFetchWrapper(
+    const wrapper = createLLMGatewayFetchWrapper(
       { reasoning: { effort: 'high' } },
       mockFetch
     );
 
     const originalBody = JSON.stringify({ model: 'test', messages: [] });
-    await wrapper('https://openrouter.ai/api/v1/chat/completions', {
+    await wrapper('https://api.llmgateway.io/v1/chat/completions', {
       method: 'POST',
       body: originalBody,
     });
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+    expect(url).toBe('https://api.llmgateway.io/v1/chat/completions');
     const parsedBody = JSON.parse(init.body as string) as Record<
       string,
       unknown
@@ -172,17 +157,17 @@ describe('createOpenRouterFetchWrapper', () => {
 
   it('passes through GET requests unchanged', async () => {
     const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
-    const wrapper = createOpenRouterFetchWrapper(
+    const wrapper = createLLMGatewayFetchWrapper(
       { reasoning: { effort: 'high' } },
       mockFetch
     );
 
-    await wrapper('https://openrouter.ai/api/v1/models', {
+    await wrapper('https://api.llmgateway.io/v1/models', {
       method: 'GET',
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://openrouter.ai/api/v1/models',
+      'https://api.llmgateway.io/v1/models',
       {
         method: 'GET',
       }
@@ -191,19 +176,19 @@ describe('createOpenRouterFetchWrapper', () => {
 
   it('passes through POST requests with non-string body', async () => {
     const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
-    const wrapper = createOpenRouterFetchWrapper(
+    const wrapper = createLLMGatewayFetchWrapper(
       { reasoning: { effort: 'high' } },
       mockFetch
     );
 
     const formData = new FormData();
-    await wrapper('https://openrouter.ai/api/v1/upload', {
+    await wrapper('https://api.llmgateway.io/v1/upload', {
       method: 'POST',
       body: formData as unknown as BodyInit,
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://openrouter.ai/api/v1/upload',
+      'https://api.llmgateway.io/v1/upload',
       {
         method: 'POST',
         body: formData,
@@ -213,33 +198,33 @@ describe('createOpenRouterFetchWrapper', () => {
 
   it('passes through POST requests with invalid JSON body', async () => {
     const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
-    const wrapper = createOpenRouterFetchWrapper(
+    const wrapper = createLLMGatewayFetchWrapper(
       { reasoning: { effort: 'high' } },
       mockFetch
     );
 
-    await wrapper('https://openrouter.ai/api/v1/chat/completions', {
+    await wrapper('https://api.llmgateway.io/v1/chat/completions', {
       method: 'POST',
       body: 'not json',
     });
 
     expect(mockFetch).toHaveBeenCalledWith(
-      'https://openrouter.ai/api/v1/chat/completions',
+      'https://api.llmgateway.io/v1/chat/completions',
       { method: 'POST', body: 'not json' }
     );
   });
 
-  it('merges multiple extra body keys', async () => {
+  it('merges multiple extra body keys including web_search tools', async () => {
     const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
-    const wrapper = createOpenRouterFetchWrapper(
+    const wrapper = createLLMGatewayFetchWrapper(
       {
         reasoning: { effort: 'xhigh' },
-        plugins: [{ id: 'web' }],
+        tools: [{ type: 'web_search' }],
       },
       mockFetch
     );
 
-    await wrapper('https://openrouter.ai/api/v1/chat/completions', {
+    await wrapper('https://api.llmgateway.io/v1/chat/completions', {
       method: 'POST',
       body: JSON.stringify({ model: 'test', messages: [] }),
     });
@@ -251,13 +236,12 @@ describe('createOpenRouterFetchWrapper', () => {
       model: 'test',
       messages: [],
       reasoning: { effort: 'xhigh' },
-      plugins: [{ id: 'web' }],
+      tools: [{ type: 'web_search' }],
     });
   });
 
   it('uses globalThis.fetch by default when no baseFetch provided', () => {
-    // Just verify the wrapper can be created without a baseFetch argument
-    const wrapper = createOpenRouterFetchWrapper({
+    const wrapper = createLLMGatewayFetchWrapper({
       reasoning: { effort: 'high' },
     });
     expect(typeof wrapper).toBe('function');

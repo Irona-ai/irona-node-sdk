@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Shared binary / data input type
+ * Shared binary / data input type (used for file/PDF parts)
  */
 const BinaryDataSchema = z.union([
   z.string(),
@@ -20,16 +20,19 @@ export const TextPartSchema = z.object({
 });
 
 /**
- * ImagePart
+ * ImageUrlPart — OpenAI-compatible image format.
+ * `url` may be an HTTPS URL or a base64 data URI (data:image/...;base64,...).
  */
-export const ImagePartSchema = z.object({
-  type: z.literal('image'),
-  image: BinaryDataSchema,
-  mediaType: z.string().optional(),
+export const ImageUrlPartSchema = z.object({
+  type: z.literal('image_url'),
+  image_url: z.object({
+    url: z.string(),
+    detail: z.string().optional(),
+  }),
 });
 
 /**
- * FilePart
+ * FilePart (PDF / binary file input — Vercel AI SDK native format)
  */
 export const FilePartSchema = z.object({
   type: z.literal('file'),
@@ -42,7 +45,7 @@ export const FilePartSchema = z.object({
  */
 export const MessagePartSchema = z.union([
   TextPartSchema,
-  ImagePartSchema,
+  ImageUrlPartSchema,
   FilePartSchema,
 ]);
 

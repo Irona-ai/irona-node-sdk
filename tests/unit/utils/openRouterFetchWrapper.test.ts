@@ -1,5 +1,5 @@
-import { createOpenRouterFetchWrapper } from '../../../src/utils/openRouterFetchWrapper';
-import type { OpenRouterExtraBody } from '../../../src/utils/openRouterMapper';
+import { createLLMGatewayFetchWrapper } from '../../../src/utils/llmGatewayFetchWrapper';
+import type { LLMGatewayExtraBody } from '../../../src/utils/llmGatewayMapper';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,20 +70,20 @@ async function readStreamToString(
 }
 
 async function callWrapper(
-  extraBody: OpenRouterExtraBody,
+  extraBody: LLMGatewayExtraBody,
   responseBody: string,
   contentType = 'application/json'
 ): Promise<Response> {
   const mockFetch = createMockFetch(responseBody, contentType);
-  const wrapper = createOpenRouterFetchWrapper(extraBody, mockFetch);
-  return wrapper('https://openrouter.ai/api/v1/chat/completions', {
+  const wrapper = createLLMGatewayFetchWrapper(extraBody, mockFetch);
+  return wrapper('https://api.llmgateway.io/v1/chat/completions', {
     method: 'POST',
     body: JSON.stringify({ model: 'test', messages: [] }),
   });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Bug 1: Reasoning content was silently discarded (non-streaming)
+// Non-streaming reasoning injection
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Non-streaming reasoning injection', () => {
@@ -98,11 +98,9 @@ describe('Non-streaming reasoning injection', () => {
       choices: Array<{ message: { content: string; reasoning?: string } }>;
     };
 
-    // Reasoning should be injected as <think> tags in content
     expect(json.choices[0].message.content).toBe(
       '<think>Let me calculate 15 * 37 step by step...</think>The answer is 555.'
     );
-    // The original reasoning field should be removed
     expect(json.choices[0].message.reasoning).toBeUndefined();
   });
 
@@ -162,85 +160,7 @@ describe('Non-streaming reasoning injection', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Bug 2: Annotations were deleted instead of flattened
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('Non-streaming annotation normalisation', () => {
-  it('flattens nested url_citation objects instead of deleting them', async () => {
-    const body = nonStreamingBody({
-      content: 'Search result text',
-      annotations: [
-        {
-          type: 'url_citation',
-          url_citation: {
-            url: 'https://example.com',
-            title: 'Example',
-            start_index: 0,
-            end_index: 18,
-          },
-        },
-      ],
-    });
-
-    const response = await callWrapper({ plugins: [{ id: 'web' }] }, body);
-    const json = (await response.json()) as {
-      choices: Array<{
-        message: {
-          annotations: Array<{
-            type: string;
-            url: string;
-            title: string;
-            start_index: number;
-            end_index: number;
-            url_citation?: unknown;
-          }>;
-        };
-      }>;
-    };
-
-    const ann = json.choices[0].message.annotations[0];
-    // Fields should be flat at top level
-    expect(ann.url).toBe('https://example.com');
-    expect(ann.title).toBe('Example');
-    expect(ann.start_index).toBe(0);
-    expect(ann.end_index).toBe(18);
-    // Nested sub-object should be removed
-    expect(ann.url_citation).toBeUndefined();
-    // Annotations array should still exist (not deleted!)
-    expect(json.choices[0].message.annotations).toHaveLength(1);
-  });
-
-  it('preserves already-flat annotations unchanged', async () => {
-    const body = nonStreamingBody({
-      content: 'Already flat',
-      annotations: [
-        {
-          type: 'url_citation',
-          url: 'https://flat.example.com',
-          title: 'Flat',
-          start_index: 0,
-          end_index: 12,
-        },
-      ],
-    });
-
-    const response = await callWrapper({ plugins: [{ id: 'web' }] }, body);
-    const json = (await response.json()) as {
-      choices: Array<{
-        message: {
-          annotations: Array<{ url: string; title: string }>;
-        };
-      }>;
-    };
-
-    expect(json.choices[0].message.annotations[0].url).toBe(
-      'https://flat.example.com'
-    );
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Bug 3: Transforms were conditional on hasSearchPlugin
+// Transforms always applied (not conditional on search)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Transforms always applied (not conditional on search)', () => {
@@ -250,7 +170,6 @@ describe('Transforms always applied (not conditional on search)', () => {
       reasoning: 'Thinking step by step...',
     });
 
-    // extraBody has reasoning but NO plugins (no search)
     const response = await callWrapper(
       { reasoning: { effort: 'medium' } },
       body
@@ -259,7 +178,6 @@ describe('Transforms always applied (not conditional on search)', () => {
       choices: Array<{ message: { content: string; reasoning?: string } }>;
     };
 
-    // Even without search, reasoning should be injected
     expect(json.choices[0].message.content).toContain('<think>');
     expect(json.choices[0].message.reasoning).toBeUndefined();
   });
@@ -270,7 +188,6 @@ describe('Transforms always applied (not conditional on search)', () => {
       reasoning: 'Some reasoning',
     });
 
-    // Empty extraBody — no reasoning config means reasoning is dropped, not injected
     const response = await callWrapper({}, body);
     const json = (await response.json()) as {
       choices: Array<{ message: { content: string; reasoning?: string } }>;
@@ -279,10 +196,25 @@ describe('Transforms always applied (not conditional on search)', () => {
     expect(json.choices[0].message.content).toBe('Plain');
     expect(json.choices[0].message.reasoning).toBeUndefined();
   });
+
+  it('drops reasoning when extraBody has no reasoning config', async () => {
+    const body = nonStreamingBody({
+      content: 'Native reasoning response',
+      reasoning: 'The model thought on its own.',
+    });
+
+    const response = await callWrapper({}, body);
+    const json = (await response.json()) as {
+      choices: Array<{ message: { content: string; reasoning?: string } }>;
+    };
+
+    expect(json.choices[0].message.content).toBe('Native reasoning response');
+    expect(json.choices[0].message.reasoning).toBeUndefined();
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Bug 5: Streaming reasoning with stateful <think> tag tracking
+// Streaming reasoning with stateful <think> tag tracking
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('Streaming reasoning injection', () => {
@@ -301,13 +233,13 @@ describe('Streaming reasoning injection', () => {
 
     const sseBody = buildSSEBody(chunks);
     const mockFetch = createStreamingMockFetch(sseBody);
-    const wrapper = createOpenRouterFetchWrapper(
+    const wrapper = createLLMGatewayFetchWrapper(
       { reasoning: { effort: 'high' } },
       mockFetch
     );
 
     const response = await wrapper(
-      'https://openrouter.ai/api/v1/chat/completions',
+      'https://api.llmgateway.io/v1/chat/completions',
       {
         method: 'POST',
         body: JSON.stringify({ model: 'test', messages: [] }),
@@ -316,14 +248,10 @@ describe('Streaming reasoning injection', () => {
 
     const text = await readStreamToString(response.body!);
 
-    // First reasoning chunk should have <think> prefix
     expect(text).toContain('<think>Step 1: ');
-    // Second reasoning chunk should NOT have <think> prefix (already open)
     expect(text).toContain('Step 2. ');
     expect(text).not.toContain('<think>Step 2. ');
-    // First content chunk should have </think> prefix
     expect(text).toContain('</think>The answer is 42.');
-    // reasoning fields should be removed from deltas
     expect(text).not.toContain('"reasoning"');
   });
 
@@ -338,13 +266,13 @@ describe('Streaming reasoning injection', () => {
 
     const sseBody = buildSSEBody(chunks);
     const mockFetch = createStreamingMockFetch(sseBody);
-    const wrapper = createOpenRouterFetchWrapper(
+    const wrapper = createLLMGatewayFetchWrapper(
       { reasoning: { effort: 'medium' } },
       mockFetch
     );
 
     const response = await wrapper(
-      'https://openrouter.ai/api/v1/chat/completions',
+      'https://api.llmgateway.io/v1/chat/completions',
       {
         method: 'POST',
         body: JSON.stringify({ model: 'test', messages: [] }),
@@ -356,23 +284,227 @@ describe('Streaming reasoning injection', () => {
     expect(text).toContain('<think>All reasoning, no text.');
     expect(text).not.toContain('"reasoning"');
   });
+});
 
-  it('flattens nested annotations in streaming delta', async () => {
+// ═══════════════════════════════════════════════════════════════════════════════
+// Combined: reasoning + search in same response
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Combined reasoning + search in single response', () => {
+  it('handles reasoning injection with web search tools', async () => {
+    const body = nonStreamingBody({
+      content: 'The population is about 1.4 billion.',
+      reasoning: 'Let me search and reason about this.',
+    });
+
+    const response = await callWrapper(
+      {
+        reasoning: { effort: 'medium' },
+        tools: [{ type: 'web_search' }],
+      },
+      body
+    );
+    const json = (await response.json()) as {
+      choices: Array<{
+        message: {
+          content: string;
+          reasoning?: string;
+        };
+      }>;
+    };
+
+    expect(json.choices[0].message.content).toBe(
+      '<think>Let me search and reason about this.</think>The population is about 1.4 billion.'
+    );
+    expect(json.choices[0].message.reasoning).toBeUndefined();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Web search: tools merging and annotation normalisation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('Web search tools merging', () => {
+  it('injects web_search tool when request has no existing tools', async () => {
+    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
+    const wrapper = createLLMGatewayFetchWrapper(
+      { tools: [{ type: 'web_search' }] },
+      mockFetch
+    );
+
+    await wrapper('https://api.llmgateway.io/v1/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'grok-4-fast', messages: [] }),
+    });
+
+    const sent = JSON.parse(
+      (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string
+    ) as Record<string, unknown>;
+    expect(sent.tools).toEqual([{ type: 'web_search' }]);
+  });
+
+  it('merges web_search tool with existing function-calling tools', async () => {
+    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
+    const wrapper = createLLMGatewayFetchWrapper(
+      { tools: [{ type: 'web_search' }] },
+      mockFetch
+    );
+
+    const fnTool = { type: 'function', function: { name: 'get_weather' } };
+    await wrapper('https://api.llmgateway.io/v1/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({
+        model: 'grok-4-fast',
+        messages: [],
+        tools: [fnTool],
+      }),
+    });
+
+    const sent = JSON.parse(
+      (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string
+    ) as Record<string, unknown>;
+    expect(sent.tools).toEqual([fnTool, { type: 'web_search' }]);
+  });
+
+  it('does not send tools key when search is not requested', async () => {
+    const mockFetch = jest.fn().mockResolvedValue(new Response('ok'));
+    const wrapper = createLLMGatewayFetchWrapper(
+      { reasoning: { effort: 'high' } },
+      mockFetch
+    );
+
+    await wrapper('https://api.llmgateway.io/v1/chat/completions', {
+      method: 'POST',
+      body: JSON.stringify({ model: 'test', messages: [] }),
+    });
+
+    const sent = JSON.parse(
+      (mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string
+    ) as Record<string, unknown>;
+    expect(sent).not.toHaveProperty('tools');
+  });
+});
+
+describe('Non-streaming annotation normalisation', () => {
+  it('normalises flat message.annotations in non-streaming response', async () => {
+    const body = JSON.stringify({
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: 'The weather is nice.',
+            annotations: [
+              {
+                type: 'url_citation',
+                url: 'https://example.com',
+                title: 'Example',
+              },
+            ],
+          },
+          finish_reason: 'stop',
+        },
+      ],
+    });
+
+    const response = await callWrapper({}, body);
+    const json = (await response.json()) as {
+      choices: Array<{ message: { annotations: unknown[] } }>;
+    };
+    const annotation = json.choices[0].message.annotations[0] as Record<
+      string,
+      unknown
+    >;
+
+    expect(annotation.type).toBe('url_citation');
+    expect(annotation.url).toBe('https://example.com');
+    expect(annotation.start_index).toBe(0);
+    expect(annotation.end_index).toBe(0);
+  });
+
+  it('normalises nested url_citation format in non-streaming response (Google/Gemini)', async () => {
+    const body = JSON.stringify({
+      choices: [
+        {
+          message: {
+            role: 'assistant',
+            content: 'The weather is nice.',
+            annotations: [
+              {
+                type: 'url_citation',
+                url_citation: { url: 'https://weather.com', title: 'Weather' },
+              },
+            ],
+          },
+          finish_reason: 'stop',
+        },
+      ],
+    });
+
+    const response = await callWrapper({}, body);
+    const json = (await response.json()) as {
+      choices: Array<{ message: { annotations: unknown[] } }>;
+    };
+    const annotation = json.choices[0].message.annotations[0] as Record<
+      string,
+      unknown
+    >;
+
+    expect(annotation.url).toBe('https://weather.com');
+    expect(annotation.title).toBe('Weather');
+    expect(annotation).not.toHaveProperty('url_citation');
+  });
+});
+
+describe('Annotation normalisation for sources', () => {
+  it('normalises flat delta.annotations missing start_index/end_index', async () => {
     const chunks = [
       {
         choices: [
           {
             index: 0,
             delta: {
-              content: 'Source: ',
+              annotations: [
+                {
+                  type: 'url_citation',
+                  url: 'https://example.com',
+                  title: 'Example',
+                },
+              ],
+            },
+          },
+        ],
+      },
+    ];
+
+    const sseBody = buildSSEBody(chunks);
+    const mockFetch = createStreamingMockFetch(sseBody);
+    const wrapper = createLLMGatewayFetchWrapper({}, mockFetch);
+
+    const response = await wrapper(
+      'https://api.llmgateway.io/v1/chat/completions',
+      { method: 'POST', body: JSON.stringify({ model: 'test', messages: [] }) }
+    );
+
+    const text = await readStreamToString(response.body!);
+    expect(text).toContain('"start_index":0');
+    expect(text).toContain('"end_index":0');
+    expect(text).toContain('https://example.com');
+  });
+
+  it('normalises nested url_citation format (Google/Gemini via LLM Gateway)', async () => {
+    const chunks = [
+      {
+        choices: [
+          {
+            index: 0,
+            delta: {
+              content: 'It is sunny.',
               annotations: [
                 {
                   type: 'url_citation',
                   url_citation: {
-                    url: 'https://stream.example.com',
-                    title: 'Stream Source',
-                    start_index: 0,
-                    end_index: 7,
+                    url: 'https://weather.com',
+                    title: 'Weather',
                   },
                 },
               ],
@@ -384,120 +516,63 @@ describe('Streaming reasoning injection', () => {
 
     const sseBody = buildSSEBody(chunks);
     const mockFetch = createStreamingMockFetch(sseBody);
-    const wrapper = createOpenRouterFetchWrapper(
-      { plugins: [{ id: 'web' }] },
-      mockFetch
-    );
+    const wrapper = createLLMGatewayFetchWrapper({}, mockFetch);
 
     const response = await wrapper(
-      'https://openrouter.ai/api/v1/chat/completions',
-      {
-        method: 'POST',
-        body: JSON.stringify({ model: 'test', messages: [] }),
-      }
+      'https://api.llmgateway.io/v1/chat/completions',
+      { method: 'POST', body: JSON.stringify({ model: 'test', messages: [] }) }
     );
 
     const text = await readStreamToString(response.body!);
-    const parsed = JSON.parse(
-      text
-        .split('\n')
-        .find(l => l.startsWith('data: {'))!
-        .slice(6)
-    ) as {
-      choices: Array<{
-        delta: {
-          annotations: Array<{
-            url: string;
-            url_citation?: unknown;
-          }>;
-        };
-      }>;
+    const chunk = JSON.parse(text.replace(/^data: /, '').split('\n')[0]) as {
+      choices: Array<{ delta: { annotations: unknown[] } }>;
     };
+    const annotation = chunk.choices[0].delta.annotations[0] as Record<
+      string,
+      unknown
+    >;
 
-    const ann = parsed.choices[0].delta.annotations[0];
-    expect(ann.url).toBe('https://stream.example.com');
-    expect(ann.url_citation).toBeUndefined();
+    expect(annotation.type).toBe('url_citation');
+    expect(annotation.url).toBe('https://weather.com');
+    expect(annotation.title).toBe('Weather');
+    expect(annotation.start_index).toBe(0);
+    expect(annotation.end_index).toBe(0);
+    expect(annotation).not.toHaveProperty('url_citation');
   });
-});
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Bug 4: buildOpenRouterExtraBody returning undefined → no fetch wrapper
-// (Tested via the public wrapper API to verify transform is always applied)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('Response transform applied regardless of extraBody contents', () => {
-  it('drops reasoning when extraBody has only provider config (no reasoning requested)', async () => {
-    // When buildOpenRouterExtraBody returns only { provider: { sort: 'latency' } }
-    // (no reasoning config), injectReasoning=false — reasoning is dropped, not injected.
-    // This prevents native reasoning tokens from leaking into response text.
-    const body = nonStreamingBody({
-      content: 'Native reasoning response',
-      reasoning: 'The model thought on its own.',
-    });
-
-    const response = await callWrapper(
-      { provider: { sort: 'latency' } } as OpenRouterExtraBody,
-      body
-    );
-    const json = (await response.json()) as {
-      choices: Array<{ message: { content: string; reasoning?: string } }>;
-    };
-
-    // No reasoning config → reasoning is silently dropped
-    expect(json.choices[0].message.content).toBe('Native reasoning response');
-    expect(json.choices[0].message.reasoning).toBeUndefined();
-  });
-});
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Combined: reasoning + search + annotations in same response
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('Combined reasoning + annotations in single response', () => {
-  it('handles both reasoning injection and annotation flattening', async () => {
-    const body = nonStreamingBody({
-      content: 'The population is about 1.4 billion.',
-      reasoning: 'Let me search and reason about this.',
-      annotations: [
-        {
-          type: 'url_citation',
-          url_citation: {
-            url: 'https://census.gov',
-            title: 'Census Data',
-            start_index: 0,
-            end_index: 35,
-          },
-        },
-      ],
-    });
-
-    const response = await callWrapper(
+  it('promotes message.annotations into delta.annotations on final chunk', async () => {
+    const chunks = [
       {
-        reasoning: { effort: 'medium' },
-        plugins: [{ id: 'web' }],
+        choices: [
+          {
+            index: 0,
+            delta: { content: 'The weather is nice.' },
+            message: {
+              annotations: [
+                {
+                  type: 'url_citation',
+                  url: 'https://weather.com',
+                  title: 'Weather',
+                },
+              ],
+            },
+          },
+        ],
       },
-      body
-    );
-    const json = (await response.json()) as {
-      choices: Array<{
-        message: {
-          content: string;
-          reasoning?: string;
-          annotations: Array<{ url: string; url_citation?: unknown }>;
-        };
-      }>;
-    };
+    ];
 
-    // Reasoning injected
-    expect(json.choices[0].message.content).toBe(
-      '<think>Let me search and reason about this.</think>The population is about 1.4 billion.'
-    );
-    expect(json.choices[0].message.reasoning).toBeUndefined();
+    const sseBody = buildSSEBody(chunks);
+    const mockFetch = createStreamingMockFetch(sseBody);
+    const wrapper = createLLMGatewayFetchWrapper({}, mockFetch);
 
-    // Annotations flattened
-    expect(json.choices[0].message.annotations[0].url).toBe(
-      'https://census.gov'
+    const response = await wrapper(
+      'https://api.llmgateway.io/v1/chat/completions',
+      { method: 'POST', body: JSON.stringify({ model: 'test', messages: [] }) }
     );
-    expect(json.choices[0].message.annotations[0].url_citation).toBeUndefined();
+
+    const text = await readStreamToString(response.body!);
+    expect(text).toContain('"annotations"');
+    expect(text).toContain('https://weather.com');
+    expect(text).not.toContain('"message"');
   });
 });

@@ -148,7 +148,7 @@ export class LocalRouter implements Router {
       const price = getModelPrice(m.provider, m.model);
       const capabilities = getModelCapabilities(m.provider, m.model);
       // Weight: 1 part input + 3 parts output (output is typically more significant)
-      const cost = price ? price.input + 3 * price.output : 0;
+      const cost = price !== null ? price.input + 3 * price.output : 0;
       const hasReasoning = capabilities?.includes('reasoning') ?? false;
       return { ...m, cost, hasReasoning };
     });

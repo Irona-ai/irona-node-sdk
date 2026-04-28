@@ -11,7 +11,7 @@ import {
 } from '../../mocks/ai-sdk.mock';
 import {
   mockDoesModelSupportWebSearch,
-  mockGetOpenRouterIdentifier,
+  mockGetLLMGatewayIdentifier,
   resetSupportedModelsMocks,
 } from '../../mocks/supported-models.mock';
 import { resetProviderUtilsMocks } from '../../mocks/provider-utils.mock';
@@ -21,8 +21,8 @@ import {
   mockConsole,
   setupTestEnv,
 } from '../../utils/test-helpers';
-import * as openRouterMapper from '../../../src/utils/openRouterMapper';
-import * as openRouterFetchWrapper from '../../../src/utils/openRouterFetchWrapper';
+import * as llmGatewayMapper from '../../../src/utils/llmGatewayMapper';
+import * as llmGatewayFetchWrapper from '../../../src/utils/llmGatewayFetchWrapper';
 
 describe('Gateway Completions', () => {
   beforeEach(() => {
@@ -38,8 +38,8 @@ describe('Gateway Completions', () => {
     const config: Config = {
       apiKey: 'test-api-key',
       gateway: {
-        baseUrl: 'https://openrouter.ai/api/v1',
-        apiKey: 'openrouter-test-key',
+        baseUrl: 'https://api.llmgateway.io/v1',
+        apiKey: 'llmgateway-test-key',
       },
     };
     const client = new IronaChatClient(config, mockRouter);
@@ -54,20 +54,20 @@ describe('Gateway Completions', () => {
     expect(mockGenerateText).toHaveBeenCalledTimes(1);
   });
 
-  it('uses OpenRouter model mapping when available and no provider key is set', async () => {
+  it('uses LLMGateway model mapping when available and no provider key is set', async () => {
     const mockRouter = createMockRouterClient();
     const config: Config = {
       apiKey: 'test-api-key',
       gateway: {
-        baseUrl: 'https://openrouter.ai/api/v1',
-        apiKey: 'openrouter-test-key',
+        baseUrl: 'https://api.llmgateway.io/v1',
+        apiKey: 'llmgateway-test-key',
       },
     };
     const client = new IronaChatClient(config, mockRouter);
 
     // Delete direct provider key so google routes through gateway
     delete process.env.GOOGLE_API_KEY;
-    mockGetOpenRouterIdentifier.mockReturnValue('google/gemini-2.0-flash-001');
+    mockGetLLMGatewayIdentifier.mockReturnValue('gemini-2.0-flash-001');
     setupSuccessfulGeneration('Mapped response');
 
     await client.completions(
@@ -79,7 +79,7 @@ describe('Gateway Completions', () => {
     const requestConfig = mockGenerateText.mock.calls[0][0] as {
       model: { modelId: string };
     };
-    expect(requestConfig.model.modelId).toBe('google/gemini-2.0-flash-001');
+    expect(requestConfig.model.modelId).toBe('gemini-2.0-flash-001');
   });
 
   it('routes through gateway even when provider env var is set', async () => {
@@ -87,14 +87,14 @@ describe('Gateway Completions', () => {
     const config: Config = {
       apiKey: 'test-api-key',
       gateway: {
-        baseUrl: 'https://openrouter.ai/api/v1',
-        apiKey: 'openrouter-test-key',
+        baseUrl: 'https://api.llmgateway.io/v1',
+        apiKey: 'llmgateway-test-key',
       },
     };
     const client = new IronaChatClient(config, mockRouter);
 
     // GOOGLE_API_KEY is set by setupTestEnv() — should still route through gateway
-    mockGetOpenRouterIdentifier.mockReturnValue('google/gemini-2.0-flash-001');
+    mockGetLLMGatewayIdentifier.mockReturnValue('gemini-2.0-flash-001');
     setupSuccessfulGeneration('Gateway response');
 
     await client.completions(
@@ -106,8 +106,8 @@ describe('Gateway Completions', () => {
     const requestConfig = mockGenerateText.mock.calls[0][0] as {
       model: { modelId: string };
     };
-    // Model name should be the OpenRouter identifier, NOT raw
-    expect(requestConfig.model.modelId).toBe('google/gemini-2.0-flash-001');
+    // Model name should be the LLMGateway identifier (bare, no provider prefix)
+    expect(requestConfig.model.modelId).toBe('gemini-2.0-flash-001');
   });
 
   it('routes through gateway even with programmatic provider config', async () => {
@@ -115,8 +115,8 @@ describe('Gateway Completions', () => {
     const config: Config = {
       apiKey: 'test-api-key',
       gateway: {
-        baseUrl: 'https://openrouter.ai/api/v1',
-        apiKey: 'openrouter-test-key',
+        baseUrl: 'https://api.llmgateway.io/v1',
+        apiKey: 'llmgateway-test-key',
       },
       providers: {
         openai: { apiKey: 'programmatic-openai-key' },
@@ -129,11 +129,11 @@ describe('Gateway Completions', () => {
     const result = await client.completions(createTestPayload());
 
     expect(result.response.content).toBe('Gateway via programmatic config');
-    // Model name should be gateway-prefixed, not raw
+    // LLMGateway uses bare model names (no provider prefix)
     const requestConfig = mockGenerateText.mock.calls[0][0] as {
       model: { modelId: string };
     };
-    expect(requestConfig.model.modelId).toBe('openai/gpt-4o-mini');
+    expect(requestConfig.model.modelId).toBe('gpt-4o-mini');
   });
 
   it('falls back to direct provider when no gateway is configured', async () => {
@@ -181,18 +181,18 @@ describe('Gateway Completions', () => {
     expect(requestConfig.model.modelId).toBe('gpt-4o-mini');
   });
 
-  describe('OpenRouter payload mapping', () => {
+  describe('LLMGateway payload mapping', () => {
     let buildExtraBodySpy: jest.SpyInstance;
     let fetchWrapperSpy: jest.SpyInstance;
 
     beforeEach(() => {
       buildExtraBodySpy = jest.spyOn(
-        openRouterMapper,
-        'buildOpenRouterExtraBody'
+        llmGatewayMapper,
+        'buildLLMGatewayExtraBody'
       );
       fetchWrapperSpy = jest.spyOn(
-        openRouterFetchWrapper,
-        'createOpenRouterFetchWrapper'
+        llmGatewayFetchWrapper,
+        'createLLMGatewayFetchWrapper'
       );
     });
 
@@ -201,13 +201,13 @@ describe('Gateway Completions', () => {
       fetchWrapperSpy.mockRestore();
     });
 
-    it('sends reasoning params through OpenRouter gateway', async () => {
+    it('sends reasoning params through LLMGateway', async () => {
       const mockRouter = createMockRouterClient();
       const config: Config = {
         apiKey: 'test-api-key',
         gateway: {
-          baseUrl: 'https://openrouter.ai/api/v1',
-          apiKey: 'openrouter-test-key',
+          baseUrl: 'https://api.llmgateway.io/v1',
+          apiKey: 'llmgateway-test-key',
         },
       };
       const client = new IronaChatClient(config, mockRouter);
@@ -220,20 +220,19 @@ describe('Gateway Completions', () => {
       expect(buildExtraBodySpy).toHaveBeenCalledWith(
         expect.objectContaining({ reasoningEffort: 'high' })
       );
-      // When extra body is returned, the fetch wrapper is created
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
         expect.objectContaining({ reasoning: { effort: 'high' } })
       );
       expect(mockGenerateText).toHaveBeenCalledTimes(1);
     });
 
-    it('sends search params through OpenRouter gateway', async () => {
+    it('sends search params through LLMGateway', async () => {
       const mockRouter = createMockRouterClient();
       const config: Config = {
         apiKey: 'test-api-key',
         gateway: {
-          baseUrl: 'https://openrouter.ai/api/v1',
-          apiKey: 'openrouter-test-key',
+          baseUrl: 'https://api.llmgateway.io/v1',
+          apiKey: 'llmgateway-test-key',
         },
       };
       const client = new IronaChatClient(config, mockRouter);
@@ -252,18 +251,45 @@ describe('Gateway Completions', () => {
       );
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
         expect.objectContaining({
-          plugins: [{ id: 'web' }],
+          tools: [{ type: 'web_search' }],
         })
       );
     });
 
-    it('sends both reasoning and search through OpenRouter gateway', async () => {
+    it('sends search tool even when model is not in Gist capabilities (new models like gpt-5.2)', async () => {
       const mockRouter = createMockRouterClient();
       const config: Config = {
         apiKey: 'test-api-key',
         gateway: {
-          baseUrl: 'https://openrouter.ai/api/v1',
-          apiKey: 'openrouter-test-key',
+          baseUrl: 'https://api.llmgateway.io/v1',
+          apiKey: 'llmgateway-test-key',
+        },
+      };
+      const client = new IronaChatClient(config, mockRouter);
+
+      delete process.env.OPENAI_API_KEY;
+      // Model is NOT listed as supporting web search in the Gist
+      mockDoesModelSupportWebSearch.mockReturnValue(false);
+      setupSuccessfulGeneration('Search response');
+
+      await client.completions(createTestPayload({ search: true }));
+
+      // LLM Gateway always receives the web_search tool when search is requested,
+      // regardless of Gist capabilities — the gateway validates model support itself.
+      expect(fetchWrapperSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tools: [{ type: 'web_search' }],
+        })
+      );
+    });
+
+    it('sends both reasoning and search through LLMGateway', async () => {
+      const mockRouter = createMockRouterClient();
+      const config: Config = {
+        apiKey: 'test-api-key',
+        gateway: {
+          baseUrl: 'https://api.llmgateway.io/v1',
+          apiKey: 'llmgateway-test-key',
         },
       };
       const client = new IronaChatClient(config, mockRouter);
@@ -279,18 +305,18 @@ describe('Gateway Completions', () => {
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           reasoning: { effort: 'xhigh' },
-          plugins: [{ id: 'web' }],
+          tools: [{ type: 'web_search' }],
         })
       );
     });
 
-    it('does not create fetch wrapper when no features are requested', async () => {
+    it('creates fetch wrapper even when no extra features are requested (handles native reasoning cleanup)', async () => {
       const mockRouter = createMockRouterClient();
       const config: Config = {
         apiKey: 'test-api-key',
         gateway: {
-          baseUrl: 'https://openrouter.ai/api/v1',
-          apiKey: 'openrouter-test-key',
+          baseUrl: 'https://api.llmgateway.io/v1',
+          apiKey: 'llmgateway-test-key',
         },
       };
       const client = new IronaChatClient(config, mockRouter);
@@ -300,16 +326,13 @@ describe('Gateway Completions', () => {
 
       await client.completions(createTestPayload());
 
-      // buildOpenRouterExtraBody always returns provider config (sort by latency)
       expect(buildExtraBodySpy).toHaveBeenCalled();
-      expect(buildExtraBodySpy).toHaveReturnedWith({
-        provider: { sort: 'latency' },
-      });
-      // Fetch wrapper is always created for OpenRouter (provider sort is always set)
+      expect(buildExtraBodySpy).toHaveReturnedWith({});
+      // Fetch wrapper is always created so delta.reasoning cleanup is always applied
       expect(fetchWrapperSpy).toHaveBeenCalled();
     });
 
-    it('does not use OpenRouter mapping for non-OpenRouter gateways', async () => {
+    it('does not use LLMGateway mapping for non-LLMGateway gateways', async () => {
       const mockRouter = createMockRouterClient();
       const config: Config = {
         apiKey: 'test-api-key',
@@ -321,22 +344,22 @@ describe('Gateway Completions', () => {
       const client = new IronaChatClient(config, mockRouter);
 
       delete process.env.OPENAI_API_KEY;
-      setupSuccessfulGeneration('Non-OpenRouter response');
+      setupSuccessfulGeneration('Non-LLMGateway response');
 
       await client.completions(createTestPayload({ reasoningEffort: 'high' }));
 
-      // buildOpenRouterExtraBody should NOT be called for non-OpenRouter gateways
+      // buildLLMGatewayExtraBody should NOT be called for non-LLMGateway gateways
       expect(buildExtraBodySpy).not.toHaveBeenCalled();
       expect(fetchWrapperSpy).not.toHaveBeenCalled();
     });
 
-    it('uses OpenRouter mapping even when provider has direct API key', async () => {
+    it('uses LLMGateway mapping even when provider has direct API key', async () => {
       const mockRouter = createMockRouterClient();
       const config: Config = {
         apiKey: 'test-api-key',
         gateway: {
-          baseUrl: 'https://openrouter.ai/api/v1',
-          apiKey: 'openrouter-test-key',
+          baseUrl: 'https://api.llmgateway.io/v1',
+          apiKey: 'llmgateway-test-key',
         },
       };
       const client = new IronaChatClient(config, mockRouter);
@@ -346,34 +369,8 @@ describe('Gateway Completions', () => {
 
       await client.completions(createTestPayload());
 
-      // Gateway is always used — OpenRouter mapping is called
+      // Gateway is always used — LLMGateway mapping is called
       expect(buildExtraBodySpy).toHaveBeenCalled();
-    });
-
-    it('works with OpenRouter subdomain gateways', async () => {
-      const mockRouter = createMockRouterClient();
-      const config: Config = {
-        apiKey: 'test-api-key',
-        gateway: {
-          baseUrl: 'https://api.openrouter.ai/api/v1',
-          apiKey: 'openrouter-test-key',
-        },
-      };
-      const client = new IronaChatClient(config, mockRouter);
-
-      delete process.env.OPENAI_API_KEY;
-      setupSuccessfulGeneration('Subdomain response');
-
-      await client.completions(
-        createTestPayload({ reasoningEffort: 'medium' })
-      );
-
-      expect(buildExtraBodySpy).toHaveBeenCalledWith(
-        expect.objectContaining({ reasoningEffort: 'medium' })
-      );
-      expect(fetchWrapperSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ reasoning: { effort: 'medium' } })
-      );
     });
   });
 });

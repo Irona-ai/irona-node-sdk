@@ -28,14 +28,14 @@ import {
   doesModelSupportMediaTypes,
   doesModelSupportWebSearch,
   getModelPrefix,
-  getOpenRouterIdentifier,
+  getLLMGatewayIdentifier,
 } from '../supported_models';
 import type { Config, GatewayConfig, ProviderConfig } from '../types';
 import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
+import { createLLMGatewayFetchWrapper } from '../utils/llmGatewayFetchWrapper';
+import { buildLLMGatewayExtraBody } from '../utils/llmGatewayMapper';
+import type { LLMGatewayExtraBody } from '../utils/llmGatewayMapper';
 import { logger } from '../utils/logger';
-import { createOpenRouterFetchWrapper } from '../utils/openRouterFetchWrapper';
-import { buildOpenRouterExtraBody } from '../utils/openRouterMapper';
-import type { OpenRouterExtraBody } from '../utils/openRouterMapper';
 import {
   extractMediaTypeArrayFromMessages,
   validateAndGetProviderAndModel,
@@ -157,8 +157,10 @@ export class IronaChatClient {
         this.loadApiKeyForProvider(provider, model);
       }
 
-      // Convert messages to Vercel AI SDK format
-      const vercelMessages = this.convertToVercelMessages(payload.messages);
+      // Convert messages to Vercel AI SDK format (async — downloads URL-based PDFs)
+      const vercelMessages = await this.convertToVercelMessages(
+        payload.messages
+      );
 
       let fullModelName = model;
       if (!isUsingGateway && provider === 'togetherai') {
@@ -171,19 +173,21 @@ export class IronaChatClient {
         fullModelName = this.resolveGatewayModelName(provider, fullModelName);
       }
 
-      // Build OpenRouter-specific extra body when routing through OpenRouter
-      const isOpenRouter = isUsingGateway && this.isOpenRouterGateway();
-      let openRouterExtra: OpenRouterExtraBody | undefined;
-      if (isOpenRouter) {
-        openRouterExtra = buildOpenRouterExtraBody({
+      // Build LLMGateway-specific extra body when routing through LLMGateway
+      const isLLMGateway = isUsingGateway && this.isLLMGatewayGateway();
+      let llmGatewayExtra: LLMGatewayExtraBody | undefined;
+      if (isLLMGateway) {
+        const llmGatewaySupportsSearch =
+          payload.search === true || supportsWebSearch;
+        llmGatewayExtra = buildLLMGatewayExtraBody({
           reasoningEffort: payload.reasoningEffort,
           search: payload.search,
-          supportsWebSearch,
+          supportsWebSearch: llmGatewaySupportsSearch,
         });
       }
 
-      const modelFactory = isOpenRouter
-        ? (this.getGatewayModelFactory(openRouterExtra) ??
+      const modelFactory = isLLMGateway
+        ? (this.getGatewayModelFactory(llmGatewayExtra) ??
           this.getModelInstance(
             provider,
             fullModelName,
@@ -203,14 +207,14 @@ export class IronaChatClient {
 
       const baseModel = modelFactory(fullModelName);
 
-      // When using OpenRouter with reasoning explicitly requested, the fetch wrapper
+      // When using LLMGateway with reasoning explicitly requested, the fetch wrapper
       // injects delta.reasoning as <think>…</think> tags. Wrap the model so the AI
       // SDK extracts those tags into reasoning-delta stream parts.
       // Mapper omits the reasoning field for 'off'/undefined, so its presence means active.
-      const shouldExtractOpenRouterReasoning =
-        isOpenRouter && openRouterExtra?.reasoning !== undefined;
+      const shouldExtractLLMGatewayReasoning =
+        isLLMGateway && llmGatewayExtra?.reasoning !== undefined;
 
-      const finalModel = shouldExtractOpenRouterReasoning
+      const finalModel = shouldExtractLLMGatewayReasoning
         ? (wrapLanguageModel({
             model: baseModel as Parameters<
               typeof wrapLanguageModel
@@ -238,7 +242,7 @@ export class IronaChatClient {
       // Handle tools from payload
       let tools = payload.tools ? { ...payload.tools } : {};
 
-      // Add search tools if search is enabled (skip for gateways — OpenRouter
+      // Add search tools if search is enabled (skip for gateways — LLMGateway
       // handles search via plugins in the request body, not native tools)
       if (
         !isUsingGateway &&
@@ -402,78 +406,84 @@ export class IronaChatClient {
   }
 
   /**
-   * Converts messages to Vercel AI SDK format
+   * Converts messages to Vercel AI SDK format.
    */
-  private convertToVercelMessages(messages: MessagePayload[]): ModelMessage[] {
-    return messages.map((msg): ModelMessage => {
-      if (typeof msg.content === 'string') {
-        return {
-          role: msg.role,
-          content: msg.content,
-        } as ModelMessage;
-      }
+  private async convertToVercelMessages(
+    messages: MessagePayload[]
+  ): Promise<ModelMessage[]> {
+    return Promise.all(
+      messages.map(async (msg): Promise<ModelMessage> => {
+        if (typeof msg.content === 'string') {
+          return {
+            role: msg.role,
+            content: msg.content,
+          } as ModelMessage;
+        }
 
-      if (msg.role === 'user') {
-        const parts = msg.content.map(part => {
-          if (part.type === 'text') {
-            return { type: 'text' as const, text: part.text };
-          } else if (part.type === 'image') {
-            return { type: 'image' as const, image: part.image };
-          } else if (part.type === 'file') {
-            return {
-              type: 'file' as const,
-              data: part.data,
-              mediaType: part.mediaType ?? 'application/pdf',
-            };
-          }
-          throw new Error(
-            `Unsupported user message part type: ${(part as { type: string }).type}`
+        if (msg.role === 'user') {
+          const parts = await Promise.all(
+            msg.content.map(async part => {
+              if (part.type === 'text') {
+                return { type: 'text' as const, text: part.text };
+              } else if (part.type === 'image_url') {
+                return { type: 'image' as const, image: part.image_url.url };
+              } else if (part.type === 'file') {
+                return {
+                  type: 'file' as const,
+                  data: part.data,
+                  mediaType: part.mediaType ?? 'application/pdf',
+                };
+              }
+              throw new Error(
+                `Unsupported user message part type: ${(part as { type: string }).type}`
+              );
+            })
           );
-        });
-        return { role: 'user', content: parts } as ModelMessage;
-      }
+          return { role: 'user', content: parts } as ModelMessage;
+        }
 
-      if (msg.role === 'assistant') {
-        const parts = msg.content.map(part => {
-          if (part.type === 'text') {
-            return { type: 'text' as const, text: part.text };
-          } else if (part.type === 'reasoning') {
-            return { type: 'reasoning' as const, text: part.text };
-          } else if (part.type === 'file') {
-            return {
-              type: 'file' as const,
-              data: part.data,
-              mediaType: part.mediaType,
-            };
-          } else if (part.type === 'tool-call') {
-            return {
-              type: 'tool-call' as const,
-              toolCallId: part.toolCallId,
-              toolName: part.toolName,
-              input: part.input,
-            };
-          }
-          throw new Error(
-            `Unsupported assistant message part type: ${(part as { type: string }).type}`
-          );
-        });
-        return { role: 'assistant', content: parts } as ModelMessage;
-      }
+        if (msg.role === 'assistant') {
+          const parts = msg.content.map(part => {
+            if (part.type === 'text') {
+              return { type: 'text' as const, text: part.text };
+            } else if (part.type === 'reasoning') {
+              return { type: 'reasoning' as const, text: part.text };
+            } else if (part.type === 'file') {
+              return {
+                type: 'file' as const,
+                data: part.data,
+                mediaType: part.mediaType,
+              };
+            } else if (part.type === 'tool-call') {
+              return {
+                type: 'tool-call' as const,
+                toolCallId: part.toolCallId,
+                toolName: part.toolName,
+                input: part.input,
+              };
+            }
+            throw new Error(
+              `Unsupported assistant message part type: ${(part as { type: string }).type}`
+            );
+          });
+          return { role: 'assistant', content: parts } as ModelMessage;
+        }
 
-      if (msg.role === 'tool') {
-        const parts = msg.content.map(part => ({
-          type: 'tool-result' as const,
-          toolCallId: part.toolCallId,
-          toolName: part.toolName,
-          output: part.output,
-        }));
-        return { role: 'tool', content: parts } as ModelMessage;
-      }
+        if (msg.role === 'tool') {
+          const parts = msg.content.map(part => ({
+            type: 'tool-result' as const,
+            toolCallId: part.toolCallId,
+            toolName: part.toolName,
+            output: part.output,
+          }));
+          return { role: 'tool', content: parts } as ModelMessage;
+        }
 
-      throw new Error(
-        `Unsupported message role: ${(msg as { role: string }).role}`
-      );
-    });
+        throw new Error(
+          `Unsupported message role: ${(msg as { role: string }).role}`
+        );
+      })
+    );
   }
 
   /**
@@ -557,20 +567,17 @@ export class IronaChatClient {
     return provider.chat;
   }
 
-  private isOpenRouterGateway(): boolean {
-    return (
-      this.gatewayHostname === 'openrouter.ai' ||
-      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
-    );
+  private isLLMGatewayGateway(): boolean {
+    return this.gatewayHostname === 'api.llmgateway.io';
   }
 
   /**
    * Returns the gateway model factory, optionally with a custom fetch wrapper
-   * that merges OpenRouter-specific params into the request body.
+   * that merges LLMGateway-specific params into the request body.
    * When no extra body is needed, reuses the singleton gateway provider.
    */
   private getGatewayModelFactory(
-    extraBody: OpenRouterExtraBody | undefined
+    extraBody: LLMGatewayExtraBody | undefined
   ): ReturnType<typeof createOpenAI>['chat'] | undefined {
     if (
       this.gatewayProvider === undefined ||
@@ -586,7 +593,7 @@ export class IronaChatClient {
       apiKey: this.config.gateway.apiKey,
       headers: this.config.gateway.headers,
       name: this.config.gateway.providerName ?? 'gateway',
-      fetch: createOpenRouterFetchWrapper(extraBody),
+      fetch: createLLMGatewayFetchWrapper(extraBody),
     }).chat;
   }
 
@@ -596,14 +603,13 @@ export class IronaChatClient {
       return model;
     }
 
-    if (
-      this.gatewayHostname === 'openrouter.ai' ||
-      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
-    ) {
-      const openRouterModelName = getOpenRouterIdentifier(provider, model);
-      if (openRouterModelName !== null && openRouterModelName !== '') {
-        return openRouterModelName;
+    if (this.isLLMGatewayGateway()) {
+      const llmGatewayModelName = getLLMGatewayIdentifier(provider, model);
+      if (llmGatewayModelName !== null && llmGatewayModelName !== '') {
+        return llmGatewayModelName;
       }
+      // LLMGateway uses bare model names without provider prefix
+      return model;
     }
 
     const includeProviderInModelName =
@@ -673,25 +679,6 @@ export class IronaChatClient {
       );
       return { provider: null, model: null };
     }
-  }
-
-  /**
-   * Checks if a provider has a direct API key (programmatic config or env var).
-   * @deprecated No longer used for routing decisions. When a gateway is
-   * configured, all providers route through it regardless of direct keys.
-   * Kept for potential diagnostic use.
-   */
-  private hasDirectProviderKey(provider: string): boolean {
-    const providerConf = this.config.providers?.[provider];
-    if (providerConf?.apiKey !== undefined && providerConf.apiKey !== '') {
-      return true;
-    }
-    const envKeyName = providerApiKeyName(provider);
-    if (envKeyName === undefined) {
-      return false;
-    }
-    const envVal = process.env[envKeyName];
-    return envVal !== undefined && envVal !== '';
   }
 
   /**

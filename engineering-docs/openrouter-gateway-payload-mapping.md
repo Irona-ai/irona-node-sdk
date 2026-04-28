@@ -1,29 +1,29 @@
-# OpenRouter Gateway Payload Mapping
+# LLMGateway Payload Mapping
 
 ## Overview
 
-Previously, when the SDK routed through OpenRouter as a gateway, all advanced features were silently dropped — reasoning effort was skipped, web search was never passed, and no provider-specific options were mapped. This change translates SDK-native options into OpenRouter's API format via a custom `fetch` wrapper.
+When the SDK routes through LLMGateway (`api.llmgateway.io`), advanced features are translated from SDK-native options into LLMGateway's API format via a custom `fetch` wrapper.
 
-**What now works through OpenRouter gateway:**
+**What works through LLMGateway:**
 
-| Feature            | Before  | After                                                     |
-| ------------------ | ------- | --------------------------------------------------------- |
-| Reasoning effort   | Dropped | Mapped to `reasoning` body param                          |
-| Web search         | Dropped | Mapped to `plugins: [{id: 'web'}]`                        |
-| Streaming + above  | N/A     | Both work in streaming and non-streaming modes            |
-| Non-OpenRouter GWs | N/A     | Completely unaffected (hostname check gates all mappings) |
+| Feature            | Status                                                       |
+| ------------------ | ------------------------------------------------------------ |
+| Reasoning effort   | Mapped to `reasoning` body param                             |
+| Web search         | Mapped to `plugins: [{id: 'web'}]`                           |
+| Model names        | Bare names (no `provider/` prefix)                           |
+| Streaming + above  | Both work in streaming and non-streaming modes               |
+| Non-LLMGateway GWs | Completely unaffected (hostname check gates all mappings)    |
 
 ## Files Changed
 
 | File                                        | Change                                                         |
 | ------------------------------------------- | -------------------------------------------------------------- |
-| `src/utils/openRouterMapper.ts`             | New — pure mapper functions                                    |
-| `src/utils/openRouterFetchWrapper.ts`       | New — custom fetch wrapper with request/response interception  |
+| `src/utils/llmGatewayMapper.ts`             | Mapper functions (migrated from openRouterMapper.ts)           |
+| `src/utils/llmGatewayFetchWrapper.ts`       | Custom fetch wrapper (migrated from openRouterFetchWrapper.ts) |
 | `src/irona-chat-client/IronaChatClient.ts`  | Wires up mapper + fetch wrapper; forces `.chat` API on gateway |
-| `docs/openrouter-mapping.md`                | New — user-facing mapping reference                            |
-| `tests/unit/utils/openRouterMapper.test.ts` | New — unit tests for mappers and fetch wrapper                 |
-| `tests/unit/completions/gateway.test.ts`    | Added 7 OpenRouter payload mapping tests                       |
-| `example/testOpenRouterGateway.js`          | New — 9 integration tests against real OpenRouter              |
+| `src/supported_models.ts`                   | Renamed `openrouter_identifier` → `llmgateway_identifier`      |
+| `src/index.ts`                              | Auto-detects `LLM_GATEWAY_API_KEY` → `api.llmgateway.io/v1`   |
+| `docs/openrouter-mapping.md`                | Updated user-facing mapping reference                          |
 
 ## Key Technical Decisions
 
@@ -38,73 +38,35 @@ createOpenAI({fetch}) → OpenAIChatLanguageModel({fetch}) → postJsonToApi({fe
   → postToApi({fetch}) → fetch(url, {method: "POST", body: JSON.stringify(args)})
 ```
 
-The wrapper intercepts POST requests, parses the JSON body, merges OpenRouter-specific params, and forwards to the real `fetch`.
+The wrapper intercepts POST requests, parses the JSON body, merges LLMGateway-specific params, and forwards to the real `fetch`.
 
 ### Why `.chat` on the gateway provider?
 
-`@ai-sdk/openai` v2.0.32 defaults to the **Responses API** (`/responses` endpoint). OpenRouter and most gateways only support the **Chat Completions API** (`/chat/completions`).
+`@ai-sdk/openai` v2.0.32 defaults to the **Responses API** (`/responses` endpoint). LLMGateway only supports the **Chat Completions API** (`/chat/completions`).
 
 ```typescript
-// Before — uses Responses API by default (breaks on OpenRouter)
-return createOpenAI({ baseURL, apiKey, headers, name });
-
-// After — explicitly uses Chat Completions API
+// Explicitly uses Chat Completions API
 return createOpenAI({ baseURL, apiKey, headers, name }).chat;
 ```
 
-This changes the type from `ReturnType<typeof createOpenAI>` to `ReturnType<typeof createOpenAI>['chat']`.
+### Why bare model names?
 
-### Why strip `annotations` from search responses?
+LLMGateway uses model names without provider prefixes (e.g., `gemini-2.0-flash-001` not `google/gemini-2.0-flash-001`). The `isLLMGatewayGateway()` check gates the lookup of `llmgateway_identifier` from provider metadata. If no identifier is found, the bare model name is used as-is.
 
-When the web search plugin is active, OpenRouter adds `annotations` (URL citations) to the response:
+### Why the fetch wrapper is always created
 
-```json
-{
-  "choices": [{
-    "message": {
-      "role": "assistant",
-      "content": "Today is February 26...",
-      "annotations": [{ "type": "url_citation", "url_citation": { ... } }]
-    }
-  }]
-}
-```
-
-`@ai-sdk/openai` strictly validates the response schema and rejects `annotations` as an unexpected field, causing `AI_TypeValidationError` (streaming) or `AI_APICallError: Invalid JSON response` (non-streaming).
-
-The fetch wrapper intercepts responses and strips `annotations` from both:
-
-- **Non-streaming:** Proxies `response.body` through a `TransformStream` that buffers, strips, and re-emits
-- **Streaming (SSE):** Processes each `data: {...}` line, strips annotations from the JSON, and re-emits
-
-### Why `web_search_options` was removed
-
-The initial plan included mapping `web_search_options: { search_context_size: 'medium' }` alongside `plugins`. Integration testing revealed that OpenRouter **forwards** `web_search_options` to the upstream provider (e.g., OpenAI), which rejects it as an invalid parameter. Only `plugins: [{id: 'web'}]` is needed.
-
-### Why native `webSearch` tool is skipped for gateways
-
-The OpenAI `webSearch` tool (`openai.tools.webSearch({})`) is designed for OpenAI's native Responses API. When routing through a gateway, this tool causes failures because the gateway doesn't support it. OpenRouter handles search at the API level via `plugins`, so native tools are skipped:
-
-```typescript
-// Before — always added for OpenAI + search
-if (provider === 'openai' && payload.search === true && supportsWebSearch) { ... }
-
-// After — skip for gateways (OpenRouter handles via plugins)
-if (!isUsingGateway && provider === 'openai' && payload.search === true && supportsWebSearch) { ... }
-```
+The transform is always applied — even with an empty extra body — to clean up `delta.reasoning` tokens that models can emit unconditionally (even without a reasoning request). Without cleanup, these tokens would leak into the text-delta stream parts.
 
 ## Implementation Details
 
-### Mapper functions (`openRouterMapper.ts`)
-
-Pure functions with zero side effects:
+### Mapper functions (`llmGatewayMapper.ts`)
 
 **Reasoning effort mapping:**
 
-| SDK `reasoning_effort` | OpenRouter `reasoning`              |
+| SDK `reasoning_effort` | LLMGateway `reasoning`              |
 | ---------------------- | ----------------------------------- |
-| `undefined`            | _(omitted — no reasoning key sent)_ |
-| `'off'`                | `{ enabled: false }`                |
+| `undefined`            | _(omitted)_                         |
+| `'off'`                | _(omitted)_                         |
 | `'low'`                | `{ effort: 'low' }`                 |
 | `'medium'`             | `{ effort: 'medium' }`              |
 | `'high'`               | `{ effort: 'high' }`                |
@@ -112,70 +74,48 @@ Pure functions with zero side effects:
 
 **Search mapping:**
 
-| SDK `search`                               | OpenRouter               |
+| SDK `search`                               | LLMGateway               |
 | ------------------------------------------ | ------------------------ |
 | `undefined` / `false`                      | _(omitted)_              |
 | `true` (model supports search)             | `plugins: [{id: 'web'}]` |
 | `true` (model does **not** support search) | _(omitted)_              |
 
-`buildOpenRouterExtraBody()` returns `undefined` when no features are requested, avoiding unnecessary fetch wrapper creation.
+`buildLLMGatewayExtraBody()` returns `{}` when no features are requested. The fetch wrapper is still created (for reasoning cleanup) even with an empty body.
 
-### Wiring in IronaChatClient
+### LLMGateway hostname detection
 
-Three additions in `invokeChatCompletions()`:
+Matches only the exact LLMGateway hostname:
 
 ```typescript
-// 1. Check if this is an OpenRouter gateway
-const isOpenRouter = isUsingGateway && this.isOpenRouterGateway();
-
-// 2. Build extra body (returns undefined if no features requested)
-let openRouterExtra: OpenRouterExtraBody | undefined;
-if (isOpenRouter) {
-  openRouterExtra = buildOpenRouterExtraBody({
-    reasoningEffort: payload.reasoning_effort,
-    search: payload.search,
-    supportsWebSearch,
-  });
+private isLLMGatewayGateway(): boolean {
+  return this.gatewayHostname === 'api.llmgateway.io';
 }
-
-// 3. Get model factory (creates per-request provider with custom fetch if needed)
-const modelFactory = isOpenRouter
-  ? (this.getGatewayModelFactory(openRouterExtra) ?? this.getModelInstance(...))
-  : this.getModelInstance(...);
 ```
 
-`getGatewayModelFactory()` reuses the singleton `this.gatewayProvider` when no extra body exists, and creates a per-request `createOpenAI()` with a custom fetch wrapper when OpenRouter-specific params are needed.
+### Auto-detection from environment
 
-### OpenRouter hostname detection
-
-Matches both `openrouter.ai` and subdomains like `api.openrouter.ai`:
+Setting `LLM_GATEWAY_API_KEY` without `LLM_GATEWAY_BASE_URL` automatically resolves to `https://api.llmgateway.io/v1`:
 
 ```typescript
-private isOpenRouterGateway(): boolean {
-  return (
-    this.gatewayHostname === 'openrouter.ai' ||
-    (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
-  );
-}
+const llmGatewayApiKey = process.env.LLM_GATEWAY_API_KEY;
+const defaultLLMGatewayBaseUrl =
+  llmGatewayApiKey !== undefined && llmGatewayApiKey !== ''
+    ? 'https://api.llmgateway.io/v1'
+    : undefined;
 ```
 
 ## Gotchas and Lessons Learned
 
-1. **`@ai-sdk/openai` defaults to Responses API** — Always use `.chat` for gateways. This is not OpenRouter-specific; it affects all gateway providers.
+1. **`@ai-sdk/openai` defaults to Responses API** — Always use `.chat` for gateways.
 
-2. **OpenRouter forwards unknown body keys to upstream providers** — Don't include keys like `web_search_options` that the upstream (OpenAI, Anthropic, etc.) might reject. Only use keys that OpenRouter consumes itself.
+2. **Per-request provider instances are necessary** — The custom fetch wrapper contains request-specific data (the extra body). A singleton gateway provider can't carry per-request state.
 
-3. **Response format differs with search plugins** — OpenRouter adds `annotations` to responses when web search is active. Any strict response parser will break. The fetch wrapper must handle both streaming and non-streaming response interception.
-
-4. **Per-request provider instances are necessary** — The custom fetch wrapper contains request-specific data (the extra body). A singleton gateway provider can't carry per-request state, so a new `createOpenAI()` is created for each request that needs OpenRouter-specific params.
-
-5. **The native `webSearch` tool must be skipped for gateways** — The existing code didn't gate the OpenAI search tool behind `!isUsingGateway` (Google and xAI blocks already did). This caused failures when OpenRouter received the native tool.
+3. **The native `webSearch` tool must be skipped for gateways** — LLMGateway handles search at the API level via `plugins`. The existing `!isUsingGateway` guard prevents the native tool from being added.
 
 ## Verification
 
 ```bash
 npm run clean           # lint + format
 npm run type-check      # TypeScript compilation
-npm test                # 91 unit tests pass
-node example/testOpenRouterGateway.js  # 9/9 integration tests pass
+npm test                # All unit tests pass
 ```

@@ -9,7 +9,7 @@ interface ProviderInfo {
   capabilities?: Record<string, string[]>; // New property that replaces support_media_inputs and support_web_search
   support_tools?: string[];
   support_response_model?: string[];
-  openrouter_identifier?: Record<string, string>;
+  llmgateway_identifier?: Record<string, string>;
   price: Record<string, Record<string, number>>;
   name?: Record<string, string>;
   availableForChatApp: Record<string, string>;
@@ -101,14 +101,14 @@ export function getModelPrefix(provider: string, model: string): string | null {
   return modelPrefixes[model] || null;
 }
 
-export function getOpenRouterIdentifier(
+export function getLLMGatewayIdentifier(
   provider: string,
   model: string
 ): string | null {
-  const openRouterIdentifiers = PROVIDERS[provider]?.openrouter_identifier;
-  if (!openRouterIdentifiers) return null;
+  const llmGatewayIdentifiers = PROVIDERS[provider]?.llmgateway_identifier;
+  if (!llmGatewayIdentifiers) return null;
 
-  return openRouterIdentifiers[model] || null;
+  return llmGatewayIdentifiers[model] || null;
 }
 
 export function getModelPrice(

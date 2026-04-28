@@ -32,8 +32,8 @@ export const createImagePayload = (): CompletionsPayload => {
         content: [
           { type: 'text', text: 'What is this image?' },
           {
-            type: 'image' as const,
-            image: new URL('https://example.com/image.jpg'),
+            type: 'image_url' as const,
+            image_url: { url: 'https://example.com/image.jpg' },
           },
         ],
       },

@@ -20,6 +20,8 @@ export class IronaAI {
   private static providersLoadedPromise: Promise<void> | null = null;
   private ironaRouter: Router;
   private llmChatService: IronaChatClient;
+  private readonly resolvedGateway: GatewayConfig | undefined;
+
   private constructor(config: Config = {}) {
     // Check for API key
     const apiKey = config.apiKey ?? process.env.IRONAAI_API_KEY ?? '';
@@ -37,10 +39,13 @@ export class IronaAI {
       );
     }
 
+    const resolvedGateway = this.resolveGatewayConfig(config.gateway);
+    this.resolvedGateway = resolvedGateway;
+
     const normalizedConfig: Config = {
       ...config,
       baseUrl: config?.baseUrl ?? DEFAULT_BASE_URL,
-      gateway: this.resolveGatewayConfig(config.gateway),
+      gateway: resolvedGateway,
     };
 
     this.ironaRouter = createRouter(normalizedConfig);
@@ -54,7 +59,8 @@ export class IronaAI {
   public static async createInstance(config: Config = {}): Promise<IronaAI> {
     IronaAI.providersLoadedPromise ??= this.ensureProvidersLoaded();
     await IronaAI.providersLoadedPromise;
-    return new IronaAI(config);
+    const instance = new IronaAI(config);
+    return instance;
   }
 
   private static async ensureProvidersLoaded(
@@ -86,20 +92,17 @@ export class IronaAI {
   private resolveGatewayConfig(
     configuredGateway?: GatewayConfig
   ): GatewayConfig | undefined {
-    const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-    const defaultOpenRouterBaseUrl =
-      openRouterApiKey !== undefined && openRouterApiKey !== ''
-        ? 'https://openrouter.ai/api/v1'
+    const llmGatewayApiKey = process.env.LLM_GATEWAY_API_KEY;
+    const defaultLLMGatewayBaseUrl =
+      llmGatewayApiKey !== undefined && llmGatewayApiKey !== ''
+        ? 'https://api.llmgateway.io/v1'
         : undefined;
     const gatewayBaseUrl =
       configuredGateway?.baseUrl ??
       process.env.LLM_GATEWAY_BASE_URL ??
-      process.env.OPENROUTER_BASE_URL ??
-      defaultOpenRouterBaseUrl;
+      defaultLLMGatewayBaseUrl;
     const gatewayApiKey =
-      configuredGateway?.apiKey ??
-      process.env.LLM_GATEWAY_API_KEY ??
-      process.env.OPENROUTER_API_KEY;
+      configuredGateway?.apiKey ?? process.env.LLM_GATEWAY_API_KEY;
 
     if (
       gatewayBaseUrl !== undefined &&
@@ -107,7 +110,7 @@ export class IronaAI {
       (gatewayApiKey === undefined || gatewayApiKey === '')
     ) {
       throw new MissingApiKeyError(
-        'Gateway base URL is configured but no gateway API key is set. Provide `config.gateway.apiKey` or set `LLM_GATEWAY_API_KEY`/`OPENROUTER_API_KEY`.'
+        'Gateway base URL is configured but no gateway API key is set. Provide `config.gateway.apiKey` or set `LLM_GATEWAY_API_KEY`.'
       );
     }
 
@@ -117,7 +120,7 @@ export class IronaAI {
       gatewayApiKey !== ''
     ) {
       throw new MissingApiKeyError(
-        'Gateway API key is configured but no gateway base URL is set. Provide `config.gateway.baseUrl` or set `LLM_GATEWAY_BASE_URL`/`OPENROUTER_BASE_URL`.'
+        'Gateway API key is configured but no gateway base URL is set. Provide `config.gateway.baseUrl` or set `LLM_GATEWAY_BASE_URL`.'
       );
     }
 
@@ -148,21 +151,6 @@ export class IronaAI {
     const gatewayHeaders: Record<string, string> = {
       ...(configuredGateway?.headers ?? {}),
     };
-
-    if (
-      gatewayHeaders['HTTP-Referer'] === undefined &&
-      process.env.OPENROUTER_HTTP_REFERER !== undefined &&
-      process.env.OPENROUTER_HTTP_REFERER !== ''
-    ) {
-      gatewayHeaders['HTTP-Referer'] = process.env.OPENROUTER_HTTP_REFERER;
-    }
-    if (
-      gatewayHeaders['X-Title'] === undefined &&
-      process.env.OPENROUTER_X_TITLE !== undefined &&
-      process.env.OPENROUTER_X_TITLE !== ''
-    ) {
-      gatewayHeaders['X-Title'] = process.env.OPENROUTER_X_TITLE;
-    }
 
     const providerName =
       configuredGateway?.providerName ?? process.env.LLM_GATEWAY_PROVIDER_NAME;

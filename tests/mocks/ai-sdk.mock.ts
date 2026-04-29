@@ -21,8 +21,19 @@ export const resetAiMocks = () => {
     .mockImplementation((count: number) => ({ count }));
 };
 
-export const setupSuccessfulGeneration = (text: string = 'Test response') => {
-  mockGenerateText.mockResolvedValue({ text });
+export const setupSuccessfulGeneration = (
+  text: string = 'Test response',
+  options: { cached?: boolean } = {}
+) => {
+  const totalTokens = options.cached === true ? 0 : 100;
+  mockGenerateText.mockResolvedValue({
+    text,
+    usage: {
+      totalTokens,
+      promptTokens: totalTokens > 0 ? 80 : 0,
+      completionTokens: totalTokens > 0 ? 20 : 0,
+    },
+  });
 };
 
 export const setupSuccessfulStream = (

@@ -31,6 +31,7 @@ import {
   getLLMGatewayIdentifier,
 } from '../supported_models';
 import type { Config, GatewayConfig, ProviderConfig } from '../types';
+import { normalizeMessagesForCache } from '../utils/cacheNormalizer';
 import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
 import { createLLMGatewayFetchWrapper } from '../utils/llmGatewayFetchWrapper';
 import { buildLLMGatewayExtraBody } from '../utils/llmGatewayMapper';
@@ -157,10 +158,13 @@ export class IronaChatClient {
         this.loadApiKeyForProvider(provider, model);
       }
 
+      const sourceMessages =
+        isUsingGateway && this.config.gateway?.normalizeForCache === true
+          ? normalizeMessagesForCache(payload.messages)
+          : payload.messages;
+
       // Convert messages to Vercel AI SDK format (async — downloads URL-based PDFs)
-      const vercelMessages = await this.convertToVercelMessages(
-        payload.messages
-      );
+      const vercelMessages = await this.convertToVercelMessages(sourceMessages);
 
       let fullModelName = model;
       if (!isUsingGateway && provider === 'togetherai') {
@@ -343,7 +347,17 @@ export class IronaChatClient {
                   );
                 }
                 chunkCount++;
-                yield part;
+                if (part.type === 'finish') {
+                  const totalTokens =
+                    (
+                      part as unknown as {
+                        totalUsage?: { totalTokens?: number };
+                      }
+                    ).totalUsage?.totalTokens ?? -1;
+                  yield { ...part, cached: totalTokens === 0 };
+                } else {
+                  yield part;
+                }
               }
               if (chunkCount === 0) {
                 throw new Error(
@@ -388,6 +402,7 @@ export class IronaChatClient {
             },
             provider,
             model,
+            cached: (response.usage?.totalTokens ?? -1) === 0,
           };
         } catch (error) {
           logger.error(

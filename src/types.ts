@@ -7,6 +7,7 @@ export type GatewayConfig = {
   headers?: Record<string, string>;
   providerName?: string;
   includeProviderInModelName?: boolean;
+  normalizeForCache?: boolean;
 };
 
 export type ProviderConfig = {

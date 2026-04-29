@@ -16,6 +16,7 @@ export interface CompletionsResponse {
   };
   provider: string;
   model: string;
+  cached?: boolean;
 }
 
 export interface ModelInfo {

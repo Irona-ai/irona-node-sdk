@@ -1,4 +1,4 @@
-const { IronaAI } = require('ironaai');
+﻿const { IronlabsAI } = require('../src/index');
 
 const body = {
   messages: [
@@ -16,10 +16,12 @@ const body = {
     // You can use any supported model here
     // 'google/gemini-2.5-flash',
     // 'openai/gpt-4o-mini',
-    // "openai/gpt-5",
+    'openai/gpt-5.2',
     // 'google/gemini-2.5-pro',
     // "xai/grok-3-mini"
-    'xai/grok-4-fast',
+    // 'xai/grok-4-fast',
+    // "anthropic/claude-opus-4-7",
+    // "anthropic/claude-sonnet-4-5-20250929"
   ],
   fallbackModels: ['openai/gpt-4o-mini'],
   stream: true,
@@ -27,7 +29,7 @@ const body = {
 };
 
 async function modelSelectTest() {
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
   try {
     // Select a model
     const modelResponse = await sdkClient.modelSelect(body);
@@ -41,7 +43,7 @@ async function modelSelectTest() {
 }
 
 async function CompletionsTest() {
-  const sdkClient = await IronaAI.createInstance({
+  const sdkClient = await IronlabsAI.createInstance({
     fallbackModels: ['openai/gpt-4o-mini'],
   });
   try {

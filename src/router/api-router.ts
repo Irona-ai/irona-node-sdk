@@ -1,13 +1,13 @@
-/**
+﻿/**
  * Generic API Router — works with any routing endpoint that accepts
  * {messages, llm_providers} and returns {providers}.
  *
- * Supports: NotDiamond, Irona-compatible endpoints, custom routers.
+ * Supports: NotDiamond, Ironlabs-compatible endpoints, custom routers.
  * Swap routers by changing baseUrl + apiKey.
  */
 
 import { MissingApiKeyError, BadRequestError } from '../errors';
-import { Base } from '../irona-router-client/base';
+import { Base } from '../ironlabs-router-client/base';
 import type { ModelInfo, ModelSelectResponse } from '../responseTypes';
 import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import { ModelSelectSchema } from '../schemas/modelSelect.schema';

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Integration test: OpenRouter Gateway Payload Mapping
  *
  * Validates that reasoningEffort, search, and standard payloads
@@ -6,17 +6,17 @@
  *
  * Requires: OPENROUTER_API_KEY set in environment or .env
  */
-const { IronaAI } = require('ironaai');
+const { IronlabsAI } = require('ironlabsai');
 
 const OPENROUTER_API_KEY =
   process.env.OPENROUTER_API_KEY ||
   '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';
 
-const IRONAAI_API_KEY =
-  process.env.IRONAAI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji';
+const IRONLABS_AI_API_KEY =
+  process.env.IRONLABS_AI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji';
 
 const gatewayConfig = {
-  apiKey: IRONAAI_API_KEY,
+  apiKey: IRONLABS_AI_API_KEY,
   gateway: {
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: OPENROUTER_API_KEY,
@@ -50,7 +50,7 @@ function logResult(name, success, detail) {
 async function testBasicCompletions() {
   log('Test 1', 'Basic completions through OpenRouter gateway');
   try {
-    const sdk = await IronaAI.createInstance(gatewayConfig);
+    const sdk = await IronlabsAI.createInstance(gatewayConfig);
     const { provider, model, response } = await sdk.completions.create({
       messages: [{ role: 'user', content: 'Say "hello" and nothing else.' }],
       models: ['openai/gpt-4o-mini'],
@@ -77,7 +77,7 @@ async function testBasicCompletions() {
 async function testReasoningEffort() {
   log('Test 2', 'Reasoning effort "high" through OpenRouter gateway');
   try {
-    const sdk = await IronaAI.createInstance(gatewayConfig);
+    const sdk = await IronlabsAI.createInstance(gatewayConfig);
     const { provider, model, response } = await sdk.completions.create({
       messages: [
         {
@@ -112,7 +112,7 @@ async function testReasoningEffort() {
 async function testReasoningMax() {
   log('Test 3', 'Reasoning effort "max" (xhigh) through OpenRouter gateway');
   try {
-    const sdk = await IronaAI.createInstance(gatewayConfig);
+    const sdk = await IronlabsAI.createInstance(gatewayConfig);
     const { provider, model, response } = await sdk.completions.create({
       messages: [
         {
@@ -149,7 +149,7 @@ async function testReasoningMax() {
 async function testReasoningOff() {
   log('Test 4', 'Reasoning effort "off" through OpenRouter gateway');
   try {
-    const sdk = await IronaAI.createInstance(gatewayConfig);
+    const sdk = await IronlabsAI.createInstance(gatewayConfig);
     const { provider, model, response } = await sdk.completions.create({
       messages: [{ role: 'user', content: 'What is 2+2? Just the number.' }],
       models: ['openai/gpt-4o-mini'],
@@ -177,7 +177,7 @@ async function testReasoningOff() {
 async function testWebSearch() {
   log('Test 5', 'Web search through OpenRouter gateway');
   try {
-    const sdk = await IronaAI.createInstance(gatewayConfig);
+    const sdk = await IronlabsAI.createInstance(gatewayConfig);
     const { provider, model, response } = await sdk.completions.create({
       messages: [
         {
@@ -210,7 +210,7 @@ async function testWebSearch() {
 async function testReasoningAndSearch() {
   log('Test 6', 'Reasoning + Search combined through OpenRouter gateway');
   try {
-    const sdk = await IronaAI.createInstance(gatewayConfig);
+    const sdk = await IronlabsAI.createInstance(gatewayConfig);
     const { provider, model, response } = await sdk.completions.create({
       messages: [
         {
@@ -249,7 +249,7 @@ async function testReasoningAndSearch() {
 async function testStreamingWithReasoning() {
   log('Test 7', 'Streaming with reasoning through OpenRouter gateway');
   try {
-    const sdk = await IronaAI.createInstance(gatewayConfig);
+    const sdk = await IronlabsAI.createInstance(gatewayConfig);
     const { provider, model, response } = await sdk.completions.create({
       messages: [
         { role: 'user', content: 'What is 99 * 101? Think step by step.' },
@@ -301,7 +301,7 @@ async function testStreamingWithReasoning() {
 async function testStreamingWithSearch() {
   log('Test 8', 'Streaming with search through OpenRouter gateway');
   try {
-    const sdk = await IronaAI.createInstance(gatewayConfig);
+    const sdk = await IronlabsAI.createInstance(gatewayConfig);
     const { provider, model, response } = await sdk.completions.create({
       messages: [
         {
@@ -342,7 +342,7 @@ async function testStreamingWithSearch() {
 async function testNonOpenAIModelReasoning() {
   log('Test 9', 'Anthropic model with reasoning through OpenRouter gateway');
   try {
-    const sdk = await IronaAI.createInstance(gatewayConfig);
+    const sdk = await IronlabsAI.createInstance(gatewayConfig);
     const { provider, model, response } = await sdk.completions.create({
       messages: [
         {

@@ -1,4 +1,4 @@
-import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
+﻿import { anthropic, createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI, google } from '@ai-sdk/google';
 import { createMistral, mistral } from '@ai-sdk/mistral';
 import { createOpenAI, openai } from '@ai-sdk/openai';
@@ -45,13 +45,13 @@ import type { ReasoningEffort } from '../utils/reasoningConfig';
 import { validateSchema } from '../utils/requestValidator';
 export { CompletionsResponse };
 
-export class IronaChatClient {
+export class IronlabsChatClient {
   private readonly gatewayProvider?: ReturnType<typeof createOpenAI>['chat'];
   private readonly gatewayHostname?: string;
 
   constructor(
     private readonly config: Config,
-    private readonly ironaRouter: Router
+    private readonly IronlabsRouter: Router
   ) {
     this.gatewayProvider = this.createGatewayProvider(this.config.gateway);
     if (this.config.gateway !== undefined) {
@@ -90,7 +90,7 @@ export class IronaChatClient {
     let attemptNumber = 1;
     for (const { provider, model } of modelPriorityQueue) {
       logger.info(
-        `[IronaChatClient][completions] Attempt ${attemptNumber}: Invoking chat completions with provider: ${provider}, model: ${model}`
+        `[IronlabsChatClient][completions] Attempt ${attemptNumber}: Invoking chat completions with provider: ${provider}, model: ${model}`
       );
       try {
         const supportsWebSearch = doesModelSupportWebSearch(provider, model);
@@ -101,12 +101,12 @@ export class IronaChatClient {
           supportsWebSearch
         );
         logger.info(
-          `[IronaChatClient][completions] Attempt ${attemptNumber}: Successfully executed chat completions with provider: ${provider}, model: ${model}`
+          `[IronlabsChatClient][completions] Attempt ${attemptNumber}: Successfully executed chat completions with provider: ${provider}, model: ${model}`
         );
         return response; // Return on first success
       } catch (error) {
         logger.error(
-          `\n[IronaChatClient][completions] Attempt ${attemptNumber}: Error with ${provider}/${model}: ${
+          `\n[IronlabsChatClient][completions] Attempt ${attemptNumber}: Error with ${provider}/${model}: ${
             (error as Error).message
           }`
         );
@@ -115,7 +115,7 @@ export class IronaChatClient {
     }
     // If all retries fail, throw an error
     throw new Error(
-      `[IronaChatClient][completions] All attempts to process the completions request failed. Please verify the providers and models in your configuration.`
+      `[IronlabsChatClient][completions] All attempts to process the completions request failed. Please verify the providers and models in your configuration.`
     );
   }
 
@@ -348,7 +348,7 @@ export class IronaChatClient {
               }
             } catch (err) {
               logger.error(
-                `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}: ${err}`
+                `[IronlabsChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}: ${err}`
               );
               throw new Error(
                 `Streaming failed for provider: ${provider}, model: ${model}.\n${
@@ -387,7 +387,7 @@ export class IronaChatClient {
           };
         } catch (error) {
           logger.error(
-            `[IronaChatClient] Non-stream request failed for ${provider}/${model}: ${error}`
+            `[IronlabsChatClient] Non-stream request failed for ${provider}/${model}: ${error}`
           );
           throw error;
         }
@@ -642,12 +642,12 @@ export class IronaChatClient {
 
   private async selectBestModel(body: CompletionsPayload) {
     logger.info(
-      `[IronaChatClient][selectBestModel] Models provided: ${
+      `[IronlabsChatClient][selectBestModel] Models provided: ${
         body.models?.length || 0
       }, calling model-select endpoint`
     );
     try {
-      const response = await this.ironaRouter.modelSelect(
+      const response = await this.IronlabsRouter.modelSelect(
         this.extractModelSelectPayloadFromCompletionsPayload(body)
       );
 
@@ -655,7 +655,7 @@ export class IronaChatClient {
       // Not using fallbacks here to remove duplicacy as they are added in model priority queue
       if (response.error !== null && response.error !== undefined) {
         logger.warn(
-          `[IronaChatClient][selectBestModel][IronaML] Model selection error: ${JSON.stringify(
+          `[IronlabsChatClient][selectBestModel][IronlabsML] Model selection error: ${JSON.stringify(
             response.error,
             null,
             2
@@ -667,7 +667,7 @@ export class IronaChatClient {
       return response.providers[0];
     } catch (error) {
       logger.error(
-        `[IronaChatClient][selectBestModel] Model selection error: ${
+        `[IronlabsChatClient][selectBestModel] Model selection error: ${
           (error as Error).message
         }`
       );

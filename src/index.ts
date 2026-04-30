@@ -1,7 +1,7 @@
-import { MissingApiKeyError } from './errors';
-import { IronaChatClient } from './irona-chat-client/IronaChatClient';
-import type { CompletionsResponse } from './irona-chat-client/IronaChatClient';
-import type { ModelSelectResponse } from './irona-router-client/IronaRouterClient';
+﻿import { MissingApiKeyError } from './errors';
+import { IronlabsChatClient } from './ironlabs-chat-client/IronlabsChatClient';
+import type { CompletionsResponse } from './ironlabs-chat-client/IronlabsChatClient';
+import type { ModelSelectResponse } from './ironlabs-router-client/IronlabsRouterClient';
 import { createRouter } from './router/factory';
 import type { Router } from './router/types';
 import type { CompletionsPayload } from './schemas/completions.schema';
@@ -9,28 +9,28 @@ import type { ModelSelectPayload } from './schemas/modelSelect.schema';
 import { updateProvidersFromGist } from './supported_models';
 import type { Config, GatewayConfig } from './types';
 import {
-  IRONAAI_API_KEY_PREFIX,
+  IRONLABS_AI_API_KEY_PREFIX,
   DEFAULT_BASE_URL,
   SUPPORTED_MODELS_DEFAULT_URL,
 } from './utils/constants';
 import { logger } from './utils/logger';
 require('dotenv').config();
 
-export class IronaAI {
+export class IronlabsAI {
   private static providersLoadedPromise: Promise<void> | null = null;
-  private ironaRouter: Router;
-  private llmChatService: IronaChatClient;
+  private IronlabsRouter: Router;
+  private llmChatService: IronlabsChatClient;
   private constructor(config: Config = {}) {
     // Check for API key
     const apiKey = config.apiKey ?? process.env.IRONAAI_API_KEY ?? '';
     if (!apiKey) {
       throw new MissingApiKeyError(
-        "The API key is missing. Please provide the API key either through the 'IRONAAI_API_KEY' environment variable or the 'config.apiKey' property."
+        "The API key is missing. Please provide the API key either through the 'IRONLABS_AI_API_KEY' environment variable or the 'config.apiKey' property."
       );
     }
     if (
       typeof apiKey !== 'string' ||
-      !apiKey.startsWith(IRONAAI_API_KEY_PREFIX)
+      !apiKey.startsWith(IRONLABS_AI_API_KEY_PREFIX)
     ) {
       throw new MissingApiKeyError(
         "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."
@@ -43,18 +43,18 @@ export class IronaAI {
       gateway: this.resolveGatewayConfig(config.gateway),
     };
 
-    this.ironaRouter = createRouter(normalizedConfig);
-    this.llmChatService = new IronaChatClient(
+    this.IronlabsRouter = createRouter(normalizedConfig);
+    this.llmChatService = new IronlabsChatClient(
       normalizedConfig,
-      this.ironaRouter
+      this.IronlabsRouter
     );
   }
 
   // Static factory method to handle async initialization
-  public static async createInstance(config: Config = {}): Promise<IronaAI> {
-    IronaAI.providersLoadedPromise ??= this.ensureProvidersLoaded();
-    await IronaAI.providersLoadedPromise;
-    return new IronaAI(config);
+  public static async createInstance(config: Config = {}): Promise<IronlabsAI> {
+    IronlabsAI.providersLoadedPromise ??= this.ensureProvidersLoaded();
+    await IronlabsAI.providersLoadedPromise;
+    return new IronlabsAI(config);
   }
 
   private static async ensureProvidersLoaded(
@@ -79,7 +79,7 @@ export class IronaAI {
     }
 
     throw new Error(
-      'Cannot instantiate IronaAI as it failed to load Supported Models details from Gist after multiple attempts. Please provide correct value of environment key SUPPORTED_MODELS_URL or leave it undefined.'
+      'Cannot instantiate IronlabsAI as it failed to load Supported Models details from Gist after multiple attempts. Please provide correct value of environment key SUPPORTED_MODELS_URL or leave it undefined.'
     );
   }
 
@@ -186,7 +186,7 @@ export class IronaAI {
   }
 
   public modelSelect(body: ModelSelectPayload): Promise<ModelSelectResponse> {
-    return this.ironaRouter.modelSelect(body);
+    return this.IronlabsRouter.modelSelect(body);
   }
 
   public completions = {

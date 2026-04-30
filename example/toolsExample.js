@@ -1,8 +1,8 @@
-const { IronaAI } = require('ironaai');
+﻿const { IronlabsAI } = require('ironlabsai');
 const { z } = require('zod');
 
 /**
- * Example demonstrating how to use tools with the IronaAI SDK.
+ * Example demonstrating how to use tools with the IronlabsAI SDK.
  * Tools allow the AI model to execute functions and provide structured responses.
  */
 
@@ -73,7 +73,7 @@ const tools = {
 async function modelSelectWithTools() {
   console.log('\n=== Model Select with Tools Example ===');
 
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
 
   try {
     const response = await sdkClient.modelSelect({
@@ -110,7 +110,7 @@ async function modelSelectWithTools() {
 async function completionsWithTools() {
   console.log('\n=== Completions with Tools Example (Non-streaming) ===');
 
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
 
   try {
     const response = await sdkClient.completions.create({
@@ -148,7 +148,7 @@ async function completionsWithTools() {
 async function streamingCompletionsWithTools() {
   console.log('\n=== Completions with Tools Example (Streaming) ===');
 
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
 
   try {
     const response = await sdkClient.completions.create({
@@ -200,7 +200,7 @@ async function streamingCompletionsWithTools() {
 async function toolsWithWebSearch() {
   console.log('\n=== Tools with Web Search Example ===');
 
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
 
   try {
     const response = await sdkClient.completions.create({
@@ -236,7 +236,7 @@ async function toolsWithWebSearch() {
 async function toolsWithFallbacks() {
   console.log('\n=== Tools with Fallback Models Example ===');
 
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
 
   try {
     const response = await sdkClient.completions.create({
@@ -275,7 +275,7 @@ async function toolsWithFallbacks() {
  * Main function to run all examples
  */
 async function main() {
-  console.log('=== IronaAI Tools Examples ===');
+  console.log('=== IronlabsAI Tools Examples ===');
   console.log('Demonstrating how to use function calling tools with the SDK');
 
   try {

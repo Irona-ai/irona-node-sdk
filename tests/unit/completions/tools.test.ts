@@ -1,11 +1,11 @@
-// Import mocks before anything else
+﻿// Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
 import '../../mocks/supported-models.mock';
 import '../../mocks/provider-utils.mock';
 import { z } from 'zod';
 
-import { IronaAI } from '../../../src/index';
-import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
+import { IronlabsAI } from '../../../src/index';
+import { IronlabsChatClient } from '../../../src/ironlabs-chat-client/IronlabsChatClient';
 import type { Config } from '../../../src/types';
 import {
   setupSuccessfulGeneration,
@@ -30,7 +30,7 @@ import {
 } from '../../utils/test-helpers';
 
 describe('Tools Support', () => {
-  let client: IronaChatClient;
+  let client: IronlabsChatClient;
   let mockRouter: ReturnType<typeof createMockRouterClient>;
 
   beforeEach(() => {
@@ -42,7 +42,7 @@ describe('Tools Support', () => {
 
     mockRouter = createMockRouterClient();
     const config: Config = { apiKey: 'test-api-key' };
-    client = new IronaChatClient(config, mockRouter);
+    client = new IronlabsChatClient(config, mockRouter);
   });
 
   describe('Completions with Tools', () => {
@@ -228,7 +228,7 @@ describe('Tools Support', () => {
   });
 });
 
-describe('IronaAI SDK Tools Integration', () => {
+describe('IronlabsAI SDK Tools Integration', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setupTestEnv();
@@ -239,10 +239,10 @@ describe('IronaAI SDK Tools Integration', () => {
     jest.restoreAllMocks();
   });
 
-  it('IronaAI instance accepts tools in completions.create', async () => {
+  it('IronlabsAI instance accepts tools in completions.create', async () => {
     setupSuccessfulGeneration('SDK tools response');
 
-    const ironaAI = await IronaAI.createInstance({
+    const sdk = await IronlabsAI.createInstance({
       apiKey: 'sk_test-api-key',
     });
 
@@ -251,7 +251,7 @@ describe('IronaAI SDK Tools Integration', () => {
       inputSchema: z.object({ test: z.string() }),
     };
 
-    const result = await ironaAI.completions.create({
+    const result = await sdk.completions.create({
       messages: [{ role: 'user', content: 'Test with tools' }],
       models: ['openai/gpt-4o-mini'],
       tools: { testTool: mockTool },
@@ -260,8 +260,8 @@ describe('IronaAI SDK Tools Integration', () => {
     expect(result.response.content).toBe('SDK tools response');
   });
 
-  it('IronaAI instance accepts tools in modelSelect', async () => {
-    const ironaAI = await IronaAI.createInstance({
+  it('IronlabsAI instance accepts tools in modelSelect', async () => {
+    const sdk = await IronlabsAI.createInstance({
       apiKey: 'sk_test-api-key',
     });
 
@@ -269,14 +269,14 @@ describe('IronaAI SDK Tools Integration', () => {
     const mockModelSelect = jest.fn().mockResolvedValue({
       providers: [{ provider: 'openai', model: 'gpt-4o-mini' }],
     });
-    (ironaAI as any).ironaRouter.modelSelect = mockModelSelect;
+    (sdk as any).IronlabsRouter.modelSelect = mockModelSelect;
 
     const mockTool = {
       description: 'Test tool',
       inputSchema: z.object({ test: z.string() }),
     };
 
-    await ironaAI.modelSelect({
+    await sdk.modelSelect({
       messages: [{ role: 'user', content: 'Test message' }],
       models: ['openai/gpt-4o-mini'],
       tools: { testTool: mockTool },

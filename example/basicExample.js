@@ -1,4 +1,4 @@
-const { IronaAI } = require('ironaai');
+﻿const { IronlabsAI } = require('../src/index');
 
 const commonBody = {
   messages: [
@@ -8,16 +8,17 @@ const commonBody = {
     },
   ],
   models: [
-    'openai/gpt-4-1106-preview',
-    'openai/gpt-4-turbo',
-    'perplexity/sonar',
-    'anthropic/claude-3-opus-20240229',
-    'anthropic/claude-2.1',
-    'mistral/open-mixtral-8x22b',
-    'google/gemini-1.0-pro-latest',
-    'google/gemini-2.0-flash',
+    // 'openai/gpt-4-1106-preview',
+    // 'openai/gpt-4-turbo',
+    // 'perplexity/sonar',
+    // 'anthropic/claude-3-opus-20240229',
+    // 'anthropic/claude-2.1',
+    // 'mistral/open-mixtral-8x22b',
+    // 'google/gemini-1.0-pro-latest',
+    'google/gemini-2.5-flash',
+    'openai/gpt-5-nano',
   ],
-  fallbackModels: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
+  fallbackModels: ['openai/gpt-4o-mini', 'google/gemini-2.5-flash'],
 };
 
 async function modelSelectTest() {
@@ -25,7 +26,7 @@ async function modelSelectTest() {
     ...commonBody,
     topkModels: 2,
   };
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
   try {
     // Select a model
     const modelResponse = await sdkClient.modelSelect({
@@ -47,7 +48,7 @@ async function CompletionsTest() {
     stream: true,
     temperature: 0.2,
   };
-  const sdkClient = await IronaAI.createInstance({
+  const sdkClient = await IronlabsAI.createInstance({
     fallbackModels: ['openai/gpt-4o-mini'],
   });
   try {

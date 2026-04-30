@@ -1,4 +1,4 @@
-import { MissingApiKeyError, BadRequestError } from '../errors';
+﻿import { MissingApiKeyError, BadRequestError } from '../errors';
 import { ModelInfo, ModelSelectResponse } from '../responseTypes';
 import type { Router } from '../router/types';
 import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
@@ -18,16 +18,16 @@ export { ModelInfo, ModelSelectResponse };
 
 const resources = '';
 
-export class IronaRouterClient extends Base implements Router {
+export class IronlabsRouterClient extends Base implements Router {
   constructor(config: Config) {
     super(config);
   }
 
   async modelSelect(body: ModelSelectPayload): Promise<ModelSelectResponse> {
-    const apiKey = process.env.IRONAAI_API_KEY ?? '';
+    const apiKey = process.env.IRONLABS_AI_API_KEY ?? '';
     if (!apiKey) {
       throw new MissingApiKeyError(
-        'The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables.'
+        'The IRONLABS_AI_API_KEY environment variable is missing or empty. Please ensure that the IRONLABS_AI_API_KEY is set in the environment variables.'
       );
     }
     const validationResult = validateSchema(ModelSelectSchema, body);
@@ -55,7 +55,7 @@ export class IronaRouterClient extends Base implements Router {
     // Single model optimization - skip API call if only one model provided
     if (body.models.length === 1) {
       logger.info(
-        `[IronaRouterClient][modelSelect] Single model provided, skip-API call, returning directly: ${body.models[0]}`
+        `[IronlabsRouterClient][modelSelect] Single model provided, skip-API call, returning directly: ${body.models[0]}`
       );
       return {
         providers: [mediaSupportedProviderAndModelArray[0]],

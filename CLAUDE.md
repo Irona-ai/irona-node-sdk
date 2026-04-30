@@ -1,4 +1,4 @@
-# CLAUDE.md
+﻿# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -80,11 +80,11 @@ npm run eg-test   # Builds, links locally, and tests without publishing
 
 ### Core Components
 
-**IronaAI** (`src/index.ts`): Main SDK export. Uses async factory pattern — must be instantiated via `IronaAI.createInstance(config)`, not `new`. Validates API key (must start with `sk_`), loads supported models from external Gist (with retries), resolves optional gateway config. Exposes `modelSelect()` and `completions.create()`.
+**IronlabsAI** (`src/index.ts`): Main SDK export. Uses async factory pattern — must be instantiated via `IronlabsAI.createInstance(config)`, not `new`. Validates API key (must start with `sk_`), loads supported models from external Gist (with retries), resolves optional gateway config. Exposes `modelSelect()` and `completions.create()`.
 
-**IronaRouterClient** (`src/irona-router-client/`): Calls Irona's routing API to select the optimal model based on criteria (cost, latency, performance). Validates payloads with Zod schemas, filters models by media type support (images, PDFs), returns fallback providers on error.
+**IronlabsRouterClient** (`src/ironlabs-router-client/`): Calls Ironlabs's routing API to select the optimal model based on criteria (cost, latency, performance). Validates payloads with Zod schemas, filters models by media type support (images, PDFs), returns fallback providers on error.
 
-**IronaChatClient** (`src/irona-chat-client/IronaChatClient.ts`): Executes LLM calls via Vercel AI SDK. Handles streaming/non-streaming completions, retry logic with fallback chain, web search grounding (Google, OpenAI), reasoning effort config, and function calling/tools. Supports providers: OpenAI, Anthropic, Google, Mistral, Perplexity, TogetherAI, xAI.
+**IronlabsChatClient** (`src/ironlabs-chat-client/IronlabsChatClient.ts`): Executes LLM calls via Vercel AI SDK. Handles streaming/non-streaming completions, retry logic with fallback chain, web search grounding (Google, OpenAI), reasoning effort config, and function calling/tools. Supports providers: OpenAI, Anthropic, Google, Mistral, Perplexity, TogetherAI, xAI.
 
 ### Gateway Support
 
@@ -92,7 +92,7 @@ Optional OpenAI-compatible gateway routing (e.g., OpenRouter). When configured, 
 
 ### Key Patterns
 
-- **Factory initialization**: `IronaAI.createInstance()` — async, loads model data before construction
+- **Factory initialization**: `IronlabsAI.createInstance()` — async, loads model data before construction
 - **Fallback chain**: Primary model → fallbacks in sequence on failure
 - **Media filtering**: Models validated for required media type support before routing
 - **Provider abstraction**: Vercel AI SDK (`ai` package) as unified interface across all providers
@@ -131,7 +131,7 @@ Mock utilities provide pre-configured scenarios — see `tests/README.md` for fu
 
 ## Environment Variables
 
-Required: `IRONAAI_API_KEY` (must start with `sk_`)
+Required: `IRONLABS_AI_API_KEY` (must start with `sk_`)
 
 Provider keys (optional, one per provider used): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `MISTRAL_API_KEY`, `PPLX_API_KEY`, `TOGETHER_API_KEY`
 

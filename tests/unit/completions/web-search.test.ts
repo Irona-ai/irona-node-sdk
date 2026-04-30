@@ -1,9 +1,9 @@
-// Import mocks before anything else
+﻿// Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
 import '../../mocks/supported-models.mock';
 import '../../mocks/provider-utils.mock';
 
-import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
+import { IronlabsChatClient } from '../../../src/ironlabs-chat-client/IronlabsChatClient';
 import type { Config } from '../../../src/types';
 import {
   setupSuccessfulGeneration,
@@ -22,7 +22,7 @@ import {
 } from '../../utils/test-helpers';
 
 describe('Web Search Integration', () => {
-  let client: IronaChatClient;
+  let client: IronlabsChatClient;
   let mockRouter: ReturnType<typeof createMockRouterClient>;
 
   beforeEach(() => {
@@ -34,7 +34,7 @@ describe('Web Search Integration', () => {
 
     mockRouter = createMockRouterClient();
     const config: Config = { apiKey: 'test-api-key' };
-    client = new IronaChatClient(config, mockRouter);
+    client = new IronlabsChatClient(config, mockRouter);
   });
 
   it('enables web search for supported models', async () => {

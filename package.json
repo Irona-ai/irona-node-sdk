@@ -1,6 +1,6 @@
 {
-  "name": "ironaai",
-  "version": "0.0.27",
+  "name": "ironlabsai",
+  "version": "0.0.28",
   "main": "dist/index.js",
   "module": "dist/index.m.js",
   "unpkg": "dist/index.umd.js",
@@ -13,7 +13,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "eg-test": "npm run build && npm link && cd example && npm link ironaai",
+    "eg-test": "npm run build && npm link && cd example && npm link ironlabsai",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "type-check": "tsc --noEmit",
@@ -31,9 +31,9 @@
   },
   "homepage": "https://github.com/Irona-ai/irona-node-sdk/blob/main/README.md",
   "keywords": [
-    "irona",
+    "Ironlabs",
     "irona.ai",
-    "ironaai",
+    "ironlabsai",
     "llm router",
     "best llm router",
     "unified llm router",
@@ -47,7 +47,7 @@
   "files": [
     "dist"
   ],
-  "description": "Irona AI provides intelligent routing for your queries, dynamically selecting the best language model based on criteria like cost, latency, and efficiency. Our SDK offers clients the flexibility to choose from a variety of LLM models, while also providing a unified interface for seamless interactions. This enables efficient, tailored, and cost-effective solutions for conversational AI, ensuring that each query is handled by the most suitable model for optimal performance.",
+  "description": "Ironlabs AI provides intelligent routing for your queries, dynamically selecting the best language model based on criteria like cost, latency, and efficiency. Our SDK offers clients the flexibility to choose from a variety of LLM models, while also providing a unified interface for seamless interactions. This enables efficient, tailored, and cost-effective solutions for conversational AI, ensuring that each query is handled by the most suitable model for optimal performance.",
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.17",
     "@ai-sdk/google": "^2.0.15",

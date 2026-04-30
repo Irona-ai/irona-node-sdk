@@ -1,4 +1,4 @@
-# OpenRouter Gateway Payload Mapping
+﻿# OpenRouter Gateway Payload Mapping
 
 ## Overview
 
@@ -19,7 +19,7 @@ Previously, when the SDK routed through OpenRouter as a gateway, all advanced fe
 | ------------------------------------------- | -------------------------------------------------------------- |
 | `src/utils/openRouterMapper.ts`             | New — pure mapper functions                                    |
 | `src/utils/openRouterFetchWrapper.ts`       | New — custom fetch wrapper with request/response interception  |
-| `src/irona-chat-client/IronaChatClient.ts`  | Wires up mapper + fetch wrapper; forces `.chat` API on gateway |
+| `src/ironlabs-chat-client/IronlabsChatClient.ts`  | Wires up mapper + fetch wrapper; forces `.chat` API on gateway |
 | `docs/openrouter-mapping.md`                | New — user-facing mapping reference                            |
 | `tests/unit/utils/openRouterMapper.test.ts` | New — unit tests for mappers and fetch wrapper                 |
 | `tests/unit/completions/gateway.test.ts`    | Added 7 OpenRouter payload mapping tests                       |
@@ -120,7 +120,7 @@ Pure functions with zero side effects:
 
 `buildOpenRouterExtraBody()` returns `undefined` when no features are requested, avoiding unnecessary fetch wrapper creation.
 
-### Wiring in IronaChatClient
+### Wiring in IronlabsChatClient
 
 Three additions in `invokeChatCompletions()`:
 

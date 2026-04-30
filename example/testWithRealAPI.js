@@ -1,22 +1,22 @@
-/**
+﻿/**
  * Test router behavior with real API
  */
 
 require('dotenv').config();
 
-const { IronaAI } = require('../dist/index.js');
+const { IronlabsAI } = require('../dist/index.js');
 
 async function testSingleModel() {
   console.log('\n========== TEST 1: SINGLE MODEL ==========');
   console.log('Using: openai/gpt-4o-mini\n');
 
-  const ironaAI = await IronaAI.createInstance({
+  const IronlabsAI = await IronlabsAI.createInstance({
     apiKey:
-      process.env.IRONAAI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
+      process.env.IRONLABS_AI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
   });
 
   try {
-    const result = await ironaAI.completions.create({
+    const result = await IronlabsAI.completions.create({
       messages: [{ content: 'Say hello in 3 words', role: 'user' }],
       models: ['openai/gpt-4o-mini'],
       temperature: 0.5,
@@ -36,13 +36,13 @@ async function testMultipleModels() {
   console.log('\n========== TEST 2: MULTIPLE MODELS ==========');
   console.log('Using: openai/gpt-4o-mini, anthropic/claude-3-haiku-20240307\n');
 
-  const ironaAI = await IronaAI.createInstance({
+  const IronlabsAI = await IronlabsAI.createInstance({
     apiKey:
-      process.env.IRONAAI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
+      process.env.IRONLABS_AI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
   });
 
   try {
-    const result = await ironaAI.completions.create({
+    const result = await IronlabsAI.completions.create({
       messages: [{ content: 'Say hello in 3 words', role: 'user' }],
       models: ['openai/gpt-4o-mini', 'anthropic/claude-3-haiku-20240307'],
       tradeoff: 'latency',

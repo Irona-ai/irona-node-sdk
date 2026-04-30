@@ -1,4 +1,4 @@
-const { IronaAI } = require('ironaai');
+﻿const { IronlabsAI } = require('ironlabsai');
 const fs = require('fs');
 
 const body = {
@@ -27,7 +27,7 @@ const body = {
 };
 
 async function modelSelectTest() {
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
   try {
     // Select a model
     const modelResponse = await sdkClient.modelSelect(body);
@@ -39,7 +39,7 @@ async function modelSelectTest() {
 }
 
 async function CompletionsTest(body) {
-  const sdkClient = await IronaAI.createInstance({});
+  const sdkClient = await IronlabsAI.createInstance({});
   try {
     const { provider, model, response } =
       await sdkClient.completions.create(body);

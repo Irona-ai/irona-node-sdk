@@ -1,4 +1,4 @@
-# Image Storage Optimization
+﻿# Image Storage Optimization
 
 ## Problem
 
@@ -54,7 +54,7 @@ After:
   (< 200 bytes per reference, image stored externally)
 ```
 
-### Implementation (irona-chat)
+### Implementation (Ironlabs-chat)
 
 Image generation service (`generation.service.ts`) now:
 
@@ -74,7 +74,7 @@ Image generation service (`generation.service.ts`) now:
 
 ### Storage Provider: UploadThing
 
-- Already used in the irona-chat codebase for file uploads
+- Already used in the Ironlabs-chat codebase for file uploads
 - Requires `UPLOADTHING_TOKEN` env var
 - `UTApi` for server-side programmatic uploads
 - Files served from `utfs.io` CDN

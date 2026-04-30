@@ -1,9 +1,9 @@
-// Import mocks before anything else
+﻿// Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
 import '../../mocks/supported-models.mock';
 import '../../mocks/provider-utils.mock';
 
-import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
+import { IronlabsChatClient } from '../../../src/ironlabs-chat-client/IronlabsChatClient';
 import type { Config } from '../../../src/types';
 import {
   mockGenerateText,
@@ -42,7 +42,7 @@ describe('Gateway Completions', () => {
         apiKey: 'openrouter-test-key',
       },
     };
-    const client = new IronaChatClient(config, mockRouter);
+    const client = new IronlabsChatClient(config, mockRouter);
 
     delete process.env.OPENAI_API_KEY;
     setupSuccessfulGeneration('Gateway response');
@@ -63,7 +63,7 @@ describe('Gateway Completions', () => {
         apiKey: 'openrouter-test-key',
       },
     };
-    const client = new IronaChatClient(config, mockRouter);
+    const client = new IronlabsChatClient(config, mockRouter);
 
     // Delete direct provider key so google routes through gateway
     delete process.env.GOOGLE_API_KEY;
@@ -91,7 +91,7 @@ describe('Gateway Completions', () => {
         apiKey: 'openrouter-test-key',
       },
     };
-    const client = new IronaChatClient(config, mockRouter);
+    const client = new IronlabsChatClient(config, mockRouter);
 
     // GOOGLE_API_KEY is set by setupTestEnv() — should still route through gateway
     mockGetOpenRouterIdentifier.mockReturnValue('google/gemini-2.0-flash-001');
@@ -122,7 +122,7 @@ describe('Gateway Completions', () => {
         openai: { apiKey: 'programmatic-openai-key' },
       },
     };
-    const client = new IronaChatClient(config, mockRouter);
+    const client = new IronlabsChatClient(config, mockRouter);
 
     setupSuccessfulGeneration('Gateway via programmatic config');
 
@@ -142,7 +142,7 @@ describe('Gateway Completions', () => {
       apiKey: 'test-api-key',
       // No gateway configured
     };
-    const client = new IronaChatClient(config, mockRouter);
+    const client = new IronlabsChatClient(config, mockRouter);
 
     // OPENAI_API_KEY is set by setupTestEnv() — direct provider path
     setupSuccessfulGeneration('Direct response');
@@ -167,7 +167,7 @@ describe('Gateway Completions', () => {
         includeProviderInModelName: false,
       },
     };
-    const client = new IronaChatClient(config, mockRouter);
+    const client = new IronlabsChatClient(config, mockRouter);
 
     // Delete direct key so provider routes through gateway
     delete process.env.OPENAI_API_KEY;
@@ -210,7 +210,7 @@ describe('Gateway Completions', () => {
           apiKey: 'openrouter-test-key',
         },
       };
-      const client = new IronaChatClient(config, mockRouter);
+      const client = new IronlabsChatClient(config, mockRouter);
 
       delete process.env.OPENAI_API_KEY;
       setupSuccessfulGeneration('Reasoning response');
@@ -236,7 +236,7 @@ describe('Gateway Completions', () => {
           apiKey: 'openrouter-test-key',
         },
       };
-      const client = new IronaChatClient(config, mockRouter);
+      const client = new IronlabsChatClient(config, mockRouter);
 
       delete process.env.OPENAI_API_KEY;
       mockDoesModelSupportWebSearch.mockReturnValue(true);
@@ -266,7 +266,7 @@ describe('Gateway Completions', () => {
           apiKey: 'openrouter-test-key',
         },
       };
-      const client = new IronaChatClient(config, mockRouter);
+      const client = new IronlabsChatClient(config, mockRouter);
 
       delete process.env.OPENAI_API_KEY;
       mockDoesModelSupportWebSearch.mockReturnValue(true);
@@ -293,7 +293,7 @@ describe('Gateway Completions', () => {
           apiKey: 'openrouter-test-key',
         },
       };
-      const client = new IronaChatClient(config, mockRouter);
+      const client = new IronlabsChatClient(config, mockRouter);
 
       delete process.env.OPENAI_API_KEY;
       setupSuccessfulGeneration('Plain response');
@@ -318,7 +318,7 @@ describe('Gateway Completions', () => {
           apiKey: 'gateway-test-key',
         },
       };
-      const client = new IronaChatClient(config, mockRouter);
+      const client = new IronlabsChatClient(config, mockRouter);
 
       delete process.env.OPENAI_API_KEY;
       setupSuccessfulGeneration('Non-OpenRouter response');
@@ -339,7 +339,7 @@ describe('Gateway Completions', () => {
           apiKey: 'openrouter-test-key',
         },
       };
-      const client = new IronaChatClient(config, mockRouter);
+      const client = new IronlabsChatClient(config, mockRouter);
 
       // OPENAI_API_KEY is set by setupTestEnv() — should still route through gateway
       setupSuccessfulGeneration('Gateway response');
@@ -359,7 +359,7 @@ describe('Gateway Completions', () => {
           apiKey: 'openrouter-test-key',
         },
       };
-      const client = new IronaChatClient(config, mockRouter);
+      const client = new IronlabsChatClient(config, mockRouter);
 
       delete process.env.OPENAI_API_KEY;
       setupSuccessfulGeneration('Subdomain response');

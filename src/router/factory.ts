@@ -1,19 +1,19 @@
-/**
+﻿/**
  * Router Factory — creates the appropriate router based on config.
  *
  * Two router types:
  *   api   — HTTP-based routing (any compatible endpoint)
  *   local — zero-latency, zero-cost classification (ClawRouter port)
  *
- * When no router config is provided, defaults to Irona's API router.
+ * When no router config is provided, defaults to Ironlabs's API router.
  *
  * Resolution order:
  * 1. config.router (explicit config)
  * 2. ROUTER_TYPE env var
- * 3. Default: Irona API router
+ * 3. Default: Ironlabs API router
  */
 
-import { IronaRouterClient } from '../irona-router-client/IronaRouterClient';
+import { IronlabsRouterClient } from '../ironlabs-router-client/IronlabsRouterClient';
 import type { Config } from '../types';
 import { logger } from '../utils/logger';
 
@@ -51,7 +51,7 @@ export function resolveRouterConfig(
     return { type: 'local' };
   }
 
-  // Default: Irona API router (null signals "use built-in default")
+  // Default: Ironlabs API router (null signals "use built-in default")
   return null;
 }
 
@@ -59,8 +59,8 @@ export function createRouter(config: Config): Router {
   const routerConfig = resolveRouterConfig(config.router);
 
   if (routerConfig == null) {
-    logger.info('[RouterFactory] Using default Irona API router');
-    return new IronaRouterClient(config);
+    logger.info('[RouterFactory] Using default Ironlabs API router');
+    return new IronlabsRouterClient(config);
   }
 
   switch (routerConfig.type) {
@@ -77,7 +77,9 @@ export function createRouter(config: Config): Router {
       return new LocalRouter(routerConfig.scoringConfig);
 
     default:
-      logger.info('[RouterFactory] Falling back to default Irona API router');
-      return new IronaRouterClient(config);
+      logger.info(
+        '[RouterFactory] Falling back to default Ironlabs API router'
+      );
+      return new IronlabsRouterClient(config);
   }
 }

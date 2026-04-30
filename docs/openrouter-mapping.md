@@ -1,4 +1,4 @@
-# OpenRouter Gateway Payload Mapping
+﻿# OpenRouter Gateway Payload Mapping
 
 When an OpenRouter gateway is configured, the SDK maps its native options to OpenRouter's API format via a custom `fetch` wrapper. This document describes the mappings.
 
@@ -39,4 +39,4 @@ These mappings only apply when the gateway hostname is `openrouter.ai` or `*.ope
 
 - `src/utils/openRouterMapper.ts` — Pure mapper functions
 - `src/utils/openRouterFetchWrapper.ts` — Custom fetch wrapper
-- `src/irona-chat-client/IronaChatClient.ts` — Integration point
+- `src/ironlabs-chat-client/IronlabsChatClient.ts` — Integration point

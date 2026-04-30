@@ -1,10 +1,10 @@
-// Import mocks before anything else
+﻿// Import mocks before anything else
 import '../../mocks/ai-sdk.mock';
 import '../../mocks/supported-models.mock';
 import '../../mocks/provider-utils.mock';
 
 import { BadRequestError } from '../../../src/errors';
-import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
+import { IronlabsChatClient } from '../../../src/ironlabs-chat-client/IronlabsChatClient';
 import type { Config } from '../../../src/types';
 import { setupStreamError, setupEmptyStream } from '../../mocks/ai-sdk.mock';
 import {
@@ -25,7 +25,7 @@ import {
 } from '../../utils/test-helpers';
 
 describe('Edge Cases', () => {
-  let client: IronaChatClient;
+  let client: IronlabsChatClient;
   let mockRouter: ReturnType<typeof createMockRouterClient>;
 
   beforeEach(() => {
@@ -37,7 +37,7 @@ describe('Edge Cases', () => {
 
     mockRouter = createMockRouterClient();
     const config: Config = { apiKey: 'test-api-key' };
-    client = new IronaChatClient(config, mockRouter);
+    client = new IronlabsChatClient(config, mockRouter);
   });
 
   describe('Validation', () => {

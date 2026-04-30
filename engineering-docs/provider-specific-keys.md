@@ -1,4 +1,4 @@
-# Provider-Specific Keys
+﻿# Provider-Specific Keys
 
 ## Overview
 
@@ -19,7 +19,7 @@ Previously, gateway routing was all-or-nothing: when a gateway (e.g., OpenRouter
 | File                                       | Change                                                             |
 | ------------------------------------------ | ------------------------------------------------------------------ |
 | `src/types.ts`                             | Added `ProviderConfig` type, added `providers?` field to `Config`  |
-| `src/irona-chat-client/IronaChatClient.ts` | Core routing logic changes (see below)                             |
+| `src/ironlabs-chat-client/IronlabsChatClient.ts` | Core routing logic changes (see below)                             |
 | `.env.example`                             | Documented auto-detection behavior                                 |
 | `tests/unit/completions/gateway.test.ts`   | Updated gateway test + 2 new bypass tests (env var + programmatic) |
 
@@ -143,8 +143,8 @@ Since `isUsingGateway` is now `false` for providers with direct keys, all these 
 ## Usage Example
 
 ```typescript
-const irona = await IronaAI.createInstance({
-  apiKey: process.env.IRONAAI_API_KEY,
+const Ironlabs = await IronlabsAI.createInstance({
+  apiKey: process.env.IRONLABS_AI_API_KEY,
   gateway: {
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: process.env.OPENROUTER_API_KEY!,

@@ -1,5 +1,5 @@
-/**
- * End-to-end test: LocalRouter → IronaChatClient completions
+﻿/**
+ * End-to-end test: LocalRouter → IronlabsChatClient completions
  *
  * Verifies that for the 4-model setup:
  *   SIMPLE   → openai/gpt-5-nano            ($0.05/$0.40)
@@ -8,7 +8,7 @@
  *   REASONING→ anthropic/claude-sonnet-4-5-20250929 ($3/$15)
  *
  * the local router classifies the prompt, picks the right model,
- * and IronaChatClient invokes completions with that model.
+ * and IronlabsChatClient invokes completions with that model.
  */
 
 // ── Mocks (must be before imports) ──────────────────────────────────────────
@@ -90,7 +90,7 @@ jest.mock('../../../src/utils/providerAndModelUtils', () => ({
 
 // ── Imports (after mocks) ───────────────────────────────────────────────────
 
-import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
+import { IronlabsChatClient } from '../../../src/ironlabs-chat-client/IronlabsChatClient';
 import { LocalRouter } from '../../../src/router/local';
 import type { Config } from '../../../src/types';
 
@@ -150,7 +150,7 @@ function setupStream(chunks: string[] = ['Hello', ' world']) {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe('Local Router → Completions (4-model E2E)', () => {
-  let client: IronaChatClient;
+  let client: IronlabsChatClient;
   let localRouter: LocalRouter;
 
   beforeEach(() => {
@@ -161,7 +161,7 @@ describe('Local Router → Completions (4-model E2E)', () => {
 
     localRouter = new LocalRouter();
     const config: Config = { apiKey: 'test-api-key' };
-    client = new IronaChatClient(config, localRouter);
+    client = new IronlabsChatClient(config, localRouter);
   });
 
   afterEach(() => {
@@ -225,7 +225,7 @@ describe('Local Router → Completions (4-model E2E)', () => {
     });
   });
 
-  // ── Completions through IronaChatClient ────────────────────────────────
+  // ── Completions through IronlabsChatClient ────────────────────────────────
 
   describe('End-to-end completions', () => {
     it('SIMPLE prompt → completions invoked with gpt-5-nano', async () => {

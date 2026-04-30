@@ -1,4 +1,4 @@
-// Mocks MUST be before imports (critical Jest pattern for this codebase)
+﻿// Mocks MUST be before imports (critical Jest pattern for this codebase)
 jest.mock('../../../src/supported_models', () => ({
   doesModelSupportMediaTypes: jest.fn().mockReturnValue(true),
   doesModelSupportWebSearch: jest.fn().mockReturnValue(false),
@@ -644,7 +644,7 @@ describe('resolveRouterConfig', () => {
     process.env = originalEnv;
   });
 
-  it('returns null (Irona default) when no config provided', () => {
+  it('returns null (Ironlabs default) when no config provided', () => {
     const config = resolveRouterConfig();
     expect(config).toBeNull();
   });

@@ -1,4 +1,4 @@
-const { IronaAI } = require('ironaai');
+﻿const { IronlabsAI } = require('../src/index');
 
 const commonBody = {
   messages: [
@@ -33,7 +33,7 @@ async function modelSelectTest() {
     ...commonBody,
     topkModels: 2,
   };
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
   try {
     // Select a model
     const modelResponse = await sdkClient.modelSelect({
@@ -56,7 +56,7 @@ async function CompletionsTest() {
     temperature: 0.2,
     reasoningEffort: 'medium', // can be 'low', 'medium', 'high'
   };
-  const sdkClient = await IronaAI.createInstance({
+  const sdkClient = await IronlabsAI.createInstance({
     fallbackModels: ['openai/gpt-4o-mini'],
   });
   try {

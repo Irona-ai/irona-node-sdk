@@ -1,11 +1,11 @@
-```typescript
-import { IronaAI } from 'ironaai';
+﻿```typescript
+import { IronlabsAI } from 'ironlabsai';
 
-const ironaAI = new IronaAI();
+const IronlabsAI = new IronlabsAI();
 
 async function basicExample() {
   // 1. Select the best model
-  const result = await ironaAI.completions.create({
+  const result = await IronlabsAI.completions.create({
     // Define the user's message
     messages: [{ content: 'What is the golden ratio?', role: 'user' }],
     // Specify the LLM providers and models to choose from

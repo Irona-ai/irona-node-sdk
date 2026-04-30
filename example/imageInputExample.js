@@ -1,4 +1,4 @@
-const { IronaAI } = require('ironaai');
+﻿const { IronlabsAI } = require('../src/index');
 const fs = require('fs');
 
 const body = {
@@ -10,14 +10,17 @@ const body = {
         {
           type: 'image_url',
           image_url: {
-            url: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg',
+            url: 'https://file-examples.com/storage/fe53910e3e69f052f96c91e/2017/10/file_example_JPG_100kB.jpg',
           },
         },
       ],
     },
   ],
-  models: ['anthropic/claude-3-5-sonnet-20240620'],
-  fallbackModels: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
+  models: ['openai/gpt-4o'],
+  fallbackModels: [
+    'openai/gpt-4o-mini',
+    'anthropic/claude-3-5-sonnet-20240620',
+  ],
   stream: true,
 };
 
@@ -35,7 +38,7 @@ function encodeImageToBase64WithMime(filePath) {
 }
 
 async function modelSelectTest() {
-  const sdkClient = await IronaAI.createInstance();
+  const sdkClient = await IronlabsAI.createInstance();
   try {
     // Select a model
     const modelResponse = await sdkClient.modelSelect(body);
@@ -47,7 +50,7 @@ async function modelSelectTest() {
 }
 
 async function CompletionsTest(body) {
-  const sdkClient = await IronaAI.createInstance({
+  const sdkClient = await IronlabsAI.createInstance({
     fallbackModels: ['openai/gpt-4o-mini'],
   });
   try {
@@ -56,15 +59,17 @@ async function CompletionsTest(body) {
     console.log(`Selected provider: ${provider}, model: ${model}\n`);
     let accumulated = '';
     if (body.stream) {
-      for await (const chunk of response) {
-        console.log(chunk);
-        accumulated += chunk.content;
+      for await (const part of response.fullStream) {
+        if (part.type === 'text-delta') {
+          accumulated += part.text;
+        }
       }
     } else {
       console.log(response);
       accumulated += response.content;
+      console.log('Accumulated content nonStreaming: ' + accumulated);
     }
-    console.log(accumulated);
+    console.log('Final accumulated content: ' + accumulated);
   } catch (error) {
     console.log('Error in SDK Completion usage:\n');
     console.error(error);
@@ -93,8 +98,11 @@ const body2 = {
       ],
     },
   ],
-  models: ['anthropic/claude-3-5-sonnet-20240620'],
-  fallbackModels: ['openai/gpt-4o-mini', 'google/gemini-1.5-flash-latest'],
+  models: ['google/gemini-2.5-flash'],
+  fallbackModels: [
+    'openai/gpt-4o-mini',
+    'anthropic/claude-3-5-sonnet-20240620',
+  ],
   stream: true,
 };
 

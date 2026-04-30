@@ -32,6 +32,7 @@ import {
 } from '../supported_models';
 import type { Config, GatewayConfig, ProviderConfig } from '../types';
 import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
+import { LLMGatewayCostTracker } from '../utils/llmGatewayCostTracker';
 import { createLLMGatewayFetchWrapper } from '../utils/llmGatewayFetchWrapper';
 import { buildLLMGatewayExtraBody } from '../utils/llmGatewayMapper';
 import type { LLMGatewayExtraBody } from '../utils/llmGatewayMapper';
@@ -48,6 +49,7 @@ export { CompletionsResponse };
 export class IronaChatClient {
   private readonly gatewayProvider?: ReturnType<typeof createOpenAI>['chat'];
   private readonly gatewayHostname?: string;
+  private readonly costTracker?: LLMGatewayCostTracker;
 
   constructor(
     private readonly config: Config,
@@ -58,6 +60,12 @@ export class IronaChatClient {
       this.gatewayHostname = new URL(
         this.config.gateway.baseUrl
       ).hostname.toLowerCase();
+    }
+    if (
+      this.config.gateway !== undefined &&
+      this.gatewayHostname === 'api.llmgateway.io'
+    ) {
+      this.costTracker = new LLMGatewayCostTracker(this.config.gateway.apiKey);
     }
   }
 
@@ -363,10 +371,26 @@ export class IronaChatClient {
           },
         };
 
+        const costPromise =
+          this.costTracker !== undefined
+            ? stream.usage.then(usage =>
+                this.costTracker!.calculateCostForModel(
+                  fullModelName,
+                  {
+                    promptTokens: usage.inputTokens ?? 0,
+                    completionTokens: usage.outputTokens ?? 0,
+                  },
+                  provider,
+                  model
+                )
+              )
+            : undefined;
+
         return {
           response: { fullStream },
           provider,
           model,
+          cost: costPromise,
         };
       } else {
         const generateConfig = (
@@ -380,6 +404,18 @@ export class IronaChatClient {
         ) as Parameters<typeof generateText>[0];
         try {
           const response = await generateText(generateConfig);
+          const cost =
+            this.costTracker !== undefined
+              ? await this.costTracker.calculateCostForModel(
+                  fullModelName,
+                  {
+                    promptTokens: response.usage.inputTokens ?? 0,
+                    completionTokens: response.usage.outputTokens ?? 0,
+                  },
+                  provider,
+                  model
+                )
+              : undefined;
           return {
             response: {
               content: response.text,
@@ -388,6 +424,7 @@ export class IronaChatClient {
             },
             provider,
             model,
+            cost: cost !== undefined ? Promise.resolve(cost) : undefined,
           };
         } catch (error) {
           logger.error(

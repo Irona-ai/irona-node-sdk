@@ -7,6 +7,11 @@ export type ProviderName =
   | 'perplexity'
   | 'xai';
 
+export interface CostBreakdown {
+  hasDiscount: boolean;
+  totalCost: number;
+}
+
 export interface CompletionsResponse {
   response: {
     content?: string;
@@ -16,6 +21,7 @@ export interface CompletionsResponse {
   };
   provider: string;
   model: string;
+  cost?: Promise<CostBreakdown | null>;
 }
 
 export interface ModelInfo {

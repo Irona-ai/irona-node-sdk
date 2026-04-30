@@ -22,7 +22,7 @@ export class IronlabsAI {
   private llmChatService: IronlabsChatClient;
   private constructor(config: Config = {}) {
     // Check for API key
-    const apiKey = config.apiKey ?? process.env.IRONAAI_API_KEY ?? '';
+    const apiKey = config.apiKey ?? process.env.IRONLABS_AI_API_KEY ?? '';
     if (!apiKey) {
       throw new MissingApiKeyError(
         "The API key is missing. Please provide the API key either through the 'IRONLABS_AI_API_KEY' environment variable or the 'config.apiKey' property."

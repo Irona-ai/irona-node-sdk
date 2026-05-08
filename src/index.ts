@@ -11,8 +11,11 @@ import type { Config, GatewayConfig } from './types';
 import {
   IRONAAI_API_KEY_PREFIX,
   DEFAULT_BASE_URL,
+  LLM_GATEWAY_DEFAULT_BASE_URL,
+  OPENROUTER_DEFAULT_BASE_URL,
   SUPPORTED_MODELS_DEFAULT_URL,
 } from './utils/constants';
+import { detectGatewayTypeFromUrl } from './utils/gatewayType';
 import { logger } from './utils/logger';
 require('dotenv').config();
 
@@ -86,20 +89,46 @@ export class IronaAI {
   private resolveGatewayConfig(
     configuredGateway?: GatewayConfig
   ): GatewayConfig | undefined {
+    // Canonical URL env var is `GATEWAY_BASE_URL` — works for ANY
+    // OpenAI-compatible gateway. The SDK detects which flavour (OpenRouter vs
+    // LLM Gateway vs other) from the hostname and picks the right API key
+    // from the existing `OPENROUTER_API_KEY` / `LLM_GATEWAY_API_KEY` vars.
+    //
+    // Legacy `LLM_GATEWAY_BASE_URL` / `OPENROUTER_BASE_URL` are kept as
+    // fallbacks. If no URL is set at all, OpenRouter is the default when
+    // OPENROUTER_API_KEY is present.
+    const llmGatewayApiKey = process.env.LLM_GATEWAY_API_KEY;
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+    const defaultLLMGatewayBaseUrl =
+      llmGatewayApiKey !== undefined && llmGatewayApiKey !== ''
+        ? LLM_GATEWAY_DEFAULT_BASE_URL
+        : undefined;
     const defaultOpenRouterBaseUrl =
       openRouterApiKey !== undefined && openRouterApiKey !== ''
-        ? 'https://openrouter.ai/api/v1'
+        ? OPENROUTER_DEFAULT_BASE_URL
         : undefined;
     const gatewayBaseUrl =
       configuredGateway?.baseUrl ??
+      process.env.GATEWAY_BASE_URL ??
       process.env.LLM_GATEWAY_BASE_URL ??
       process.env.OPENROUTER_BASE_URL ??
-      defaultOpenRouterBaseUrl;
+      defaultOpenRouterBaseUrl ??
+      defaultLLMGatewayBaseUrl;
+    // Pair the API key with whichever base URL won above, so a user with both
+    // OPENROUTER_API_KEY and LLM_GATEWAY_API_KEY set doesn't end up sending an
+    // OpenRouter key to LLM Gateway (or vice versa). `detectGatewayTypeFromUrl`
+    // is the single source of truth for which gateway a base URL points at —
+    // used here AND in IronaChatClient.
+    const gatewayType = detectGatewayTypeFromUrl(gatewayBaseUrl);
     const gatewayApiKey =
       configuredGateway?.apiKey ??
-      process.env.LLM_GATEWAY_API_KEY ??
-      process.env.OPENROUTER_API_KEY;
+      (gatewayType === 'llmgateway'
+        ? llmGatewayApiKey
+        : gatewayType === 'openrouter'
+          ? openRouterApiKey
+          : undefined) ??
+      openRouterApiKey ??
+      llmGatewayApiKey;
 
     if (
       gatewayBaseUrl !== undefined &&
@@ -107,7 +136,7 @@ export class IronaAI {
       (gatewayApiKey === undefined || gatewayApiKey === '')
     ) {
       throw new MissingApiKeyError(
-        'Gateway base URL is configured but no gateway API key is set. Provide `config.gateway.apiKey` or set `LLM_GATEWAY_API_KEY`/`OPENROUTER_API_KEY`.'
+        'Gateway base URL is configured but no gateway API key is set. Provide `config.gateway.apiKey` or set `LLM_GATEWAY_API_KEY` / `OPENROUTER_API_KEY`.'
       );
     }
 
@@ -117,7 +146,7 @@ export class IronaAI {
       gatewayApiKey !== ''
     ) {
       throw new MissingApiKeyError(
-        'Gateway API key is configured but no gateway base URL is set. Provide `config.gateway.baseUrl` or set `LLM_GATEWAY_BASE_URL`/`OPENROUTER_BASE_URL`.'
+        'Gateway API key is configured but no gateway base URL is set. Provide `config.gateway.baseUrl` or set `GATEWAY_BASE_URL` (or the legacy `LLM_GATEWAY_BASE_URL` / `OPENROUTER_BASE_URL`).'
       );
     }
 

@@ -32,6 +32,11 @@ import {
 } from '../supported_models';
 import type { Config, GatewayConfig, ProviderConfig } from '../types';
 import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
+import { detectGatewayTypeFromUrl } from '../utils/gatewayType';
+import type { GatewayType } from '../utils/gatewayType';
+import { createLLMGatewayFetchWrapper } from '../utils/llmGatewayFetchWrapper';
+import { buildLLMGatewayExtraBody } from '../utils/llmGatewayMapper';
+import type { LLMGatewayExtraBody } from '../utils/llmGatewayMapper';
 import { logger } from '../utils/logger';
 import { createOpenRouterFetchWrapper } from '../utils/openRouterFetchWrapper';
 import { buildOpenRouterExtraBody } from '../utils/openRouterMapper';
@@ -47,18 +52,17 @@ export { CompletionsResponse };
 
 export class IronaChatClient {
   private readonly gatewayProvider?: ReturnType<typeof createOpenAI>['chat'];
-  private readonly gatewayHostname?: string;
+  // Single source of truth for which gateway flavour we're talking to. Both
+  // payload-mapping (`isOpenRouter`/`isLLMGateway` checks below) and model-name
+  // resolution branch off this rather than re-parsing the URL each time.
+  private readonly gatewayType: GatewayType;
 
   constructor(
     private readonly config: Config,
     private readonly ironaRouter: Router
   ) {
     this.gatewayProvider = this.createGatewayProvider(this.config.gateway);
-    if (this.config.gateway !== undefined) {
-      this.gatewayHostname = new URL(
-        this.config.gateway.baseUrl
-      ).hostname.toLowerCase();
-    }
+    this.gatewayType = detectGatewayTypeFromUrl(this.config.gateway?.baseUrl);
   }
 
   /**
@@ -171,31 +175,42 @@ export class IronaChatClient {
         fullModelName = this.resolveGatewayModelName(provider, fullModelName);
       }
 
-      // Build OpenRouter-specific extra body when routing through OpenRouter
+      // Pick the gateway-specific extra body + fetch wrapper based on the
+      // configured gateway hostname. OpenRouter uses `plugins`, LLM Gateway
+      // uses `web_search` — same reasoning shape, different search shape.
       const isOpenRouter = isUsingGateway && this.isOpenRouterGateway();
+      const isLLMGateway = isUsingGateway && this.isLLMGatewayGateway();
       let openRouterExtra: OpenRouterExtraBody | undefined;
+      let llmGatewayExtra: LLMGatewayExtraBody | undefined;
       if (isOpenRouter) {
         openRouterExtra = buildOpenRouterExtraBody({
           reasoningEffort: payload.reasoningEffort,
           search: payload.search,
           supportsWebSearch,
         });
+      } else if (isLLMGateway) {
+        llmGatewayExtra = buildLLMGatewayExtraBody({
+          reasoningEffort: payload.reasoningEffort,
+          search: payload.search,
+          supportsWebSearch,
+        });
       }
 
-      const modelFactory = isOpenRouter
-        ? (this.getGatewayModelFactory(openRouterExtra) ??
-          this.getModelInstance(
-            provider,
-            fullModelName,
-            payload.reasoningEffort,
-            isUsingGateway
-          ))
-        : this.getModelInstance(
-            provider,
-            fullModelName,
-            payload.reasoningEffort,
-            isUsingGateway
-          );
+      const gatewayFactory =
+        isOpenRouter && openRouterExtra !== undefined
+          ? this.getOpenRouterModelFactory(openRouterExtra)
+          : isLLMGateway
+            ? this.getLLMGatewayModelFactory(llmGatewayExtra)
+            : undefined;
+
+      const modelFactory =
+        gatewayFactory ??
+        this.getModelInstance(
+          provider,
+          fullModelName,
+          payload.reasoningEffort,
+          isUsingGateway
+        );
 
       if (!modelFactory) {
         throw new Error(`No model factory found for provider: ${provider}`);
@@ -203,14 +218,15 @@ export class IronaChatClient {
 
       const baseModel = modelFactory(fullModelName);
 
-      // When using OpenRouter with reasoning explicitly requested, the fetch wrapper
-      // injects delta.reasoning as <think>…</think> tags. Wrap the model so the AI
-      // SDK extracts those tags into reasoning-delta stream parts.
-      // Mapper omits the reasoning field for 'off'/undefined, so its presence means active.
-      const shouldExtractOpenRouterReasoning =
-        isOpenRouter && openRouterExtra?.reasoning !== undefined;
+      // When the gateway fetch wrapper injects delta.reasoning as
+      // <think>…</think> tags, wrap the model so the AI SDK extracts those
+      // tags into reasoning-delta stream parts. Both mappers omit the
+      // reasoning field for 'off'/undefined — its presence means active.
+      const shouldExtractGatewayReasoning =
+        (isOpenRouter && openRouterExtra?.reasoning !== undefined) ||
+        (isLLMGateway && llmGatewayExtra?.reasoning !== undefined);
 
-      const finalModel = shouldExtractOpenRouterReasoning
+      const finalModel = shouldExtractGatewayReasoning
         ? (wrapLanguageModel({
             model: baseModel as Parameters<
               typeof wrapLanguageModel
@@ -419,11 +435,26 @@ export class IronaChatClient {
             return { type: 'text' as const, text: part.text };
           } else if (part.type === 'image') {
             return { type: 'image' as const, image: part.image };
+          } else if (part.type === 'image_url') {
+            // OpenAI-style image_url → AI SDK image part. The SDK accepts
+            // both HTTPS URLs and `data:image/...;base64,...` strings here.
+            return { type: 'image' as const, image: part.image_url.url };
           } else if (part.type === 'file') {
             return {
               type: 'file' as const,
               data: part.data,
               mediaType: part.mediaType ?? 'application/pdf',
+            };
+          } else if (part.type === 'document') {
+            // Anthropic-style document → AI SDK file part. `source.url` (an
+            // HTTPS URL) or `source.data` (base64) both feed straight into
+            // the SDK's BinaryDataSchema-compatible `data` field.
+            const source = part.source;
+            const data = source.type === 'url' ? source.url : source.data;
+            return {
+              type: 'file' as const,
+              data,
+              mediaType: source.media_type ?? 'application/pdf',
             };
           }
           throw new Error(
@@ -558,28 +589,23 @@ export class IronaChatClient {
   }
 
   private isOpenRouterGateway(): boolean {
-    return (
-      this.gatewayHostname === 'openrouter.ai' ||
-      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
-    );
+    return this.gatewayType === 'openrouter';
+  }
+
+  private isLLMGatewayGateway(): boolean {
+    return this.gatewayType === 'llmgateway';
   }
 
   /**
-   * Returns the gateway model factory, optionally with a custom fetch wrapper
-   * that merges OpenRouter-specific params into the request body.
-   * When no extra body is needed, reuses the singleton gateway provider.
+   * Returns an OpenRouter-flavoured gateway model factory: a per-request
+   * `createOpenAI()` instance whose fetch merges OpenRouter-specific params
+   * (`reasoning`, `plugins`, `provider`) into the body.
    */
-  private getGatewayModelFactory(
-    extraBody: OpenRouterExtraBody | undefined
+  private getOpenRouterModelFactory(
+    extraBody: OpenRouterExtraBody
   ): ReturnType<typeof createOpenAI>['chat'] | undefined {
-    if (
-      this.gatewayProvider === undefined ||
-      this.config.gateway === undefined
-    ) {
+    if (this.config.gateway === undefined) {
       return undefined;
-    }
-    if (extraBody === undefined) {
-      return this.gatewayProvider;
     }
     return createOpenAI({
       baseURL: this.config.gateway.baseUrl,
@@ -590,20 +616,47 @@ export class IronaChatClient {
     }).chat;
   }
 
+  /**
+   * Returns an LLM Gateway-flavoured model factory: a per-request
+   * `createOpenAI()` instance whose fetch merges LLM Gateway-specific params
+   * (`reasoning`, `web_search`) and cleans up `delta.reasoning` tokens.
+   * The wrapper is created even with an empty extra body so the cleanup runs.
+   */
+  private getLLMGatewayModelFactory(
+    extraBody: LLMGatewayExtraBody | undefined
+  ): ReturnType<typeof createOpenAI>['chat'] | undefined {
+    if (this.config.gateway === undefined) {
+      return undefined;
+    }
+    return createOpenAI({
+      baseURL: this.config.gateway.baseUrl,
+      apiKey: this.config.gateway.apiKey,
+      headers: this.config.gateway.headers,
+      name: this.config.gateway.providerName ?? 'gateway',
+      fetch: createLLMGatewayFetchWrapper(extraBody ?? {}),
+    }).chat;
+  }
+
   private resolveGatewayModelName(provider: string, model: string): string {
     const gateway = this.config.gateway;
     if (!gateway) {
       return model;
     }
 
-    if (
-      this.gatewayHostname === 'openrouter.ai' ||
-      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
-    ) {
+    if (this.isOpenRouterGateway()) {
       const openRouterModelName = getOpenRouterIdentifier(provider, model);
       if (openRouterModelName !== null && openRouterModelName !== '') {
         return openRouterModelName;
       }
+    }
+
+    // LLM Gateway accepts bare model names (no `provider/` prefix). Strip any
+    // existing prefix so requests pass its validation regardless of how the
+    // model was supplied. See https://llmgateway.io/migration/openrouter
+    if (this.isLLMGatewayGateway()) {
+      return model.startsWith(`${provider}/`)
+        ? model.slice(provider.length + 1)
+        : model;
     }
 
     const includeProviderInModelName =

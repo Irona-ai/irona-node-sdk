@@ -192,7 +192,6 @@ export type {
   PredictionResponse,
   PredictionResult,
   RouterTrainerConfig,
-  TrainingData,
   TrainingJobResponse,
   TrainingJobStatus,
 } from './custom-router';

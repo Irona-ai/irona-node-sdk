@@ -8,8 +8,4 @@ export type {
   TrainingJobResponse,
   TrainingJobStatus,
 } from './schemas';
-export type {
-  PredictOptions,
-  RouterTrainerConfig,
-  TrainingData,
-} from './types';
+export type { PredictOptions, RouterTrainerConfig } from './types';

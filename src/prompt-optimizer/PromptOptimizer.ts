@@ -16,14 +16,11 @@ import {
   OptimizationJobResponseSchema,
   OptimizationResultsResponseSchema,
   OptimizationStatusResponseSchema,
+  type OptimizationJobResponse,
+  type OptimizationResultsResponse,
+  type OptimizationStatusResponse,
 } from './schemas';
-import type {
-  FitOptions,
-  OptimizationJobResponse,
-  OptimizationResultsResponse,
-  OptimizationStatusResponse,
-  PromptOptimizerConfig,
-} from './types';
+import type { FitOptions, PromptOptimizerConfig } from './types';
 
 export class PromptOptimizer {
   private readonly apiKey: string;

@@ -12,8 +12,15 @@ export const OptimizationJobResponseSchema = z.object({
   job_id: z.string(),
 });
 
+export const OptimizationJobStatusSchema = z.enum([
+  'in_progress',
+  'running',
+  'completed',
+  'failed',
+]);
+
 export const OptimizationStatusResponseSchema = z.object({
-  status: z.enum(['in_progress', 'running', 'completed', 'failed']),
+  status: OptimizationJobStatusSchema,
 });
 
 export const OptimizationResultMetricsSchema = z.object({
@@ -37,6 +44,23 @@ export const OptimizationResultItemSchema = z.object({
 
 export const OptimizationResultsResponseSchema = z.object({
   job_id: z.string(),
-  status: z.string(),
+  status: OptimizationJobStatusSchema,
   results: z.array(OptimizationResultItemSchema),
 });
+
+export type OptimizationJobStatus = z.infer<typeof OptimizationJobStatusSchema>;
+export type OptimizationJobResponse = z.infer<
+  typeof OptimizationJobResponseSchema
+>;
+export type OptimizationStatusResponse = z.infer<
+  typeof OptimizationStatusResponseSchema
+>;
+export type OptimizationResultMetrics = z.infer<
+  typeof OptimizationResultMetricsSchema
+>;
+export type OptimizationResultItem = z.infer<
+  typeof OptimizationResultItemSchema
+>;
+export type OptimizationResultsResponse = z.infer<
+  typeof OptimizationResultsResponseSchema
+>;

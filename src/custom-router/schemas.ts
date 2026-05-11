@@ -5,7 +5,7 @@ export const FitRequestSchema = z.object({
 });
 
 export const PredictRequestSchema = z.object({
-  model_id: z.string().optional(),
+  model_id: z.string(),
   inputs: z
     .array(z.string())
     .min(1, 'At least one input required')

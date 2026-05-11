@@ -5,11 +5,3 @@ export type RouterTrainerConfig = {
 export type PredictOptions = {
   modelId?: string;
 };
-
-export type TrainingData = {
-  problems: Array<{
-    problem_key: string;
-    problem: string;
-    correct_models: string[];
-  }>;
-};

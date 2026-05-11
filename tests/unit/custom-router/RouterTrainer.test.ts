@@ -1,12 +1,10 @@
+import { mockFetch } from '../../mocks/fetch.mock';
+
 import { MissingApiKeyError } from '../../../src/errors';
 import { RouterTrainer } from '../../../src/custom-router/RouterTrainer';
 
-// Mock fetch globally
-global.fetch = jest.fn();
-
 describe('RouterTrainer', () => {
   const validApiKey = 'sk_test_key';
-  const mockFetch = global.fetch as jest.MockedFunction<typeof fetch>;
 
   beforeEach(() => {
     jest.clearAllMocks();

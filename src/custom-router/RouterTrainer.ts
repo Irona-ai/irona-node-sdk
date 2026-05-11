@@ -102,10 +102,10 @@ export class RouterTrainer {
     const result = JobStatusResponseSchema.parse(data);
 
     if (
-      jobId === undefined &&
       result.status === 'completed' &&
       result.model_id !== undefined &&
-      result.model_id !== null
+      result.model_id !== null &&
+      (jobId === undefined || jobId === this.trainingJobId)
     ) {
       this.modelId = result.model_id;
       logger.info(

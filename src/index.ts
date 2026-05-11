@@ -207,3 +207,13 @@ export type {
   OptimizationStatusResponse,
   PromptOptimizerConfig,
 } from './prompt-optimizer';
+
+export { AgentOptimizer } from './agent-optimizer';
+export type {
+  AgentOptimizationJobResponse,
+  AgentOptimizationJobStatus,
+  AgentOptimizationResultItem,
+  AgentOptimizationResultsResponse,
+  AgentOptimizationStatusResponse,
+  AgentOptimizerConfig,
+} from './agent-optimizer';

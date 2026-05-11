@@ -227,11 +227,8 @@ describe('PromptOptimizer', () => {
     });
 
     it('handles all status values', async () => {
-      const statuses: Array<'in_progress' | 'completed' | 'failed'> = [
-        'in_progress',
-        'completed',
-        'failed',
-      ];
+      const statuses: Array<'queued' | 'in_progress' | 'completed' | 'failed'> =
+        ['queued', 'in_progress', 'completed', 'failed'];
 
       const optimizer = new PromptOptimizer({ apiKey: validApiKey });
 

@@ -13,6 +13,7 @@ export const OptimizationJobResponseSchema = z.object({
 });
 
 export const OptimizationJobStatusSchema = z.enum([
+  'queued',
   'in_progress',
   'running',
   'completed',

@@ -203,7 +203,24 @@ describe('RouterTrainer', () => {
       expect(trainer.getModelId()).toBe('model_789');
     });
 
-    it('does not auto-update model ID when an explicit jobId is passed', async () => {
+    it('auto-updates model ID when explicit jobId matches stored trainingJobId', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ training_job_id: 'job_456', status: 'queued' }),
+      } as Response);
+      const trainer = new RouterTrainer({ apiKey: validApiKey });
+      await trainer.fit(['https://example.com/data.jsonl']);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: 'completed', model_id: 'model_789' }),
+      } as Response);
+      await trainer.getStatus('job_456');
+
+      expect(trainer.getModelId()).toBe('model_789');
+    });
+
+    it('does not auto-update model ID when explicit jobId is an external job', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ status: 'completed', model_id: 'model_789' }),

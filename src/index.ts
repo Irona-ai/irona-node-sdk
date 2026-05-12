@@ -99,6 +99,7 @@ export class IronaAI {
     // OPENROUTER_API_KEY is present.
     const llmGatewayApiKey = process.env.LLM_GATEWAY_API_KEY;
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
+    const commonGatewayApiKey = process.env.GATEWAY_API_KEY;
     const defaultLLMGatewayBaseUrl =
       llmGatewayApiKey !== undefined && llmGatewayApiKey !== ''
         ? LLM_GATEWAY_DEFAULT_BASE_URL
@@ -126,7 +127,8 @@ export class IronaAI {
         ? llmGatewayApiKey
         : gatewayType === 'openrouter'
           ? openRouterApiKey
-          : undefined) ??
+          : commonGatewayApiKey) ??
+      commonGatewayApiKey ??
       openRouterApiKey ??
       llmGatewayApiKey;
 
@@ -136,7 +138,7 @@ export class IronaAI {
       (gatewayApiKey === undefined || gatewayApiKey === '')
     ) {
       throw new MissingApiKeyError(
-        'Gateway base URL is configured but no gateway API key is set. Provide `config.gateway.apiKey` or set `LLM_GATEWAY_API_KEY` / `OPENROUTER_API_KEY`.'
+        'Gateway base URL is configured but no gateway API key is set. Provide `config.gateway.apiKey` or set `GATEWAY_API_KEY` (common) / `OPENROUTER_API_KEY` / `LLM_GATEWAY_API_KEY`.'
       );
     }
 

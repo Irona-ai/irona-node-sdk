@@ -17,11 +17,15 @@ async function main() {
   console.log(`Job started: ${jobInfo.job_id}`);
 
   let status = 'queued';
+  let pollCount = 0;
+  const MAX_POLLS = 100; // 100 × 5 min ≈ 8 hours
   while (
     status !== 'completed' &&
     status !== 'failed' &&
-    status !== 'interrupted'
+    status !== 'interrupted' &&
+    pollCount < MAX_POLLS
   ) {
+    pollCount++;
     await sleep(300000); // poll every 5 min
 
     const statusResponse = await optimizer.getStatus();
@@ -33,6 +37,11 @@ async function main() {
     console.log(
       `Status: ${status} | iteration: ${iter ?? '-'}/${total ?? '-'} | best: ${best ?? '-'}`
     );
+  }
+
+  if (pollCount >= MAX_POLLS) {
+    console.error(`Polling limit reached (${MAX_POLLS} attempts). Last status: ${status}`);
+    process.exit(1);
   }
 
   if (status !== 'completed') {

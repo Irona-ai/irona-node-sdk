@@ -20,9 +20,12 @@ async function main() {
 
   console.log('\nMonitoring training progress...');
   let status = trainingJob.status;
+  let pollCount = 0;
+  const MAX_POLLS = 100; // 100 × 5 min ≈ 8 hours
 
-  while (status !== 'completed' && status !== 'failed') {
+  while (status !== 'completed' && status !== 'failed' && pollCount < MAX_POLLS) {
     console.log(`Current status: ${status}, waiting 5 minutes...`);
+    pollCount++;
     await sleep(300000);
 
     const statusResponse = await trainer.getStatus();
@@ -31,6 +34,11 @@ async function main() {
     if (statusResponse.model_id) {
       console.log(`Model ID: ${statusResponse.model_id}`);
     }
+  }
+
+  if (pollCount >= MAX_POLLS) {
+    console.error(`Polling limit reached (${MAX_POLLS} attempts). Last status: ${status}`);
+    process.exit(1);
   }
 
   if (status === 'failed') {

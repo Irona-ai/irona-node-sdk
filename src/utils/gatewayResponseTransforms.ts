@@ -9,10 +9,13 @@
 //     `{type, url_citation: {url, title, …}}` shape (Google-style — emitted by
 //     both gateways for Gemini search responses) to the flat shape the AI SDK's
 //     Zod schema requires (`{type, url, title, start_index, end_index}`).
+//   - top-level `metadata` (LLM Gateway routing info) is logged when present,
+//     since the Vercel AI SDK does not forward non-OpenAI-spec fields.
 //
 // Behaviour is identical between the two gateways because they both expose an
 // OpenAI-compatible chat-completions surface and both emit `delta.reasoning`
 // (sometimes unconditionally, e.g. gpt-5-nano).
+import type { LLMGatewayCostData } from '../responseTypes';
 
 interface NormalisedUrlCitation {
   type: 'url_citation';
@@ -146,7 +149,8 @@ export function transformNonStreamingJson(
 export function transformStreamingChunk(
   json: string,
   reasoningState: Map<number, boolean>,
-  injectReasoning: boolean
+  injectReasoning: boolean,
+  onCost?: (data: LLMGatewayCostData) => void
 ): string {
   let parsed: Record<string, unknown>;
 
@@ -159,6 +163,17 @@ export function transformStreamingChunk(
   const choices = parsed.choices as Array<Record<string, unknown>> | undefined;
   if (!Array.isArray(choices)) {
     return json;
+  }
+
+  const streamUsage = parsed.usage as Record<string, unknown> | undefined;
+  if (streamUsage?.cost !== undefined && onCost !== undefined) {
+    onCost({
+      cost: streamUsage.cost as number,
+      cost_details: (streamUsage.cost_details ?? {}) as Record<
+        string,
+        number | null
+      >,
+    });
   }
 
   let changed = false;
@@ -200,7 +215,9 @@ export function transformStreamingChunk(
       if (injectReasoning) {
         const alreadyOpen = reasoningState.get(index) ?? false;
         reasoningState.set(index, true);
-        delta.content = (alreadyOpen ? '' : '<think>') + reasoning;
+        const existingContent = typeof content === 'string' ? content : '';
+        delta.content =
+          (alreadyOpen ? '' : '<think>') + reasoning + existingContent;
       } else {
         delta.content = typeof content === 'string' ? content : '';
       }
@@ -298,7 +315,8 @@ function createNonStreamingTransform(
  */
 export function transformStreamingResponse(
   response: Response,
-  injectReasoning: boolean
+  injectReasoning: boolean,
+  onCost?: (data: LLMGatewayCostData) => void
 ): Response {
   const body = response.body;
   if (body === null) return response;
@@ -325,7 +343,8 @@ export function transformStreamingResponse(
           const transformed = transformStreamingChunk(
             jsonStr,
             reasoningState,
-            injectReasoning
+            injectReasoning,
+            onCost
           );
           controller.enqueue(encoder.encode(`data: ${transformed}\n`));
         } else {
@@ -340,7 +359,8 @@ export function transformStreamingResponse(
           const transformed = transformStreamingChunk(
             jsonStr,
             reasoningState,
-            injectReasoning
+            injectReasoning,
+            onCost
           );
           controller.enqueue(encoder.encode(`data: ${transformed}\n`));
         } else {
@@ -365,10 +385,11 @@ export function transformStreamingResponse(
  */
 export function applyResponseReasoningTransform(
   response: Response,
-  injectReasoning: boolean
+  injectReasoning: boolean,
+  onCost?: (data: LLMGatewayCostData) => void
 ): Response {
   const contentType = response.headers.get('content-type') ?? '';
   return contentType.includes('text/event-stream')
-    ? transformStreamingResponse(response, injectReasoning)
+    ? transformStreamingResponse(response, injectReasoning, onCost)
     : transformNonStreamingResponse(response, injectReasoning);
 }

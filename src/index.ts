@@ -128,9 +128,7 @@ export class IronaAI {
         : gatewayType === 'openrouter'
           ? openRouterApiKey
           : commonGatewayApiKey) ??
-      commonGatewayApiKey ??
-      openRouterApiKey ??
-      llmGatewayApiKey;
+      commonGatewayApiKey;
 
     if (
       gatewayBaseUrl !== undefined &&
@@ -180,19 +178,21 @@ export class IronaAI {
       ...(configuredGateway?.headers ?? {}),
     };
 
-    if (
-      gatewayHeaders['HTTP-Referer'] === undefined &&
-      process.env.OPENROUTER_HTTP_REFERER !== undefined &&
-      process.env.OPENROUTER_HTTP_REFERER !== ''
-    ) {
-      gatewayHeaders['HTTP-Referer'] = process.env.OPENROUTER_HTTP_REFERER;
-    }
-    if (
-      gatewayHeaders['X-Title'] === undefined &&
-      process.env.OPENROUTER_X_TITLE !== undefined &&
-      process.env.OPENROUTER_X_TITLE !== ''
-    ) {
-      gatewayHeaders['X-Title'] = process.env.OPENROUTER_X_TITLE;
+    if (gatewayType === 'openrouter') {
+      if (
+        gatewayHeaders['HTTP-Referer'] === undefined &&
+        process.env.OPENROUTER_HTTP_REFERER !== undefined &&
+        process.env.OPENROUTER_HTTP_REFERER !== ''
+      ) {
+        gatewayHeaders['HTTP-Referer'] = process.env.OPENROUTER_HTTP_REFERER;
+      }
+      if (
+        gatewayHeaders['X-Title'] === undefined &&
+        process.env.OPENROUTER_X_TITLE !== undefined &&
+        process.env.OPENROUTER_X_TITLE !== ''
+      ) {
+        gatewayHeaders['X-Title'] = process.env.OPENROUTER_X_TITLE;
+      }
     }
 
     const providerName =

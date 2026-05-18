@@ -1,5 +1,6 @@
 import { applyResponseReasoningTransform } from './gatewayResponseTransforms';
 import type { LLMGatewayExtraBody } from './llmGatewayMapper';
+import type { LLMGatewayCostData } from '../responseTypes';
 
 /**
  * Creates a custom fetch wrapper for LLM Gateway (api.llmgateway.io) that:
@@ -15,7 +16,8 @@ import type { LLMGatewayExtraBody } from './llmGatewayMapper';
  */
 export function createLLMGatewayFetchWrapper(
   extraBody: LLMGatewayExtraBody,
-  baseFetch: typeof globalThis.fetch = globalThis.fetch
+  baseFetch: typeof globalThis.fetch = globalThis.fetch,
+  onCost?: (data: LLMGatewayCostData) => void
 ): typeof globalThis.fetch {
   // Reasoning injection is active only when a reasoning config is present
   // (mapper omits the field entirely for 'off'/undefined).
@@ -46,6 +48,6 @@ export function createLLMGatewayFetchWrapper(
       body: JSON.stringify(merged),
     });
 
-    return applyResponseReasoningTransform(response, injectReasoning);
+    return applyResponseReasoningTransform(response, injectReasoning, onCost);
   };
 }

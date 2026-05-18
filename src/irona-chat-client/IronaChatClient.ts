@@ -15,7 +15,7 @@ import {
 } from 'ai';
 
 import { BadRequestError, MissingApiKeyError } from '../errors';
-import type { ProviderName } from '../responseTypes';
+import type { LLMGatewayCostData, ProviderName } from '../responseTypes';
 import { CompletionsResponse } from '../responseTypes';
 import type { Router } from '../router/types';
 import type { MessagePayload } from '../schemas/common.schema';
@@ -180,6 +180,7 @@ export class IronaChatClient {
       // uses `web_search` — same reasoning shape, different search shape.
       const isOpenRouter = isUsingGateway && this.isOpenRouterGateway();
       const isLLMGateway = isUsingGateway && this.isLLMGatewayGateway();
+      let llmGatewayCost: LLMGatewayCostData | null = null;
       let openRouterExtra: OpenRouterExtraBody | undefined;
       let llmGatewayExtra: LLMGatewayExtraBody | undefined;
       if (isOpenRouter) {
@@ -196,12 +197,11 @@ export class IronaChatClient {
         });
       }
 
-      const gatewayFactory =
-        isOpenRouter && openRouterExtra !== undefined
-          ? this.getOpenRouterModelFactory(openRouterExtra)
-          : isLLMGateway
-            ? this.getLLMGatewayModelFactory(llmGatewayExtra)
-            : undefined;
+      const gatewayFactory = isOpenRouter
+        ? this.getOpenRouterModelFactory(openRouterExtra ?? {})
+        : isLLMGateway
+            ? this.getLLMGatewayModelFactory(llmGatewayExtra, cost => { llmGatewayCost = cost; })
+          : undefined;
 
       const modelFactory =
         gatewayFactory ??
@@ -362,6 +362,9 @@ export class IronaChatClient {
                   `Empty stream response from ${provider}/${model}`
                 );
               }
+              if (llmGatewayCost !== null) {
+                yield { type: 'llmgateway-cost' as const, ...llmGatewayCost };
+              }
             } catch (err) {
               logger.error(
                 `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}: ${err}`
@@ -440,10 +443,10 @@ export class IronaChatClient {
             // both HTTPS URLs and `data:image/...;base64,...` strings here.
             return { type: 'image' as const, image: part.image_url.url };
           } else if (part.type === 'file') {
-            return {
-              type: 'file' as const,
-              data: part.data,
-              mediaType: part.mediaType ?? 'application/pdf',
+              return {
+                type: 'file' as const,
+                data: part.data,
+                mediaType: part.mediaType ?? 'application/pdf',
             };
           } else if (part.type === 'document') {
             // Anthropic-style document → AI SDK file part. `source.url` (an
@@ -623,7 +626,8 @@ export class IronaChatClient {
    * The wrapper is created even with an empty extra body so the cleanup runs.
    */
   private getLLMGatewayModelFactory(
-    extraBody: LLMGatewayExtraBody | undefined
+    extraBody: LLMGatewayExtraBody | undefined,
+    onCost?: (data: LLMGatewayCostData) => void
   ): ReturnType<typeof createOpenAI>['chat'] | undefined {
     if (this.config.gateway === undefined) {
       return undefined;
@@ -633,7 +637,7 @@ export class IronaChatClient {
       apiKey: this.config.gateway.apiKey,
       headers: this.config.gateway.headers,
       name: this.config.gateway.providerName ?? 'gateway',
-      fetch: createLLMGatewayFetchWrapper(extraBody ?? {}),
+      fetch: createLLMGatewayFetchWrapper(extraBody ?? {}, globalThis.fetch, onCost),
     }).chat;
   }
 

@@ -1,3 +1,8 @@
+export interface LLMGatewayCostData {
+  cost: number;
+  cost_details: Record<string, number | null>;
+}
+
 export type ProviderName =
   | 'google'
   | 'openai'

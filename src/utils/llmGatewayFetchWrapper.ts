@@ -1,6 +1,7 @@
+import type { LLMGatewayCostData } from '../responseTypes';
+
 import { applyResponseReasoningTransform } from './gatewayResponseTransforms';
 import type { LLMGatewayExtraBody } from './llmGatewayMapper';
-import type { LLMGatewayCostData } from '../responseTypes';
 
 /**
  * Creates a custom fetch wrapper for LLM Gateway (api.llmgateway.io) that:

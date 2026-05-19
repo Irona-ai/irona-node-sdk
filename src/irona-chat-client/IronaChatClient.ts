@@ -200,7 +200,9 @@ export class IronaChatClient {
       const gatewayFactory = isOpenRouter
         ? this.getOpenRouterModelFactory(openRouterExtra ?? {})
         : isLLMGateway
-            ? this.getLLMGatewayModelFactory(llmGatewayExtra, cost => { llmGatewayCost = cost; })
+          ? this.getLLMGatewayModelFactory(llmGatewayExtra, cost => {
+              llmGatewayCost = cost;
+            })
           : undefined;
 
       const modelFactory =
@@ -443,10 +445,10 @@ export class IronaChatClient {
             // both HTTPS URLs and `data:image/...;base64,...` strings here.
             return { type: 'image' as const, image: part.image_url.url };
           } else if (part.type === 'file') {
-              return {
-                type: 'file' as const,
-                data: part.data,
-                mediaType: part.mediaType ?? 'application/pdf',
+            return {
+              type: 'file' as const,
+              data: part.data,
+              mediaType: part.mediaType ?? 'application/pdf',
             };
           } else if (part.type === 'document') {
             // Anthropic-style document → AI SDK file part. `source.url` (an
@@ -637,7 +639,11 @@ export class IronaChatClient {
       apiKey: this.config.gateway.apiKey,
       headers: this.config.gateway.headers,
       name: this.config.gateway.providerName ?? 'gateway',
-      fetch: createLLMGatewayFetchWrapper(extraBody ?? {}, globalThis.fetch, onCost),
+      fetch: createLLMGatewayFetchWrapper(
+        extraBody ?? {},
+        globalThis.fetch,
+        onCost
+      ),
     }).chat;
   }
 

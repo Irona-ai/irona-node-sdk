@@ -54,6 +54,12 @@ import { validateSchema } from '../utils/requestValidator';
 export { CompletionsResponse };
 
 export class IronaChatClient {
+  // Media types the @ai-sdk/openai adapter accepts natively for file parts.
+  // Everything outside this set causes the adapter to throw before the HTTP
+  // request is made, so we fall back to embedding the content as a text part.
+  private static readonly OPENAI_NATIVE_FILE_RE =
+    /^(image\/|audio\/(wav|mpeg|mp3)|application\/pdf)/;
+
   private readonly gatewayProvider?: ReturnType<typeof createOpenAI>['chat'];
   // Single source of truth for which gateway flavour we're talking to. Both
   // payload-mapping (`isOpenRouter`/`isLLMGateway` checks below) and model-name
@@ -186,7 +192,10 @@ export class IronaChatClient {
       // Provider-specific API keys are ignored for routing (BYOK is handled
       // at the gateway/account level, e.g. OpenRouter dashboard).
       const isUsingGateway = this.gatewayProvider !== undefined;
-      const effectiveIsUsingGateway = isUsingGateway || useOpenRouterFallback;
+      const effectiveUseOpenRouterFallback =
+        useOpenRouterFallback && !this.hasDirectProviderKey(provider);
+      const effectiveIsUsingGateway =
+        isUsingGateway || effectiveUseOpenRouterFallback;
 
       if (!effectiveIsUsingGateway) {
         this.loadApiKeyForProvider(provider, model);
@@ -211,7 +220,7 @@ export class IronaChatClient {
       }
       // OpenRouter fallback takes priority over any configured gateway for model
       // name resolution — files always use the OpenRouter identifier.
-      if (useOpenRouterFallback) {
+      if (effectiveUseOpenRouterFallback) {
         const orName = getOpenRouterIdentifier(provider, fullModelName);
         if (orName !== null && orName !== '') {
           fullModelName = orName;
@@ -224,9 +233,12 @@ export class IronaChatClient {
       // configured gateway hostname. OpenRouter uses `plugins`, LLM Gateway
       // uses `web_search` — same reasoning shape, different search shape.
       const isOpenRouter =
-        useOpenRouterFallback || (isUsingGateway && this.isOpenRouterGateway());
+        effectiveUseOpenRouterFallback ||
+        (isUsingGateway && this.isOpenRouterGateway());
       const isLLMGateway =
-        !useOpenRouterFallback && isUsingGateway && this.isLLMGatewayGateway();
+        !effectiveUseOpenRouterFallback &&
+        isUsingGateway &&
+        this.isLLMGatewayGateway();
       let llmGatewayCost: LLMGatewayCostData | null = null;
       let openRouterExtra: OpenRouterExtraBody | undefined;
       let llmGatewayExtra: LLMGatewayExtraBody | undefined;
@@ -245,7 +257,7 @@ export class IronaChatClient {
       }
 
       const gatewayFactory = isOpenRouter
-        ? useOpenRouterFallback
+        ? effectiveUseOpenRouterFallback
           ? createOpenAI({
               baseURL: OPENROUTER_DEFAULT_BASE_URL,
               apiKey: openRouterFallbackKey,
@@ -477,9 +489,11 @@ export class IronaChatClient {
   }
 
   /**
-   * Fetches URL-based file/document parts and replaces them with base64 data.
-   * Required when routing through OpenAI-compatible gateways whose adapter
-   * rejects PDF parts supplied as plain HTTPS URLs.
+   * Fetches URL-based file/document parts for gateway routing.
+   * For media types natively supported by the OpenAI-compatible adapter
+   * (image/*, audio/wav|mp3, application/pdf) the bytes are base64-encoded
+   * and kept as file parts. For everything else — a generic fallback — the
+   * fetched content is embedded as a text part so the adapter never throws.
    */
   private async resolveFileUrlsToBase64(
     messages: MessagePayload[]
@@ -503,6 +517,9 @@ export class IronaChatClient {
                 throw new Error(
                   `Failed to fetch file part (${res.status}): ${part.data}`
                 );
+              }
+              if (!IronaChatClient.OPENAI_NATIVE_FILE_RE.test(part.mediaType)) {
+                return { type: 'text' as const, text: await res.text() };
               }
               const base64 = Buffer.from(await res.arrayBuffer()).toString(
                 'base64'
@@ -857,9 +874,8 @@ export class IronaChatClient {
 
   /**
    * Checks if a provider has a direct API key (programmatic config or env var).
-   * @deprecated No longer used for routing decisions. When a gateway is
-   * configured, all providers route through it regardless of direct keys.
-   * Kept for potential diagnostic use.
+   * Used to decide whether to bypass OpenRouter for file requests and route
+   * directly through the native SDK, which supports a broader set of file types.
    */
   private hasDirectProviderKey(provider: string): boolean {
     const providerConf = this.config.providers?.[provider];

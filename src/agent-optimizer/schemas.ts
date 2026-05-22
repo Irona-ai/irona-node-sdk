@@ -14,6 +14,7 @@ export const AgentOptimizationJobStatusSchema = z.enum([
   'queued',
   'running',
   'completed',
+  'partial',
   'failed',
   'interrupted',
 ]);
@@ -24,12 +25,18 @@ export const AgentOptimizationJobResponseSchema = z.object({
   version: z.string().optional(),
 });
 
-export const AgentOptimizationStatusResponseSchema = z.object({
-  status: AgentOptimizationJobStatusSchema,
+export const AgentOptimizationModelResultSchema = z.object({
+  model: z.string(),
+  status: z.string(),
   current_iteration: z.number().optional(),
   best_score: z.number().optional(),
   baseline_score: z.number().optional(),
+});
+
+export const AgentOptimizationStatusResponseSchema = z.object({
+  status: AgentOptimizationJobStatusSchema,
   n_iterations: z.number().optional(),
+  model_results: z.array(AgentOptimizationModelResultSchema).optional(),
 });
 
 export const AgentOptimizationResultItemSchema = z.object({
@@ -41,7 +48,9 @@ export const AgentOptimizationResultItemSchema = z.object({
   test_score: z.number(),
   iterations_run: z.number(),
   iterations_kept: z.number(),
-  agent_code_url: z.string().nullable().optional(),
+  agent_code: z.string().nullable().optional(),
+  cost_breakdown: z.record(z.unknown()).nullable().optional(),
+  token_breakdown: z.record(z.unknown()).nullable().optional(),
 });
 
 export const AgentOptimizationResultsResponseSchema = z.object({
@@ -55,6 +64,9 @@ export type AgentOptimizationJobStatus = z.infer<
 >;
 export type AgentOptimizationJobResponse = z.infer<
   typeof AgentOptimizationJobResponseSchema
+>;
+export type AgentOptimizationModelResult = z.infer<
+  typeof AgentOptimizationModelResultSchema
 >;
 export type AgentOptimizationStatusResponse = z.infer<
   typeof AgentOptimizationStatusResponseSchema

@@ -64,7 +64,7 @@ describe('AgentOptimizer', () => {
       const optimizer = new AgentOptimizer({ apiKey: validApiKey });
       const result = await optimizer.fit({
         inputUrl: 'https://example.com/agent.zip',
-        targetModel: 'openai/gpt-4o-mini',
+        targetModels: ['openai/gpt-4o-mini'],
       });
 
       expect(result).toEqual(mockResponse);
@@ -95,7 +95,7 @@ describe('AgentOptimizer', () => {
       const optimizer = new AgentOptimizer({ apiKey: validApiKey });
       await optimizer.fit({
         inputUrl: 'https://example.com/agent.zip',
-        targetModel: 'openai/gpt-4o-mini',
+        targetModels: ['openai/gpt-4o-mini'],
         nIterations: 20,
         overallTimeoutSeconds: 7200,
         llmCallTimeoutSeconds: 600,
@@ -118,7 +118,7 @@ describe('AgentOptimizer', () => {
       );
     });
 
-    it('wraps targetModel as single-element array in target_models', async () => {
+    it('passes targetModels array directly to target_models', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ job_id: 'agent_opt_abc' }),
@@ -127,7 +127,7 @@ describe('AgentOptimizer', () => {
       const optimizer = new AgentOptimizer({ apiKey: validApiKey });
       await optimizer.fit({
         inputUrl: 'https://example.com/agent.zip',
-        targetModel: 'anthropic/claude-3.5-haiku',
+        targetModels: ['anthropic/claude-3.5-haiku'],
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -152,7 +152,7 @@ describe('AgentOptimizer', () => {
       await expect(
         optimizer.fit({
           inputUrl: 'https://example.com/agent.zip',
-          targetModel: 'openai/gpt-4o-mini',
+          targetModels: ['openai/gpt-4o-mini'],
         })
       ).rejects.toThrow('Optimization request failed with status 400');
     });
@@ -163,7 +163,7 @@ describe('AgentOptimizer', () => {
       await expect(
         optimizer.fit({
           inputUrl: 'not-a-url',
-          targetModel: 'openai/gpt-4o-mini',
+          targetModels: ['openai/gpt-4o-mini'],
         })
       ).rejects.toThrow();
     });
@@ -181,7 +181,7 @@ describe('AgentOptimizer', () => {
       const optimizer = new AgentOptimizer({ apiKey: validApiKey });
       await optimizer.fit({
         inputUrl: 'https://example.com/agent.zip',
-        targetModel: 'openai/gpt-4o-mini',
+        targetModels: ['openai/gpt-4o-mini'],
       });
 
       mockFetch.mockResolvedValueOnce({
@@ -224,19 +224,25 @@ describe('AgentOptimizer', () => {
         ok: true,
         json: async () => ({
           status: 'running',
-          current_iteration: 3,
-          best_score: 0.85,
-          baseline_score: 0.72,
           n_iterations: 15,
+          model_results: [
+            {
+              model: 'openai/gpt-4o-mini',
+              status: 'running',
+              current_iteration: 3,
+              best_score: 0.85,
+              baseline_score: 0.72,
+            },
+          ],
         }),
       } as Response);
 
       const optimizer = new AgentOptimizer({ apiKey: validApiKey });
       const status = await optimizer.getStatus('agent_opt_123');
 
-      expect(status.current_iteration).toBe(3);
-      expect(status.best_score).toBe(0.85);
-      expect(status.baseline_score).toBe(0.72);
+      expect(status.model_results?.[0].current_iteration).toBe(3);
+      expect(status.model_results?.[0].best_score).toBe(0.85);
+      expect(status.model_results?.[0].baseline_score).toBe(0.72);
       expect(status.n_iterations).toBe(15);
     });
 
@@ -261,8 +267,20 @@ describe('AgentOptimizer', () => {
 
     it('handles all valid status values', async () => {
       const statuses: Array<
-        'queued' | 'running' | 'completed' | 'failed' | 'interrupted'
-      > = ['queued', 'running', 'completed', 'failed', 'interrupted'];
+        | 'queued'
+        | 'running'
+        | 'completed'
+        | 'partial'
+        | 'failed'
+        | 'interrupted'
+      > = [
+        'queued',
+        'running',
+        'completed',
+        'partial',
+        'failed',
+        'interrupted',
+      ];
 
       const optimizer = new AgentOptimizer({ apiKey: validApiKey });
 
@@ -295,7 +313,8 @@ describe('AgentOptimizer', () => {
           test_score: 0.85,
           iterations_run: 15,
           iterations_kept: 8,
-          agent_code_url: 'https://example.com/agent_code.zip',
+          agent_code:
+            'import asyncio\n\nMODEL = "openai/gpt-4o-mini"\n\nasync def run_batch(inputs, api_key): ...',
         },
       ],
     };
@@ -309,7 +328,7 @@ describe('AgentOptimizer', () => {
       const optimizer = new AgentOptimizer({ apiKey: validApiKey });
       await optimizer.fit({
         inputUrl: 'https://example.com/agent.zip',
-        targetModel: 'openai/gpt-4o-mini',
+        targetModels: ['openai/gpt-4o-mini'],
       });
 
       mockFetch.mockResolvedValueOnce({
@@ -367,7 +386,7 @@ describe('AgentOptimizer', () => {
       );
     });
 
-    it('parses result items with numeric scores and agent_code_url', async () => {
+    it('parses result items with numeric scores and agent_code', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResults,
@@ -380,9 +399,7 @@ describe('AgentOptimizer', () => {
       expect(results.results[0].test_score).toBe(0.85);
       expect(results.results[0].iterations_run).toBe(15);
       expect(results.results[0].iterations_kept).toBe(8);
-      expect(results.results[0].agent_code_url).toBe(
-        'https://example.com/agent_code.zip'
-      );
+      expect(results.results[0].agent_code).toContain('run_batch');
       expect(results.results[0].optimizer).toBe('AGENTOPT');
     });
   });
@@ -404,7 +421,7 @@ describe('AgentOptimizer', () => {
       const optimizer = new AgentOptimizer({ apiKey: validApiKey });
       await optimizer.fit({
         inputUrl: 'https://example.com/agent.zip',
-        targetModel: 'openai/gpt-4o-mini',
+        targetModels: ['openai/gpt-4o-mini'],
       });
 
       expect(optimizer.getJobId()).toBe('agent_opt_123');
@@ -419,7 +436,7 @@ describe('AgentOptimizer', () => {
       const optimizer = new AgentOptimizer({ apiKey: validApiKey });
       await optimizer.fit({
         inputUrl: 'https://example.com/agent.zip',
-        targetModel: 'openai/gpt-4o-mini',
+        targetModels: ['openai/gpt-4o-mini'],
       });
 
       expect(optimizer.getJobId()).toBe('agent_opt_first');
@@ -431,7 +448,7 @@ describe('AgentOptimizer', () => {
 
       await optimizer.fit({
         inputUrl: 'https://example.com/agent2.zip',
-        targetModel: 'anthropic/claude-3.5-haiku',
+        targetModels: ['anthropic/claude-3.5-haiku'],
       });
 
       expect(optimizer.getJobId()).toBe('agent_opt_second');

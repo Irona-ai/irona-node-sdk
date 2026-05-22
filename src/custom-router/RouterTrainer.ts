@@ -1,7 +1,3 @@
-/**
- * Train and manage custom LLM routers that learn which model performs best for different prompts.
- */
-
 import {
   INFER_ENDPOINT,
   MODELS_ENDPOINT,
@@ -37,9 +33,6 @@ export class RouterTrainer {
     this.apiKey = apiKey;
   }
 
-  /**
-   * Start training job with data from URLs (JSONL format).
-   */
   public async fit(dataUrls: string[]): Promise<TrainingJobResponse> {
     const payload = FitRequestSchema.parse({ Data_URLs: dataUrls });
 
@@ -70,9 +63,6 @@ export class RouterTrainer {
     return result;
   }
 
-  /**
-   * Check training job status. Auto-updates modelId when completed.
-   */
   public async getStatus(jobId?: string): Promise<JobStatusResponse> {
     const targetJobId = jobId ?? this.trainingJobId;
 
@@ -116,9 +106,6 @@ export class RouterTrainer {
     return result;
   }
 
-  /**
-   * Get trained model metadata and performance metrics.
-   */
   public async getModelDetails(
     modelId?: string
   ): Promise<ModelDetailsResponse> {
@@ -150,9 +137,6 @@ export class RouterTrainer {
     return ModelDetailsResponseSchema.parse(data);
   }
 
-  /**
-   * Run inference to get model recommendations (max 1000 inputs per request).
-   */
   public async predict(
     inputs: string[],
     options: PredictOptions = {}

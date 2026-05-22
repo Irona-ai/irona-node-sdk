@@ -18,7 +18,7 @@ import {
   type AgentOptimizationResultsResponse,
   type AgentOptimizationStatusResponse,
 } from './schemas';
-import type { AgentOptimizerConfig, FitOptions } from './types';
+import type { AgentFitOptions, AgentOptimizerConfig } from './types';
 
 export class AgentOptimizer {
   private readonly apiKey: string;
@@ -30,11 +30,13 @@ export class AgentOptimizer {
     this.apiKey = apiKey;
   }
 
-  public async fit(options: FitOptions): Promise<AgentOptimizationJobResponse> {
+  public async fit(
+    options: AgentFitOptions
+  ): Promise<AgentOptimizationJobResponse> {
     const payload = AgentFitRequestSchema.parse({
       optimizer: 'agentopt',
       input_url: options.inputUrl,
-      target_models: [options.targetModel],
+      target_models: options.targetModels,
       n_iterations: options.nIterations,
       overall_timeout_seconds: options.overallTimeoutSeconds,
       llm_call_timeout_seconds: options.llmCallTimeoutSeconds,

@@ -1,7 +1,3 @@
-/**
- * Optimize prompts for specific LLM models using Irona's prompt optimization service.
- */
-
 import {
   OPTIMIZE_ENDPOINT,
   OPTIMIZE_RESULT_ENDPOINT,
@@ -32,9 +28,6 @@ export class PromptOptimizer {
     this.apiKey = apiKey;
   }
 
-  /**
-   * Start a prompt optimization job.
-   */
   public async fit(options: FitOptions): Promise<OptimizationJobResponse> {
     const payload = FitRequestSchema.parse({
       prompt_url: options.promptUrl,
@@ -69,9 +62,6 @@ export class PromptOptimizer {
     return result;
   }
 
-  /**
-   * Check the status of an optimization job.
-   */
   public async getStatus(jobId?: string): Promise<OptimizationStatusResponse> {
     const targetJobId = jobId ?? this.jobId;
 
@@ -105,9 +95,6 @@ export class PromptOptimizer {
     return result;
   }
 
-  /**
-   * Get the results of an optimization job.
-   */
   public async getResults(
     jobId?: string
   ): Promise<OptimizationResultsResponse> {

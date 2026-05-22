@@ -8,9 +8,9 @@ async function main() {
   const optimizer = new AgentOptimizer();
 
   const jobInfo = await optimizer.fit({
-    // ZIP must contain: agent.py (with EDITABLE/FIXED markers), eval.py, dataset.json
+    // ZIP must contain: agent.py, eval.py, dataset.json
     inputUrl: 'https://your-host.example.com/agent-bundle.zip',
-    targetModel: 'target-model-name',
+    targetModels: ['target-model-name'],
     nIterations: 20,
   });
 
@@ -19,32 +19,30 @@ async function main() {
   let status = 'queued';
   let pollCount = 0;
   const MAX_POLLS = 100; // 100 × 5 min ≈ 8 hours
-  while (
-    status !== 'completed' &&
-    status !== 'failed' &&
-    status !== 'interrupted' &&
-    pollCount < MAX_POLLS
-  ) {
+  const TERMINAL = new Set(['completed', 'partial', 'failed', 'interrupted']);
+  while (!TERMINAL.has(status) && pollCount < MAX_POLLS) {
     pollCount++;
     await sleep(300000); // poll every 5 min
 
     const statusResponse = await optimizer.getStatus();
     status = statusResponse.status;
-
-    const iter = statusResponse.current_iteration;
     const total = statusResponse.n_iterations;
-    const best = statusResponse.best_score;
-    console.log(
-      `Status: ${status} | iteration: ${iter ?? '-'}/${total ?? '-'} | best: ${best ?? '-'}`
-    );
+
+    for (const m of statusResponse.model_results ?? []) {
+      console.log(
+        `[${status}] ${m.model} | iter: ${m.current_iteration ?? '-'}/${total ?? '-'} | best: ${m.best_score ?? '-'}`
+      );
+    }
   }
 
   if (pollCount >= MAX_POLLS) {
-    console.error(`Polling limit reached (${MAX_POLLS} attempts). Last status: ${status}`);
+    console.error(
+      `Polling limit reached (${MAX_POLLS} attempts). Last status: ${status}`
+    );
     process.exit(1);
   }
 
-  if (status !== 'completed') {
+  if (status !== 'completed' && status !== 'partial') {
     console.error(`Ended with status: ${status}`);
     process.exit(1);
   }
@@ -54,7 +52,9 @@ async function main() {
     console.log(`Model: ${r.model}`);
     console.log(`Train: ${r.train_score} | Test: ${r.test_score}`);
     console.log(`Iterations: ${r.iterations_kept}/${r.iterations_run} kept`);
-    console.log(`Agent code: ${r.agent_code_url}`);
+    if (r.agent_code) {
+      console.log(`Agent code length: ${r.agent_code.length} chars`);
+    }
   }
 }
 

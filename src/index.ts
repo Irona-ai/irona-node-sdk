@@ -210,8 +210,10 @@ export type {
 
 export { AgentOptimizer } from './agent-optimizer';
 export type {
+  AgentFitOptions,
   AgentOptimizationJobResponse,
   AgentOptimizationJobStatus,
+  AgentOptimizationModelResult,
   AgentOptimizationResultItem,
   AgentOptimizationResultsResponse,
   AgentOptimizationStatusResponse,

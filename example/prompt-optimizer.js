@@ -24,7 +24,11 @@ async function main() {
   let pollCount = 0;
   const MAX_POLLS = 100; // 100 × 5 min ≈ 8 hours
 
-  while (status !== 'completed' && status !== 'failed' && pollCount < MAX_POLLS) {
+  while (
+    status !== 'completed' &&
+    status !== 'failed' &&
+    pollCount < MAX_POLLS
+  ) {
     console.log(`Current status: ${status}, waiting 5 minutes...`);
     pollCount++;
     await sleep(300000);
@@ -34,7 +38,9 @@ async function main() {
   }
 
   if (pollCount >= MAX_POLLS) {
-    console.error(`Polling limit reached (${MAX_POLLS} attempts). Last status: ${status}`);
+    console.error(
+      `Polling limit reached (${MAX_POLLS} attempts). Last status: ${status}`
+    );
     process.exit(1);
   }
 

@@ -2,9 +2,9 @@ export type AgentOptimizerConfig = {
   apiKey?: string;
 };
 
-export type FitOptions = {
+export type AgentFitOptions = {
   inputUrl: string;
-  targetModel: string;
+  targetModels: string[];
   nIterations?: number;
   overallTimeoutSeconds?: number;
   llmCallTimeoutSeconds?: number;

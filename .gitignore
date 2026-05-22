@@ -33,3 +33,5 @@ dist-ssr
 tmp/
 # Sentry Config File
 .sentryclirc
+
+example/package-lock.json

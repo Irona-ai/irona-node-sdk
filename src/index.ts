@@ -9,11 +9,11 @@ import type { ModelSelectPayload } from './schemas/modelSelect.schema';
 import { updateProvidersFromGist } from './supported_models';
 import type { Config, GatewayConfig } from './types';
 import {
-  IRONAAI_API_KEY_PREFIX,
   DEFAULT_BASE_URL,
   SUPPORTED_MODELS_DEFAULT_URL,
 } from './utils/constants';
 import { logger } from './utils/logger';
+import { validateApiKey } from './utils/validateApiKey';
 require('dotenv').config();
 
 export class IronaAI {
@@ -21,21 +21,8 @@ export class IronaAI {
   private ironaRouter: Router;
   private llmChatService: IronaChatClient;
   private constructor(config: Config = {}) {
-    // Check for API key
     const apiKey = config.apiKey ?? process.env.IRONAAI_API_KEY ?? '';
-    if (!apiKey) {
-      throw new MissingApiKeyError(
-        "The API key is missing. Please provide the API key either through the 'IRONAAI_API_KEY' environment variable or the 'config.apiKey' property."
-      );
-    }
-    if (
-      typeof apiKey !== 'string' ||
-      !apiKey.startsWith(IRONAAI_API_KEY_PREFIX)
-    ) {
-      throw new MissingApiKeyError(
-        "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."
-      );
-    }
+    validateApiKey(apiKey);
 
     const normalizedConfig: Config = {
       ...config,
@@ -195,3 +182,40 @@ export class IronaAI {
     },
   };
 }
+
+export { RouterTrainer } from './custom-router';
+export type {
+  JobStatusResponse,
+  ModelDetailsResponse,
+  ModelPrediction,
+  PredictOptions,
+  PredictionResponse,
+  PredictionResult,
+  RouterTrainerConfig,
+  TrainingJobResponse,
+  TrainingJobStatus,
+} from './custom-router';
+
+export { PromptOptimizer } from './prompt-optimizer';
+export type {
+  FitOptions,
+  OptimizationJobResponse,
+  OptimizationJobStatus,
+  OptimizationResultItem,
+  OptimizationResultMetrics,
+  OptimizationResultsResponse,
+  OptimizationStatusResponse,
+  PromptOptimizerConfig,
+} from './prompt-optimizer';
+
+export { AgentOptimizer } from './agent-optimizer';
+export type {
+  AgentFitOptions,
+  AgentOptimizationJobResponse,
+  AgentOptimizationJobStatus,
+  AgentOptimizationModelResult,
+  AgentOptimizationResultItem,
+  AgentOptimizationResultsResponse,
+  AgentOptimizationStatusResponse,
+  AgentOptimizerConfig,
+} from './agent-optimizer';

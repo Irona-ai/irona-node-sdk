@@ -60,6 +60,22 @@ export class IronaChatClient {
   private static readonly OPENAI_NATIVE_FILE_RE =
     /^(image\/|audio\/(wav|mpeg|mp3)|application\/pdf)/;
 
+  // Restrict file fetches to HTTPS only to mitigate SSRF.
+  // Full private-IP / hostname blocklist is tracked in a separate ticket.
+  private static assertHttpsUrl(url: string): void {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new BadRequestError(`Invalid file URL: ${url}`);
+    }
+    if (parsed.protocol !== 'https:') {
+      throw new BadRequestError(
+        `File URL must use HTTPS (got "${parsed.protocol}"): ${url}`
+      );
+    }
+  }
+
   private readonly gatewayProvider?: ReturnType<typeof createOpenAI>['chat'];
   // Single source of truth for which gateway flavour we're talking to. Both
   // payload-mapping (`isOpenRouter`/`isLLMGateway` checks below) and model-name
@@ -512,6 +528,7 @@ export class IronaChatClient {
               (part.data.startsWith('https://') ||
                 part.data.startsWith('http://'))
             ) {
+              IronaChatClient.assertHttpsUrl(part.data);
               const res = await fetch(part.data);
               if (!res.ok) {
                 throw new Error(
@@ -528,6 +545,7 @@ export class IronaChatClient {
             }
 
             if (part.type === 'document' && part.source.type === 'url') {
+              IronaChatClient.assertHttpsUrl(part.source.url);
               const res = await fetch(part.source.url);
               if (!res.ok) {
                 throw new Error(

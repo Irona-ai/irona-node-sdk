@@ -15,7 +15,7 @@ import {
 } from 'ai';
 
 import { BadRequestError, MissingApiKeyError } from '../errors';
-import type { ProviderName } from '../responseTypes';
+import type { LLMGatewayCostData, ProviderName } from '../responseTypes';
 import { CompletionsResponse } from '../responseTypes';
 import type { Router } from '../router/types';
 import type { MessagePayload } from '../schemas/common.schema';
@@ -31,7 +31,15 @@ import {
   getOpenRouterIdentifier,
 } from '../supported_models';
 import type { Config, GatewayConfig, ProviderConfig } from '../types';
-import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
+import {
+  OPENROUTER_DEFAULT_BASE_URL,
+  SUPPORTED_MODELS_DEFAULT_URL,
+} from '../utils/constants';
+import { detectGatewayTypeFromUrl } from '../utils/gatewayType';
+import type { GatewayType } from '../utils/gatewayType';
+import { createLLMGatewayFetchWrapper } from '../utils/llmGatewayFetchWrapper';
+import { buildLLMGatewayExtraBody } from '../utils/llmGatewayMapper';
+import type { LLMGatewayExtraBody } from '../utils/llmGatewayMapper';
 import { logger } from '../utils/logger';
 import { createOpenRouterFetchWrapper } from '../utils/openRouterFetchWrapper';
 import { buildOpenRouterExtraBody } from '../utils/openRouterMapper';
@@ -46,19 +54,40 @@ import { validateSchema } from '../utils/requestValidator';
 export { CompletionsResponse };
 
 export class IronaChatClient {
+  // Media types the @ai-sdk/openai adapter accepts natively for file parts.
+  // Everything outside this set causes the adapter to throw before the HTTP
+  // request is made, so we fall back to embedding the content as a text part.
+  private static readonly OPENAI_NATIVE_FILE_RE =
+    /^(image\/|audio\/(wav|mpeg|mp3)|application\/pdf)/;
+
+  // Restrict file fetches to HTTPS only to mitigate SSRF.
+  // Full private-IP / hostname blocklist is tracked in a separate ticket.
+  private static assertHttpsUrl(url: string): void {
+    let parsed: URL;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw new BadRequestError(`Invalid file URL: ${url}`);
+    }
+    if (parsed.protocol !== 'https:') {
+      throw new BadRequestError(
+        `File URL must use HTTPS (got "${parsed.protocol}"): ${url}`
+      );
+    }
+  }
+
   private readonly gatewayProvider?: ReturnType<typeof createOpenAI>['chat'];
-  private readonly gatewayHostname?: string;
+  // Single source of truth for which gateway flavour we're talking to. Both
+  // payload-mapping (`isOpenRouter`/`isLLMGateway` checks below) and model-name
+  // resolution branch off this rather than re-parsing the URL each time.
+  private readonly gatewayType: GatewayType;
 
   constructor(
     private readonly config: Config,
     private readonly ironaRouter: Router
   ) {
     this.gatewayProvider = this.createGatewayProvider(this.config.gateway);
-    if (this.config.gateway !== undefined) {
-      this.gatewayHostname = new URL(
-        this.config.gateway.baseUrl
-      ).hostname.toLowerCase();
-    }
+    this.gatewayType = detectGatewayTypeFromUrl(this.config.gateway?.baseUrl);
   }
 
   /**
@@ -69,6 +98,25 @@ export class IronaChatClient {
     const validationResult = validateSchema(CompletionsSchema, payload);
     if (!validationResult.success) {
       throw new BadRequestError(validationResult.errors);
+    }
+
+    // Detect file parts (image/PDF) in messages once, before the retry loop.
+    // Files always route through OpenRouter (OPENROUTER_API_KEY) — this takes
+    // priority over any other configured gateway. Non-file requests use whatever
+    // gateway is configured (LLM Gateway, custom URL, etc.) unchanged.
+    const fileMediaTypes = extractMediaTypeArrayFromMessages(payload.messages);
+    const hasFileParts = fileMediaTypes.length > 0;
+    const openRouterFallbackKey = process.env.OPENROUTER_API_KEY ?? '';
+    const useOpenRouterFallback = hasFileParts && openRouterFallbackKey !== '';
+
+    if (hasFileParts) {
+      logger.info(
+        `[IronaChatClient][completions] Messages contain file parts (${fileMediaTypes.join(', ')}). ${
+          useOpenRouterFallback
+            ? 'Routing through OpenRouter (OPENROUTER_API_KEY).'
+            : 'No OPENROUTER_API_KEY set — falling back to configured gateway.'
+        }`
+      );
     }
 
     const selectedModel =
@@ -98,7 +146,9 @@ export class IronaChatClient {
           provider,
           model,
           payload,
-          supportsWebSearch
+          supportsWebSearch,
+          useOpenRouterFallback,
+          openRouterFallbackKey
         );
         logger.info(
           `[IronaChatClient][completions] Attempt ${attemptNumber}: Successfully executed chat completions with provider: ${provider}, model: ${model}`
@@ -141,61 +191,110 @@ export class IronaChatClient {
 
   /**
    * Handles the invocation of chat completions to a specific provider and model.
+   * `useOpenRouterFallback` and `openRouterFallbackKey` are resolved once in
+   * `completions()` — based on file parts in messages — and passed here so every
+   * retry in the priority queue uses the same routing decision.
    */
   private async invokeChatCompletions(
     provider: string,
     model: string,
     payload: CompletionsPayload,
-    supportsWebSearch: boolean
+    supportsWebSearch: boolean,
+    useOpenRouterFallback: boolean,
+    openRouterFallbackKey: string
   ): Promise<CompletionsResponse> {
     try {
       // When a gateway is configured, ALL providers route through it.
       // Provider-specific API keys are ignored for routing (BYOK is handled
       // at the gateway/account level, e.g. OpenRouter dashboard).
       const isUsingGateway = this.gatewayProvider !== undefined;
-      if (!isUsingGateway) {
+      const effectiveUseOpenRouterFallback =
+        useOpenRouterFallback && !this.hasDirectProviderKey(provider);
+      const effectiveIsUsingGateway =
+        isUsingGateway || effectiveUseOpenRouterFallback;
+
+      if (!effectiveIsUsingGateway) {
         this.loadApiKeyForProvider(provider, model);
       }
 
+      // When routing through an OpenAI-compatible gateway (OpenRouter, LLM Gateway,
+      // etc.) the Vercel AI SDK's OpenAI adapter rejects PDF file parts supplied
+      // as URLs. Fetch and base64-encode them here before conversion.
+      const resolvedMessages = effectiveIsUsingGateway
+        ? await this.resolveFileUrlsToBase64(payload.messages)
+        : payload.messages;
+
       // Convert messages to Vercel AI SDK format
-      const vercelMessages = this.convertToVercelMessages(payload.messages);
+      const vercelMessages = this.convertToVercelMessages(resolvedMessages);
 
       let fullModelName = model;
-      if (!isUsingGateway && provider === 'togetherai') {
+      if (!effectiveIsUsingGateway && provider === 'togetherai') {
         const modelPrefix = getModelPrefix(provider, model);
         if (modelPrefix !== null && modelPrefix !== undefined) {
           fullModelName = `${modelPrefix}/${model}`;
         }
       }
-      if (isUsingGateway) {
+      // OpenRouter fallback takes priority over any configured gateway for model
+      // name resolution — files always use the OpenRouter identifier.
+      if (effectiveUseOpenRouterFallback) {
+        const orName = getOpenRouterIdentifier(provider, fullModelName);
+        if (orName !== null && orName !== '') {
+          fullModelName = orName;
+        }
+      } else if (isUsingGateway) {
         fullModelName = this.resolveGatewayModelName(provider, fullModelName);
       }
 
-      // Build OpenRouter-specific extra body when routing through OpenRouter
-      const isOpenRouter = isUsingGateway && this.isOpenRouterGateway();
+      // Pick the gateway-specific extra body + fetch wrapper based on the
+      // configured gateway hostname. OpenRouter uses `plugins`, LLM Gateway
+      // uses `web_search` — same reasoning shape, different search shape.
+      const isOpenRouter =
+        effectiveUseOpenRouterFallback ||
+        (isUsingGateway && this.isOpenRouterGateway());
+      const isLLMGateway =
+        !effectiveUseOpenRouterFallback &&
+        isUsingGateway &&
+        this.isLLMGatewayGateway();
+      let llmGatewayCost: LLMGatewayCostData | null = null;
       let openRouterExtra: OpenRouterExtraBody | undefined;
+      let llmGatewayExtra: LLMGatewayExtraBody | undefined;
       if (isOpenRouter) {
         openRouterExtra = buildOpenRouterExtraBody({
           reasoningEffort: payload.reasoningEffort,
           search: payload.search,
           supportsWebSearch,
         });
+      } else if (isLLMGateway) {
+        llmGatewayExtra = buildLLMGatewayExtraBody({
+          reasoningEffort: payload.reasoningEffort,
+          search: payload.search,
+          supportsWebSearch,
+        });
       }
 
-      const modelFactory = isOpenRouter
-        ? (this.getGatewayModelFactory(openRouterExtra) ??
-          this.getModelInstance(
-            provider,
-            fullModelName,
-            payload.reasoningEffort,
-            isUsingGateway
-          ))
-        : this.getModelInstance(
-            provider,
-            fullModelName,
-            payload.reasoningEffort,
-            isUsingGateway
-          );
+      const gatewayFactory = isOpenRouter
+        ? effectiveUseOpenRouterFallback
+          ? createOpenAI({
+              baseURL: OPENROUTER_DEFAULT_BASE_URL,
+              apiKey: openRouterFallbackKey,
+              name: 'openrouter',
+              fetch: createOpenRouterFetchWrapper(openRouterExtra ?? {}),
+            }).chat
+          : this.getOpenRouterModelFactory(openRouterExtra ?? {})
+        : isLLMGateway
+          ? this.getLLMGatewayModelFactory(llmGatewayExtra, cost => {
+              llmGatewayCost = cost;
+            })
+          : undefined;
+
+      const modelFactory =
+        gatewayFactory ??
+        this.getModelInstance(
+          provider,
+          fullModelName,
+          payload.reasoningEffort,
+          effectiveIsUsingGateway
+        );
 
       if (!modelFactory) {
         throw new Error(`No model factory found for provider: ${provider}`);
@@ -203,14 +302,15 @@ export class IronaChatClient {
 
       const baseModel = modelFactory(fullModelName);
 
-      // When using OpenRouter with reasoning explicitly requested, the fetch wrapper
-      // injects delta.reasoning as <think>…</think> tags. Wrap the model so the AI
-      // SDK extracts those tags into reasoning-delta stream parts.
-      // Mapper omits the reasoning field for 'off'/undefined, so its presence means active.
-      const shouldExtractOpenRouterReasoning =
-        isOpenRouter && openRouterExtra?.reasoning !== undefined;
+      // When the gateway fetch wrapper injects delta.reasoning as
+      // <think>…</think> tags, wrap the model so the AI SDK extracts those
+      // tags into reasoning-delta stream parts. Both mappers omit the
+      // reasoning field for 'off'/undefined — its presence means active.
+      const shouldExtractGatewayReasoning =
+        (isOpenRouter && openRouterExtra?.reasoning !== undefined) ||
+        (isLLMGateway && llmGatewayExtra?.reasoning !== undefined);
 
-      const finalModel = shouldExtractOpenRouterReasoning
+      const finalModel = shouldExtractGatewayReasoning
         ? (wrapLanguageModel({
             model: baseModel as Parameters<
               typeof wrapLanguageModel
@@ -241,7 +341,7 @@ export class IronaChatClient {
       // Add search tools if search is enabled (skip for gateways — OpenRouter
       // handles search via plugins in the request body, not native tools)
       if (
-        !isUsingGateway &&
+        !effectiveIsUsingGateway &&
         provider === 'openai' &&
         payload.search === true &&
         supportsWebSearch
@@ -250,7 +350,7 @@ export class IronaChatClient {
       }
 
       if (
-        !isUsingGateway &&
+        !effectiveIsUsingGateway &&
         provider === 'google' &&
         payload.search === true &&
         supportsWebSearch
@@ -269,7 +369,7 @@ export class IronaChatClient {
       }
 
       if (
-        !isUsingGateway &&
+        !effectiveIsUsingGateway &&
         provider === 'xai' &&
         payload.search === true &&
         supportsWebSearch
@@ -286,7 +386,7 @@ export class IronaChatClient {
       const applyReasoningConfig = (
         config: Record<string, unknown>
       ): Record<string, unknown> => {
-        if (isUsingGateway) {
+        if (effectiveIsUsingGateway) {
           return config;
         }
         if (
@@ -346,6 +446,9 @@ export class IronaChatClient {
                   `Empty stream response from ${provider}/${model}`
                 );
               }
+              if (llmGatewayCost !== null) {
+                yield { type: 'llmgateway-cost' as const, ...llmGatewayCost };
+              }
             } catch (err) {
               logger.error(
                 `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}: ${err}`
@@ -402,6 +505,76 @@ export class IronaChatClient {
   }
 
   /**
+   * Fetches URL-based file/document parts for gateway routing.
+   * For media types natively supported by the OpenAI-compatible adapter
+   * (image/*, audio/wav|mp3, application/pdf) the bytes are base64-encoded
+   * and kept as file parts. For everything else — a generic fallback — the
+   * fetched content is embedded as a text part so the adapter never throws.
+   */
+  private async resolveFileUrlsToBase64(
+    messages: MessagePayload[]
+  ): Promise<MessagePayload[]> {
+    return Promise.all(
+      messages.map(async msg => {
+        if (msg.role !== 'user' || typeof msg.content === 'string') {
+          return msg;
+        }
+
+        const resolvedParts = await Promise.all(
+          msg.content.map(async part => {
+            if (
+              part.type === 'file' &&
+              typeof part.data === 'string' &&
+              (part.data.startsWith('https://') ||
+                part.data.startsWith('http://'))
+            ) {
+              IronaChatClient.assertHttpsUrl(part.data);
+              const res = await fetch(part.data);
+              if (!res.ok) {
+                throw new Error(
+                  `Failed to fetch file part (${res.status}): ${part.data}`
+                );
+              }
+              if (!IronaChatClient.OPENAI_NATIVE_FILE_RE.test(part.mediaType)) {
+                return { type: 'text' as const, text: await res.text() };
+              }
+              const base64 = Buffer.from(await res.arrayBuffer()).toString(
+                'base64'
+              );
+              return { ...part, data: base64 };
+            }
+
+            if (part.type === 'document' && part.source.type === 'url') {
+              IronaChatClient.assertHttpsUrl(part.source.url);
+              const res = await fetch(part.source.url);
+              if (!res.ok) {
+                throw new Error(
+                  `Failed to fetch document part (${res.status}): ${part.source.url}`
+                );
+              }
+              const base64 = Buffer.from(await res.arrayBuffer()).toString(
+                'base64'
+              );
+              return {
+                ...part,
+                source: {
+                  type: 'base64' as const,
+                  data: base64,
+                  media_type: part.source.media_type,
+                },
+              };
+            }
+
+            return part;
+          })
+        );
+
+        return { ...msg, content: resolvedParts } as MessagePayload;
+      })
+    );
+  }
+
+  /**
    * Converts messages to Vercel AI SDK format
    */
   private convertToVercelMessages(messages: MessagePayload[]): ModelMessage[] {
@@ -419,11 +592,26 @@ export class IronaChatClient {
             return { type: 'text' as const, text: part.text };
           } else if (part.type === 'image') {
             return { type: 'image' as const, image: part.image };
+          } else if (part.type === 'image_url') {
+            // OpenAI-style image_url → AI SDK image part. The SDK accepts
+            // both HTTPS URLs and `data:image/...;base64,...` strings here.
+            return { type: 'image' as const, image: part.image_url.url };
           } else if (part.type === 'file') {
             return {
               type: 'file' as const,
               data: part.data,
               mediaType: part.mediaType ?? 'application/pdf',
+            };
+          } else if (part.type === 'document') {
+            // Anthropic-style document → AI SDK file part. `source.url` (an
+            // HTTPS URL) or `source.data` (base64) both feed straight into
+            // the SDK's BinaryDataSchema-compatible `data` field.
+            const source = part.source;
+            const data = source.type === 'url' ? source.url : source.data;
+            return {
+              type: 'file' as const,
+              data,
+              mediaType: source.media_type ?? 'application/pdf',
             };
           }
           throw new Error(
@@ -558,28 +746,23 @@ export class IronaChatClient {
   }
 
   private isOpenRouterGateway(): boolean {
-    return (
-      this.gatewayHostname === 'openrouter.ai' ||
-      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
-    );
+    return this.gatewayType === 'openrouter';
+  }
+
+  private isLLMGatewayGateway(): boolean {
+    return this.gatewayType === 'llmgateway';
   }
 
   /**
-   * Returns the gateway model factory, optionally with a custom fetch wrapper
-   * that merges OpenRouter-specific params into the request body.
-   * When no extra body is needed, reuses the singleton gateway provider.
+   * Returns an OpenRouter-flavoured gateway model factory: a per-request
+   * `createOpenAI()` instance whose fetch merges OpenRouter-specific params
+   * (`reasoning`, `plugins`, `provider`) into the body.
    */
-  private getGatewayModelFactory(
-    extraBody: OpenRouterExtraBody | undefined
+  private getOpenRouterModelFactory(
+    extraBody: OpenRouterExtraBody
   ): ReturnType<typeof createOpenAI>['chat'] | undefined {
-    if (
-      this.gatewayProvider === undefined ||
-      this.config.gateway === undefined
-    ) {
+    if (this.config.gateway === undefined) {
       return undefined;
-    }
-    if (extraBody === undefined) {
-      return this.gatewayProvider;
     }
     return createOpenAI({
       baseURL: this.config.gateway.baseUrl,
@@ -590,20 +773,52 @@ export class IronaChatClient {
     }).chat;
   }
 
+  /**
+   * Returns an LLM Gateway-flavoured model factory: a per-request
+   * `createOpenAI()` instance whose fetch merges LLM Gateway-specific params
+   * (`reasoning`, `web_search`) and cleans up `delta.reasoning` tokens.
+   * The wrapper is created even with an empty extra body so the cleanup runs.
+   */
+  private getLLMGatewayModelFactory(
+    extraBody: LLMGatewayExtraBody | undefined,
+    onCost?: (data: LLMGatewayCostData) => void
+  ): ReturnType<typeof createOpenAI>['chat'] | undefined {
+    if (this.config.gateway === undefined) {
+      return undefined;
+    }
+    return createOpenAI({
+      baseURL: this.config.gateway.baseUrl,
+      apiKey: this.config.gateway.apiKey,
+      headers: this.config.gateway.headers,
+      name: this.config.gateway.providerName ?? 'gateway',
+      fetch: createLLMGatewayFetchWrapper(
+        extraBody ?? {},
+        globalThis.fetch,
+        onCost
+      ),
+    }).chat;
+  }
+
   private resolveGatewayModelName(provider: string, model: string): string {
     const gateway = this.config.gateway;
     if (!gateway) {
       return model;
     }
 
-    if (
-      this.gatewayHostname === 'openrouter.ai' ||
-      (this.gatewayHostname?.endsWith('.openrouter.ai') ?? false)
-    ) {
+    if (this.isOpenRouterGateway()) {
       const openRouterModelName = getOpenRouterIdentifier(provider, model);
       if (openRouterModelName !== null && openRouterModelName !== '') {
         return openRouterModelName;
       }
+    }
+
+    // LLM Gateway accepts bare model names (no `provider/` prefix). Strip any
+    // existing prefix so requests pass its validation regardless of how the
+    // model was supplied. See https://llmgateway.io/migration/openrouter
+    if (this.isLLMGatewayGateway()) {
+      return model.startsWith(`${provider}/`)
+        ? model.slice(provider.length + 1)
+        : model;
     }
 
     const includeProviderInModelName =
@@ -677,9 +892,8 @@ export class IronaChatClient {
 
   /**
    * Checks if a provider has a direct API key (programmatic config or env var).
-   * @deprecated No longer used for routing decisions. When a gateway is
-   * configured, all providers route through it regardless of direct keys.
-   * Kept for potential diagnostic use.
+   * Used to decide whether to bypass OpenRouter for file requests and route
+   * directly through the native SDK, which supports a broader set of file types.
    */
   private hasDirectProviderKey(provider: string): boolean {
     const providerConf = this.config.providers?.[provider];

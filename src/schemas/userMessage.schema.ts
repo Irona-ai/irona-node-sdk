@@ -20,7 +20,8 @@ export const TextPartSchema = z.object({
 });
 
 /**
- * ImagePart
+ * ImagePart — native (Vercel AI SDK) shape: `{ type: 'image', image: <data> }`.
+ * Kept for backward compatibility.
  */
 export const ImagePartSchema = z.object({
   type: z.literal('image'),
@@ -29,7 +30,19 @@ export const ImagePartSchema = z.object({
 });
 
 /**
- * FilePart
+ * ImageUrlPart — OpenAI-compatible shape: `{ type: 'image_url', image_url: { url } }`.
+ * `url` may be an HTTPS URL or a base64 data URI (`data:image/...;base64,...`).
+ */
+export const ImageUrlPartSchema = z.object({
+  type: z.literal('image_url'),
+  image_url: z.object({
+    url: z.string(),
+    detail: z.string().optional(),
+  }),
+});
+
+/**
+ * FilePart — native (Vercel AI SDK) shape: `{ type: 'file', data, mediaType }`.
  */
 export const FilePartSchema = z.object({
   type: z.literal('file'),
@@ -38,12 +51,36 @@ export const FilePartSchema = z.object({
 });
 
 /**
+ * DocumentPart — Anthropic-compatible shape:
+ *   `{ type: 'document', source: { type: 'url' | 'base64', url? | data?, media_type? } }`.
+ * Mapped onto the AI SDK's `file` part with `mediaType` defaulting to
+ * `application/pdf`.
+ */
+export const DocumentPartSchema = z.object({
+  type: z.literal('document'),
+  source: z.union([
+    z.object({
+      type: z.literal('url'),
+      url: z.string(),
+      media_type: z.string().optional(),
+    }),
+    z.object({
+      type: z.literal('base64'),
+      data: z.string(),
+      media_type: z.string().optional(),
+    }),
+  ]),
+});
+
+/**
  * Union of content parts
  */
 export const MessagePartSchema = z.union([
   TextPartSchema,
   ImagePartSchema,
+  ImageUrlPartSchema,
   FilePartSchema,
+  DocumentPartSchema,
 ]);
 
 /**

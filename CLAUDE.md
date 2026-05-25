@@ -12,6 +12,8 @@ git checkout development && git pull && git checkout -b feat/my-feature
 
 PRs should target `development`. The `main` branch is production-only.
 
+**Publish-time sync policy:** Whenever publishing a new version to npm, `development` and `main` MUST be in sync. Before (or as part of) every release, open a `development` → `main` PR (or merge) so both branches reflect the same commit. Do not publish from a state where `main` is behind `development`.
+
 ## Commands
 
 ### Build

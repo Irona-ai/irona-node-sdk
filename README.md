@@ -143,46 +143,86 @@ Ref [blog link](https://medium.com/@oresoftware/node-js-how-to-test-your-new-npm
 
 ### Publish Package to npm
 
-Publishing uses **OIDC trusted publishing** — no npm tokens are needed. The GitHub Actions workflow authenticates directly with npm via OpenID Connect.
+**Preferred method: manual publish with a granular npm access token.** The interactive `npm login` + 2FA OTP path is fragile (the OTP prompt fails for accounts whose 2FA mode is "auth and writes" or when the authenticator app isn't available), and the CI publish workflow has historically failed due to npm-version / OIDC setup gaps. Use a granular token until those paths are fixed.
 
-#### Prerequisites (one-time setup)
+> **Branch sync requirement:** Per [`CLAUDE.md`](./CLAUDE.md), `development` and `main` must be in sync before publishing — open a `development` → `main` PR (or merge) as part of every release. Publish from `main`.
 
-- **npm trusted publisher** configured on [npmjs.com/package/ironaai/access](https://www.npmjs.com/package/ironaai/access) (GitHub org: `Irona-ai`, repo: `irona-node-sdk`, workflow: `publish.yml`, environment: `npm`)
-- **GitHub environment** `npm` created in repo Settings > Environments with branch policy restricted to `main`
+#### Option A (Preferred): Manual publish with a granular npm token
 
-#### Option A: Manual publish
+1. **Create the token (one-time):**
+   - Go to [npmjs.com → Access Tokens → Generate New Token → Granular](https://www.npmjs.com/settings/~/tokens).
+   - Permissions: `Read and write`. Scope: package `ironaai` (or limit to the org). Expiration: set a reasonable bound (e.g., 90 days).
+   - Granular tokens bypass 2FA, so the OTP prompt is not triggered.
 
-1. Update the version in `package.json`
-2. Build the package:
+2. **Sync branches and check out `main`:**
+
    ```bash
-   npm run build
+   git checkout main && git pull origin main
    ```
-3. Verify what will be published:
+
+   Verify `package.json` version is the one you intend to publish.
+
+3. **Build:**
+
+   ```bash
+   npm ci && npm run build
+   ```
+
+4. **Dry-run to verify the tarball contents:**
+
    ```bash
    npm publish --dry-run
    ```
-4. Publish to npm (must be logged in via `npm login`):
+
+5. **Publish via a scoped temporary `.npmrc`** (avoids touching `~/.npmrc`):
+
    ```bash
-   npm publish
+   export NPM_TOKEN=<paste_your_granular_token>
+   umask 077
+   printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" > /tmp/publish-npmrc
+   npm publish --userconfig /tmp/publish-npmrc --access public --tag latest
+   rm -f /tmp/publish-npmrc
+   unset NPM_TOKEN
    ```
 
-#### Option B: Automated publish via GitHub Release
+6. **Verify:**
 
-1. Update the version in `package.json`
-2. Commit and push changes to `main`
-3. Create a GitHub Release with tag matching the version:
    ```bash
-   gh release create v0.0.23 --title "v0.0.23" --notes "Release notes here" --target main
+   npm view ironaai version          # should print the new version
+   npm view ironaai dist-tags        # latest should match
    ```
-   Or via GitHub UI: Go to Releases > "Create a new release" > Enter tag (e.g., `v0.0.23`) > Publish
 
-The release triggers the CI workflow (`.github/workflows/publish.yml`) which builds and publishes to npm automatically with provenance.
+7. **Rotate the token** if it was ever pasted into a shared terminal, screenshot, or chat transcript.
+
+#### Option B (Legacy): `npm login` + OTP
+
+Only works if your npm account's 2FA mode is set to "Authorization only" (not "Authorization and writes") and you have access to your authenticator app.
+
+```bash
+npm login            # complete 2FA in browser/terminal
+npm run build
+npm publish --dry-run
+npm publish --otp=<6-digit-code>
+```
+
+If `npm publish` prompts for an OTP and you can't supply one, fall back to Option A.
+
+#### Option C (Currently broken): OIDC trusted publishing via GitHub Actions
+
+The `.github/workflows/publish.yml` workflow is wired for npm OIDC trusted publishing, but every run on record has failed with `ENEEDAUTH`. Known gaps:
+
+- The runner's bundled npm (10.x with Node 22) is below the `>= 11.5.1` required for OIDC trusted publishing — the workflow does **not** install a newer npm.
+- The npm trusted-publisher binding (org `Irona-ai`, repo `irona-node-sdk`, workflow `publish.yml`) must be configured on [npmjs.com/package/ironaai/access](https://www.npmjs.com/package/ironaai/access). Verify before relying on it.
+
+Do not use this path until those are fixed. PRs welcome.
 
 #### Troubleshooting
 
-- **`NODE_AUTH_TOKEN` must NOT be set** — even an empty string prevents OIDC from working. The workflow intentionally omits it.
-- **`repository.url`** in `package.json` must exactly match the GitHub repo URL (case-sensitive) for provenance validation.
-- **npm version** — OIDC trusted publishing requires npm >= 11.5.1. The workflow upgrades npm automatically before publishing.
+- **`EOTP` / "operation requires a one-time password"** — your token is a classic/legacy token, or you're using `npm login` with 2FA mode set to "auth and writes". Switch to a granular token (Option A) or change the 2FA mode on npmjs.com.
+- **`ENEEDAUTH` / "need auth"** — no valid credentials. Re-check `NPM_TOKEN`, or that the token still has write access to `ironaai`.
+- **`E403` / "You cannot publish over the previously published version"** — bump the version in `package.json` and rebuild before retrying.
+- **`--provenance` errors locally** — `--provenance` only works inside supported CI (e.g., GitHub Actions). Omit it for local manual publishes.
+- **`repository.url`** in `package.json` must exactly match the GitHub repo URL (case-sensitive) — required if you ever do get OIDC + provenance working.
 
 ## Key Concepts
 

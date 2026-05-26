@@ -25,16 +25,12 @@ import { ModelSelectSchema } from '../schemas/modelSelect.schema';
 import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import {
   providerApiKeyName,
-  doesModelSupportMediaTypes,
   doesModelSupportWebSearch,
   getModelPrefix,
   getOpenRouterIdentifier,
 } from '../supported_models';
 import type { Config, GatewayConfig, ProviderConfig } from '../types';
-import {
-  OPENROUTER_DEFAULT_BASE_URL,
-  SUPPORTED_MODELS_DEFAULT_URL,
-} from '../utils/constants';
+import { OPENROUTER_DEFAULT_BASE_URL } from '../utils/constants';
 import { detectGatewayTypeFromUrl } from '../utils/gatewayType';
 import type { GatewayType } from '../utils/gatewayType';
 import { createLLMGatewayFetchWrapper } from '../utils/llmGatewayFetchWrapper';
@@ -42,8 +38,10 @@ import { buildLLMGatewayExtraBody } from '../utils/llmGatewayMapper';
 import type { LLMGatewayExtraBody } from '../utils/llmGatewayMapper';
 import { logger } from '../utils/logger';
 import { createOpenRouterFetchWrapper } from '../utils/openRouterFetchWrapper';
+import type { OpenRouterUserMessage } from '../utils/openRouterFetchWrapper';
 import { buildOpenRouterExtraBody } from '../utils/openRouterMapper';
 import type { OpenRouterExtraBody } from '../utils/openRouterMapper';
+import { buildOpenRouterUserMessages } from '../utils/openRouterMessageConverter';
 import {
   extractMediaTypeArrayFromMessages,
   validateAndGetProviderAndModel,
@@ -100,21 +98,32 @@ export class IronaChatClient {
       throw new BadRequestError(validationResult.errors);
     }
 
-    // Detect file parts (image/PDF) in messages once, before the retry loop.
+    // Detect file parts (image/PDF/video) in messages once, before the retry loop.
     // Files always route through OpenRouter (OPENROUTER_API_KEY) — this takes
     // priority over any other configured gateway. Non-file requests use whatever
     // gateway is configured (LLM Gateway, custom URL, etc.) unchanged.
+    //
+    // Special case: when LLM Gateway is configured and the request contains video
+    // parts, we force routing through OpenRouter regardless of whether a direct
+    // provider key exists — LLM Gateway does not support video.
     const fileMediaTypes = extractMediaTypeArrayFromMessages(payload.messages);
     const hasFileParts = fileMediaTypes.length > 0;
+    const hasVideoParts = fileMediaTypes.includes('video');
     const openRouterFallbackKey = process.env.OPENROUTER_API_KEY ?? '';
     const useOpenRouterFallback = hasFileParts && openRouterFallbackKey !== '';
+    const forceVideoThroughOpenRouter =
+      hasVideoParts &&
+      this.isLLMGatewayGateway() &&
+      openRouterFallbackKey !== '';
 
     if (hasFileParts) {
       logger.info(
         `[IronaChatClient][completions] Messages contain file parts (${fileMediaTypes.join(', ')}). ${
-          useOpenRouterFallback
-            ? 'Routing through OpenRouter (OPENROUTER_API_KEY).'
-            : 'No OPENROUTER_API_KEY set — falling back to configured gateway.'
+          forceVideoThroughOpenRouter
+            ? 'Video detected with LLM Gateway — forcing OpenRouter (OPENROUTER_API_KEY).'
+            : useOpenRouterFallback
+              ? 'Routing through OpenRouter (OPENROUTER_API_KEY).'
+              : 'No OPENROUTER_API_KEY set — falling back to configured gateway.'
         }`
       );
     }
@@ -148,7 +157,8 @@ export class IronaChatClient {
           payload,
           supportsWebSearch,
           useOpenRouterFallback,
-          openRouterFallbackKey
+          openRouterFallbackKey,
+          forceVideoThroughOpenRouter
         );
         logger.info(
           `[IronaChatClient][completions] Attempt ${attemptNumber}: Successfully executed chat completions with provider: ${provider}, model: ${model}`
@@ -171,20 +181,20 @@ export class IronaChatClient {
 
   private selectSingleModel(body: CompletionsPayload) {
     const { provider, model } = validateAndGetProviderAndModel(body.models[0]);
-    const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
-    const supportsMediaTypes = doesModelSupportMediaTypes(
-      provider,
-      model,
-      mediaInputsArray
-    );
+    // const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
+    // const supportsMediaTypes = doesModelSupportMediaTypes(
+    //   provider,
+    //   model,
+    //   mediaInputsArray
+    // );
 
-    if (!supportsMediaTypes) {
-      throw new BadRequestError(
-        `Model ${provider}/${model} does not support required media types: ${mediaInputsArray.join(
-          ', '
-        )}. Please choose a model that supports the requested media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
-      );
-    }
+    // if (!supportsMediaTypes) {
+    //   throw new BadRequestError(
+    //     `Model ${provider}/${model} does not support required media types: ${mediaInputsArray.join(
+    //       ', '
+    //     )}. Please choose a model that supports the requested media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
+    //   );
+    // }
 
     return { provider, model };
   }
@@ -201,15 +211,18 @@ export class IronaChatClient {
     payload: CompletionsPayload,
     supportsWebSearch: boolean,
     useOpenRouterFallback: boolean,
-    openRouterFallbackKey: string
+    openRouterFallbackKey: string,
+    forceVideoThroughOpenRouter = false
   ): Promise<CompletionsResponse> {
     try {
       // When a gateway is configured, ALL providers route through it.
       // Provider-specific API keys are ignored for routing (BYOK is handled
       // at the gateway/account level, e.g. OpenRouter dashboard).
+      // Exception: video parts with LLM Gateway always bypass to OpenRouter.
       const isUsingGateway = this.gatewayProvider !== undefined;
       const effectiveUseOpenRouterFallback =
-        useOpenRouterFallback && !this.hasDirectProviderKey(provider);
+        forceVideoThroughOpenRouter ||
+        (useOpenRouterFallback && !this.hasDirectProviderKey(provider));
       const effectiveIsUsingGateway =
         isUsingGateway || effectiveUseOpenRouterFallback;
 
@@ -272,15 +285,36 @@ export class IronaChatClient {
         });
       }
 
+      // When routing through OpenRouter and the messages contain video_url parts,
+      // build OpenRouter-native user messages. The fetch wrapper will substitute
+      // these into the outgoing request body, replacing the Vercel AI SDK's
+      // serialisation (which uses an image placeholder for video_url parts).
+      const hasVideoInMessages = resolvedMessages.some(
+        msg =>
+          Array.isArray(msg.content) &&
+          msg.content.some(p => p.type === 'video_url' || p.type === 'video')
+      );
+      let openRouterUserMessages: OpenRouterUserMessage[] | undefined;
+      if (isOpenRouter && hasVideoInMessages) {
+        openRouterUserMessages = buildOpenRouterUserMessages(resolvedMessages);
+      }
+
       const gatewayFactory = isOpenRouter
         ? effectiveUseOpenRouterFallback
           ? createOpenAI({
               baseURL: OPENROUTER_DEFAULT_BASE_URL,
               apiKey: openRouterFallbackKey,
               name: 'openrouter',
-              fetch: createOpenRouterFetchWrapper(openRouterExtra ?? {}),
+              fetch: createOpenRouterFetchWrapper(
+                openRouterExtra ?? {},
+                globalThis.fetch,
+                openRouterUserMessages
+              ),
             }).chat
-          : this.getOpenRouterModelFactory(openRouterExtra ?? {})
+          : this.getOpenRouterModelFactory(
+              openRouterExtra ?? {},
+              openRouterUserMessages
+            )
         : isLLMGateway
           ? this.getLLMGatewayModelFactory(llmGatewayExtra, cost => {
               llmGatewayCost = cost;
@@ -613,6 +647,15 @@ export class IronaChatClient {
               data,
               mediaType: source.media_type ?? 'application/pdf',
             };
+          } else if (part.type === 'video_url') {
+            // video_url is not understood by the Vercel AI SDK. We use an image
+            // placeholder here so the SDK doesn't throw; the OpenRouter fetch
+            // wrapper replaces the entire user message with the correctly-formatted
+            // video_url content before the request reaches OpenRouter.
+            return { type: 'image' as const, image: part.video_url.url };
+          } else if (part.type === 'video') {
+            // Shorthand video part — same placeholder strategy as video_url.
+            return { type: 'image' as const, image: part.video };
           }
           throw new Error(
             `Unsupported user message part type: ${(part as { type: string }).type}`
@@ -756,10 +799,13 @@ export class IronaChatClient {
   /**
    * Returns an OpenRouter-flavoured gateway model factory: a per-request
    * `createOpenAI()` instance whose fetch merges OpenRouter-specific params
-   * (`reasoning`, `plugins`, `provider`) into the body.
+   * (`reasoning`, `plugins`, `provider`) into the body. When
+   * `openRouterUserMessages` is provided the wrapper substitutes those
+   * pre-formatted messages for user-role entries (used for video_url support).
    */
   private getOpenRouterModelFactory(
-    extraBody: OpenRouterExtraBody
+    extraBody: OpenRouterExtraBody,
+    openRouterUserMessages?: OpenRouterUserMessage[]
   ): ReturnType<typeof createOpenAI>['chat'] | undefined {
     if (this.config.gateway === undefined) {
       return undefined;
@@ -769,7 +815,11 @@ export class IronaChatClient {
       apiKey: this.config.gateway.apiKey,
       headers: this.config.gateway.headers,
       name: this.config.gateway.providerName ?? 'gateway',
-      fetch: createOpenRouterFetchWrapper(extraBody),
+      fetch: createOpenRouterFetchWrapper(
+        extraBody,
+        globalThis.fetch,
+        openRouterUserMessages
+      ),
     }).chat;
   }
 

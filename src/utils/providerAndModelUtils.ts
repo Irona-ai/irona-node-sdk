@@ -33,6 +33,9 @@ export function extractMediaTypeArrayFromMessages(
         if (item.type === 'file' || item.type === 'document') {
           mediaTypes.add('pdf');
         }
+        if (item.type === 'video_url' || item.type === 'video') {
+          mediaTypes.add('video');
+        }
       }
     }
   }

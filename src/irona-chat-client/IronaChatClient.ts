@@ -25,6 +25,7 @@ import { ModelSelectSchema } from '../schemas/modelSelect.schema';
 import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import {
   providerApiKeyName,
+  doesModelSupportMediaTypes,
   doesModelSupportWebSearch,
   getModelPrefix,
   getOpenRouterIdentifier,
@@ -181,20 +182,20 @@ export class IronaChatClient {
 
   private selectSingleModel(body: CompletionsPayload) {
     const { provider, model } = validateAndGetProviderAndModel(body.models[0]);
-    // const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
-    // const supportsMediaTypes = doesModelSupportMediaTypes(
-    //   provider,
-    //   model,
-    //   mediaInputsArray
-    // );
+    const mediaInputsArray = extractMediaTypeArrayFromMessages(body.messages);
+    const supportsMediaTypes = doesModelSupportMediaTypes(
+      provider,
+      model,
+      mediaInputsArray
+    );
 
-    // if (!supportsMediaTypes) {
-    //   throw new BadRequestError(
-    //     `Model ${provider}/${model} does not support required media types: ${mediaInputsArray.join(
-    //       ', '
-    //     )}. Please choose a model that supports the requested media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
-    //   );
-    // }
+    if (!supportsMediaTypes) {
+      throw new BadRequestError(
+        `Model ${provider}/${model} does not support required media types: ${mediaInputsArray.join(
+          ', '
+        )}. Please choose a model that supports the requested media types.`
+      );
+    }
 
     return { provider, model };
   }

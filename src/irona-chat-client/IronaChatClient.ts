@@ -163,7 +163,33 @@ export class IronaChatClient {
       }
       attemptNumber++;
     }
-    // If all retries fail, throw an error
+    // All queue retries failed — attempt OpenRouter as final fallback.
+    const finalOrKey = process.env.OPENROUTER_API_KEY ?? '';
+    if (finalOrKey !== '' && modelPriorityQueue.length > 0) {
+      const { provider: orProvider, model: orModel } = modelPriorityQueue[0];
+      logger.info(
+        `[IronaChatClient][completions] All attempts failed. Attempting OpenRouter fallback for ${orProvider}/${orModel}`
+      );
+      try {
+        const supportsWebSearch = doesModelSupportWebSearch(
+          orProvider,
+          orModel
+        );
+        return await this.invokeChatCompletions(
+          orProvider,
+          orModel,
+          payload,
+          supportsWebSearch,
+          false,
+          finalOrKey,
+          true
+        );
+      } catch (fallbackErr) {
+        logger.error(
+          `[IronaChatClient][completions] OpenRouter fallback also failed: ${(fallbackErr as Error).message}`
+        );
+      }
+    }
     throw new Error(
       `[IronaChatClient][completions] All attempts to process the completions request failed. Please verify the providers and models in your configuration.`
     );
@@ -201,7 +227,8 @@ export class IronaChatClient {
     payload: CompletionsPayload,
     supportsWebSearch: boolean,
     useOpenRouterFallback: boolean,
-    openRouterFallbackKey: string
+    openRouterFallbackKey: string,
+    forceOpenRouterFallback = false
   ): Promise<CompletionsResponse> {
     try {
       // When a gateway is configured, ALL providers route through it.
@@ -209,7 +236,8 @@ export class IronaChatClient {
       // at the gateway/account level, e.g. OpenRouter dashboard).
       const isUsingGateway = this.gatewayProvider !== undefined;
       const effectiveUseOpenRouterFallback =
-        useOpenRouterFallback && !this.hasDirectProviderKey(provider);
+        forceOpenRouterFallback ||
+        (useOpenRouterFallback && !this.hasDirectProviderKey(provider));
       const effectiveIsUsingGateway =
         isUsingGateway || effectiveUseOpenRouterFallback;
 
@@ -421,6 +449,7 @@ export class IronaChatClient {
         // Return the stream immediately — no early validation.
         // Errors are caught inline via the error-handling wrapper below
         // and will propagate up to completions() for fallback retry.
+        const self = this;
         const fullStream = {
           async *[Symbol.asyncIterator]() {
             let chunkCount = 0;
@@ -453,6 +482,33 @@ export class IronaChatClient {
               logger.error(
                 `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}: ${err}`
               );
+              const orKey = process.env.OPENROUTER_API_KEY ?? '';
+              if (!isOpenRouter && !forceOpenRouterFallback && orKey !== '') {
+                logger.info(
+                  `[IronaChatClient][completions][invokeChatCompletions] Attempting OpenRouter fallback for ${provider}/${model}`
+                );
+                try {
+                  const fallback = await self.invokeChatCompletions(
+                    provider,
+                    model,
+                    payload,
+                    supportsWebSearch,
+                    false,
+                    orKey,
+                    true
+                  );
+                  if (fallback.response.fullStream !== undefined) {
+                    for await (const part of fallback.response.fullStream) {
+                      yield part;
+                    }
+                  }
+                  return;
+                } catch (fallbackErr) {
+                  logger.error(
+                    `[IronaChatClient][completions][invokeChatCompletions] OpenRouter fallback also failed for ${provider}/${model}: ${fallbackErr}`
+                  );
+                }
+              }
               throw new Error(
                 `Streaming failed for provider: ${provider}, model: ${model}.\n${
                   (err as Error).message

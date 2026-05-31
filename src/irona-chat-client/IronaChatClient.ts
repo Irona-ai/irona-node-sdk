@@ -31,7 +31,10 @@ import {
   getOpenRouterIdentifier,
 } from '../supported_models';
 import type { Config, GatewayConfig, ProviderConfig } from '../types';
-import { OPENROUTER_DEFAULT_BASE_URL } from '../utils/constants';
+import {
+  OPENROUTER_DEFAULT_BASE_URL,
+  SUPPORTED_MODELS_DEFAULT_URL,
+} from '../utils/constants';
 import { detectGatewayTypeFromUrl } from '../utils/gatewayType';
 import type { GatewayType } from '../utils/gatewayType';
 import { createLLMGatewayFetchWrapper } from '../utils/llmGatewayFetchWrapper';
@@ -113,9 +116,13 @@ export class IronaChatClient {
     const openRouterFallbackKey = process.env.OPENROUTER_API_KEY ?? '';
     const useOpenRouterFallback = hasFileParts && openRouterFallbackKey !== '';
     const forceVideoThroughOpenRouter =
-      hasVideoParts &&
-      this.isLLMGatewayGateway() &&
-      openRouterFallbackKey !== '';
+      hasVideoParts && this.isLLMGateway() && openRouterFallbackKey !== '';
+
+    if (hasVideoParts && openRouterFallbackKey === '') {
+      logger.warn(
+        '[IronaChatClient] Video input detected but no OPENROUTER_API_KEY — video may not be supported by the configured provider.'
+      );
+    }
 
     if (hasFileParts) {
       logger.info(
@@ -193,7 +200,7 @@ export class IronaChatClient {
       throw new BadRequestError(
         `Model ${provider}/${model} does not support required media types: ${mediaInputsArray.join(
           ', '
-        )}. Please choose a model that supports the requested media types.`
+        )}. Please choose a model that supports the requested media types. You can visit ${SUPPORTED_MODELS_DEFAULT_URL} to see the list of supported models.`
       );
     }
 
@@ -268,7 +275,7 @@ export class IronaChatClient {
       const isLLMGateway =
         !effectiveUseOpenRouterFallback &&
         isUsingGateway &&
-        this.isLLMGatewayGateway();
+        this.isLLMGateway();
       let llmGatewayCost: LLMGatewayCostData | null = null;
       let openRouterExtra: OpenRouterExtraBody | undefined;
       let llmGatewayExtra: LLMGatewayExtraBody | undefined;
@@ -793,7 +800,7 @@ export class IronaChatClient {
     return this.gatewayType === 'openrouter';
   }
 
-  private isLLMGatewayGateway(): boolean {
+  private isLLMGateway(): boolean {
     return this.gatewayType === 'llmgateway';
   }
 
@@ -866,7 +873,7 @@ export class IronaChatClient {
     // LLM Gateway accepts bare model names (no `provider/` prefix). Strip any
     // existing prefix so requests pass its validation regardless of how the
     // model was supplied. See https://llmgateway.io/migration/openrouter
-    if (this.isLLMGatewayGateway()) {
+    if (this.isLLMGateway()) {
       return model.startsWith(`${provider}/`)
         ? model.slice(provider.length + 1)
         : model;

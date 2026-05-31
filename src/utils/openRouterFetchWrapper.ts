@@ -1,4 +1,5 @@
 import { applyResponseReasoningTransform } from './gatewayResponseTransforms';
+import { logger } from './logger';
 import type { OpenRouterExtraBody } from './openRouterMapper';
 
 export type OpenRouterContentPart =
@@ -85,6 +86,11 @@ export function createOpenRouterFetchWrapper(
           return msg;
         }
       );
+      if (userIdx !== openRouterUserMessages.length) {
+        logger.warn(
+          `[openRouterFetchWrapper] User message count mismatch: expected ${openRouterUserMessages.length}, replaced ${userIdx}`
+        );
+      }
     }
 
     const response = await baseFetch(input, {

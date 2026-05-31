@@ -25,10 +25,19 @@ const commonBody = {
   fallbackModels: ['google/gemini-2.5-flash'],
 };
 
+const MIME_BY_EXT = {
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  avi: 'video/x-msvideo',
+};
+
 function encodeVideoToBase64(videoPath) {
+  const ext = require('path').extname(videoPath).toLowerCase().slice(1);
+  const mime = MIME_BY_EXT[ext] ?? 'video/mp4';
   const videoBuffer = fs.readFileSync(videoPath);
   const base64Video = videoBuffer.toString('base64');
-  return `data:video/mp4;base64,${base64Video}`;
+  return `data:${mime};base64,${base64Video}`;
 }
 
 async function modelSelectTest() {
@@ -155,7 +164,7 @@ async function runVideoShorthandExample() {
   }
 }
 
-// modelSelectTest();
-// runVideoUrlExample();
-runVideoShorthandExample();
-// runBase64VideoExample();
+modelSelectTest()
+  .then(() => runVideoUrlExample())
+  .then(() => runVideoShorthandExample())
+  .then(() => runBase64VideoExample());

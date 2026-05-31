@@ -66,9 +66,9 @@ export function buildOpenRouterUserMessages(
 
       if (part.type === 'file') {
         const data = binaryToString(part.data);
-        // If data is already a URL (HTTPS) keep it; otherwise treat as base64
+        // If data is already a URL (https or http) keep it; otherwise treat as base64
         const url =
-          (data.startsWith('https://') ?? data.startsWith('http://'))
+          data.startsWith('https://') || data.startsWith('http://')
             ? data
             : `data:${part.mediaType};base64,${data}`;
         return { type: 'image_url' as const, image_url: { url } };

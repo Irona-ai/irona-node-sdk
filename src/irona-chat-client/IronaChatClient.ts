@@ -114,11 +114,10 @@ export class IronaChatClient {
     // parts, we force routing through OpenRouter regardless of whether a direct
     // provider key exists — LLM Gateway does not support video.
     const fileMediaTypes = extractMediaTypeArrayFromMessages(payload.messages);
-    const hasFileParts = fileMediaTypes.length > 0;
+    const hasMediaParts = fileMediaTypes.length > 0;
     const hasVideoParts = fileMediaTypes.includes('video');
-    const openRouterFallbackKey = process.env.OPENROUTER_API_KEY ?? '';
     const openRouterFallbackKey = this.openRouterFallbackKey;
-    const useOpenRouterFallback = hasFileParts && openRouterFallbackKey !== '';
+    const useOpenRouterFallback = hasMediaParts && openRouterFallbackKey !== '';
     const forceVideoThroughOpenRouter =
       hasVideoParts && this.isLLMGateway() && openRouterFallbackKey !== '';
 
@@ -128,7 +127,7 @@ export class IronaChatClient {
       );
     }
 
-    if (hasFileParts) {
+    if (hasMediaParts) {
       logger.info(
         `[IronaChatClient][completions] Messages contain file parts (${fileMediaTypes.join(', ')}). ${
           forceVideoThroughOpenRouter

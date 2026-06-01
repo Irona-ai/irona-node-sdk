@@ -81,6 +81,7 @@ export class IronaChatClient {
   // payload-mapping (`isOpenRouter`/`isLLMGateway` checks below) and model-name
   // resolution branch off this rather than re-parsing the URL each time.
   private readonly gatewayType: GatewayType;
+  private readonly openRouterFallbackKey: string;
 
   constructor(
     private readonly config: Config,
@@ -88,6 +89,8 @@ export class IronaChatClient {
   ) {
     this.gatewayProvider = this.createGatewayProvider(this.config.gateway);
     this.gatewayType = detectGatewayTypeFromUrl(this.config.gateway?.baseUrl);
+    this.openRouterFallbackKey =
+      config.openRouterFallbackKey ?? process.env.OPENROUTER_API_KEY ?? '';
   }
 
   /**
@@ -106,7 +109,7 @@ export class IronaChatClient {
     // gateway is configured (LLM Gateway, custom URL, etc.) unchanged.
     const fileMediaTypes = extractMediaTypeArrayFromMessages(payload.messages);
     const hasFileParts = fileMediaTypes.length > 0;
-    const openRouterFallbackKey = process.env.OPENROUTER_API_KEY ?? '';
+    const openRouterFallbackKey = this.openRouterFallbackKey;
     const useOpenRouterFallback = hasFileParts && openRouterFallbackKey !== '';
 
     if (hasFileParts) {
@@ -163,7 +166,30 @@ export class IronaChatClient {
       }
       attemptNumber++;
     }
-    // If all retries fail, throw an error
+    // All queue retries failed — attempt OpenRouter as final fallback.
+    if (openRouterFallbackKey !== '' && modelPriorityQueue.length > 0) {
+      const { provider: orProvider, model: orModel } = modelPriorityQueue[0];
+      logger.info(
+        `[IronaChatClient][completions] All attempts failed. Attempting OpenRouter fallback for ${orProvider}/${orModel}`
+      );
+      try {
+        const supportsWebSearch = doesModelSupportWebSearch(
+          orProvider,
+          orModel
+        );
+        return await this.retryViaOpenRouter(
+          orProvider,
+          orModel,
+          payload,
+          supportsWebSearch,
+          openRouterFallbackKey
+        );
+      } catch (fallbackErr) {
+        logger.error(
+          `[IronaChatClient][completions] OpenRouter fallback also failed: ${(fallbackErr as Error).message}`
+        );
+      }
+    }
     throw new Error(
       `[IronaChatClient][completions] All attempts to process the completions request failed. Please verify the providers and models in your configuration.`
     );
@@ -201,7 +227,8 @@ export class IronaChatClient {
     payload: CompletionsPayload,
     supportsWebSearch: boolean,
     useOpenRouterFallback: boolean,
-    openRouterFallbackKey: string
+    openRouterFallbackKey: string,
+    forceOpenRouterFallback = false
   ): Promise<CompletionsResponse> {
     try {
       // When a gateway is configured, ALL providers route through it.
@@ -209,7 +236,8 @@ export class IronaChatClient {
       // at the gateway/account level, e.g. OpenRouter dashboard).
       const isUsingGateway = this.gatewayProvider !== undefined;
       const effectiveUseOpenRouterFallback =
-        useOpenRouterFallback && !this.hasDirectProviderKey(provider);
+        forceOpenRouterFallback ||
+        (useOpenRouterFallback && !this.hasDirectProviderKey(provider));
       const effectiveIsUsingGateway =
         isUsingGateway || effectiveUseOpenRouterFallback;
 
@@ -421,9 +449,20 @@ export class IronaChatClient {
         // Return the stream immediately — no early validation.
         // Errors are caught inline via the error-handling wrapper below
         // and will propagate up to completions() for fallback retry.
+        const doOpenRouterFallback = (
+          orKey: string
+        ): Promise<CompletionsResponse> =>
+          this.retryViaOpenRouter(
+            provider,
+            model,
+            payload,
+            supportsWebSearch,
+            orKey
+          );
         const fullStream = {
           async *[Symbol.asyncIterator]() {
             let chunkCount = 0;
+            let textChunkCount = 0;
             try {
               for await (const part of stream.fullStream) {
                 if (part.type === 'error') {
@@ -437,6 +476,9 @@ export class IronaChatClient {
                   throw new Error(
                     `${errMsg}${err.statusCode !== undefined ? ` (status ${err.statusCode})` : ''}`
                   );
+                }
+                if (part.type === 'text-delta') {
+                  textChunkCount++;
                 }
                 chunkCount++;
                 yield part;
@@ -453,6 +495,35 @@ export class IronaChatClient {
               logger.error(
                 `[IronaChatClient][completions][invokeChatCompletions] Stream failed for ${provider}/${model}: ${err}`
               );
+              // Only attempt the OR fallback if no text has been delivered yet.
+              // Mid-stream recovery after real text would produce interleaved
+              // output (partial A + complete OR), which is semantically broken.
+              // Metadata-only parts (step-start, response) are safe to discard.
+              if (
+                !isOpenRouter &&
+                !forceOpenRouterFallback &&
+                openRouterFallbackKey !== '' &&
+                textChunkCount === 0
+              ) {
+                logger.info(
+                  `[IronaChatClient][completions][invokeChatCompletions] Attempting OpenRouter fallback for ${provider}/${model}`
+                );
+                try {
+                  const fallback = await doOpenRouterFallback(
+                    openRouterFallbackKey
+                  );
+                  if (fallback.response.fullStream !== undefined) {
+                    for await (const part of fallback.response.fullStream) {
+                      yield part;
+                    }
+                  }
+                  return;
+                } catch (fallbackErr) {
+                  logger.error(
+                    `[IronaChatClient][completions][invokeChatCompletions] OpenRouter fallback also failed for ${provider}/${model}: ${(fallbackErr as Error).message}`
+                  );
+                }
+              }
               throw new Error(
                 `Streaming failed for provider: ${provider}, model: ${model}.\n${
                   (err as Error).message
@@ -502,6 +573,24 @@ export class IronaChatClient {
         }\n`
       );
     }
+  }
+
+  private retryViaOpenRouter(
+    provider: string,
+    model: string,
+    payload: CompletionsPayload,
+    supportsWebSearch: boolean,
+    orKey: string
+  ): Promise<CompletionsResponse> {
+    return this.invokeChatCompletions(
+      provider,
+      model,
+      payload,
+      supportsWebSearch,
+      false,
+      orKey,
+      true
+    );
   }
 
   /**

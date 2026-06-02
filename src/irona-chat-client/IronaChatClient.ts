@@ -169,7 +169,9 @@ export class IronaChatClient {
           supportsWebSearch,
           useOpenRouterFallback,
           openRouterFallbackKey,
-          forceVideoThroughOpenRouter
+          forceVideoThroughOpenRouter,
+          false,
+          hasVideoParts
         );
         logger.info(
           `[IronaChatClient][completions] Attempt ${attemptNumber}: Successfully executed chat completions with provider: ${provider}, model: ${model}`
@@ -200,7 +202,8 @@ export class IronaChatClient {
           orModel,
           payload,
           supportsWebSearch,
-          openRouterFallbackKey
+          openRouterFallbackKey,
+          hasVideoParts
         );
       } catch (fallbackErr) {
         logger.error(
@@ -247,7 +250,8 @@ export class IronaChatClient {
     useOpenRouterFallback: boolean,
     openRouterFallbackKey: string,
     forceVideoThroughOpenRouter = false,
-    forceOpenRouterFallback = false
+    forceOpenRouterFallback = false,
+    hasVideoParts = false
   ): Promise<CompletionsResponse> {
     try {
       // When a gateway is configured, ALL providers route through it.
@@ -325,13 +329,8 @@ export class IronaChatClient {
       // build OpenRouter-native user messages. The fetch wrapper will substitute
       // these into the outgoing request body, replacing the Vercel AI SDK's
       // serialisation (which uses an image placeholder for video_url parts).
-      const hasVideoInMessages = resolvedMessages.some(
-        msg =>
-          Array.isArray(msg.content) &&
-          msg.content.some(p => p.type === 'video_url' || p.type === 'video')
-      );
       let openRouterUserMessages: OpenRouterUserMessage[] | undefined;
-      if (isOpenRouter && hasVideoInMessages) {
+      if (isOpenRouter && hasVideoParts) {
         openRouterUserMessages = buildOpenRouterUserMessages(resolvedMessages);
       }
 
@@ -499,7 +498,8 @@ export class IronaChatClient {
             model,
             payload,
             supportsWebSearch,
-            orKey
+            orKey,
+            hasVideoParts
           );
         const fullStream = {
           async *[Symbol.asyncIterator]() {
@@ -622,7 +622,8 @@ export class IronaChatClient {
     model: string,
     payload: CompletionsPayload,
     supportsWebSearch: boolean,
-    orKey: string
+    orKey: string,
+    hasVideoParts = false
   ): Promise<CompletionsResponse> {
     return this.invokeChatCompletions(
       provider,
@@ -631,7 +632,9 @@ export class IronaChatClient {
       supportsWebSearch,
       false,
       orKey,
-      true
+      true,
+      false,
+      hasVideoParts
     );
   }
 

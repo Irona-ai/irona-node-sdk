@@ -21,7 +21,7 @@ const commonBody = {
       ],
     },
   ],
-  models: ['google/gemini-2.5-flash', 'openai/gpt-4o-mini'],
+  models: ['google/gemini-2.0-flash', 'openai/gpt-4o-mini'],
   fallbackModels: ['google/gemini-2.5-flash'],
 };
 

@@ -82,7 +82,7 @@ export const VideoUrlPartSchema = z.object({
 
 export const VideoPartSchema = z.object({
   type: z.literal('video'),
-  video: z.string(),
+  video: z.string().url(),
 });
 
 /**

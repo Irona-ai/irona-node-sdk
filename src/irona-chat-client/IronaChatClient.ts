@@ -759,9 +759,6 @@ export class IronaChatClient {
             // wrapper replaces the entire user message with the correctly-formatted
             // video_url content before the request reaches OpenRouter.
             return { type: 'image' as const, image: part.video_url.url };
-          } else if (part.type === 'video') {
-            // Shorthand video part — same placeholder strategy as video_url.
-            return { type: 'image' as const, image: part.video };
           }
           throw new Error(
             `Unsupported user message part type: ${(part as { type: string }).type}`

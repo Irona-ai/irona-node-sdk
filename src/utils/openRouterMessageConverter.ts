@@ -91,13 +91,6 @@ export function buildOpenRouterUserMessages(
         };
       }
 
-      if (part.type === 'video') {
-        return {
-          type: 'video_url' as const,
-          video_url: { url: part.video },
-        };
-      }
-
       throw new Error(
         `Unsupported user message part type in OpenRouter converter: ${(part as { type: string }).type}`
       );

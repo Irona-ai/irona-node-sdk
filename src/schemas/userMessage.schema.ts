@@ -80,11 +80,6 @@ export const VideoUrlPartSchema = z.object({
   filename: z.string().optional(),
 });
 
-export const VideoPartSchema = z.object({
-  type: z.literal('video'),
-  video: z.string().url(),
-});
-
 /**
  * Union of content parts
  */
@@ -95,7 +90,6 @@ export const MessagePartSchema = z.union([
   FilePartSchema,
   DocumentPartSchema,
   VideoUrlPartSchema,
-  VideoPartSchema,
 ]);
 
 /**

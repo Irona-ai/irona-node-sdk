@@ -21,7 +21,7 @@ const commonBody = {
       ],
     },
   ],
-  models: ['google/gemini-2.0-flash', 'openai/gpt-4o-mini'],
+  models: ['google/gemini-2.5-flash'],
   fallbackModels: ['google/gemini-2.5-flash'],
 };
 
@@ -123,48 +123,6 @@ async function runBase64VideoExample() {
   }
 }
 
-// CASE 3: Shorthand video part — { type: 'video', video: url }
-async function runVideoShorthandExample() {
-  const sdkClient = await IronaAI.createInstance();
-  try {
-    const { provider, model, response } = await sdkClient.completions.create({
-      ...commonBody,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: 'Please describe what is happening in this video.',
-            },
-            {
-              type: 'video',
-              // Google AI Studio only accepts YouTube URLs — no playlist params.
-              video: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
-            },
-          ],
-        },
-      ],
-      stream: true,
-    });
-    console.log(
-      `[videoInput][shorthand] Provider: ${provider}, Model: ${model}`
-    );
-
-    let accumulated = '';
-    for await (const chunk of response.fullStream) {
-      if (chunk.type === 'text-delta') {
-        process.stdout.write(chunk.text);
-        accumulated += chunk.text;
-      }
-    }
-    console.log('\n[videoInput][shorthand] Full response:', accumulated);
-  } catch (error) {
-    console.error('[videoInput][shorthand] Error:', error);
-  }
-}
-
 modelSelectTest()
   .then(() => runVideoUrlExample())
-  .then(() => runVideoShorthandExample())
   .then(() => runBase64VideoExample());

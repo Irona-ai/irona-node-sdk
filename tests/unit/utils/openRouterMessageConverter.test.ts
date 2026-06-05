@@ -338,29 +338,6 @@ describe('buildOpenRouterUserMessages', () => {
     });
   });
 
-  describe('video parts', () => {
-    it('converts video part to video_url format', () => {
-      const messages: MessagePayload[] = [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'video',
-              video: 'https://example.com/video.mp4',
-            },
-          ],
-        },
-      ];
-      const result = buildOpenRouterUserMessages(messages);
-      expect(result[0].content).toEqual([
-        {
-          type: 'video_url',
-          video_url: { url: 'https://example.com/video.mp4' },
-        },
-      ]);
-    });
-  });
-
   describe('unknown part types', () => {
     it('throws on an unknown part type', () => {
       const messages: MessagePayload[] = [

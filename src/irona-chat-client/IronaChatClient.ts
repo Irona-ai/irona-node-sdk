@@ -104,20 +104,25 @@ export class IronaChatClient {
     }
 
     // Detect file parts (image/PDF) in messages once, before the retry loop.
-    // Files always route through OpenRouter (OPENROUTER_API_KEY) — this takes
-    // priority over any other configured gateway. Non-file requests use whatever
-    // gateway is configured (LLM Gateway, custom URL, etc.) unchanged.
+    // Files route through OpenRouter (OPENROUTER_API_KEY) unless LLM Gateway
+    // is configured — it supports PDF/document input natively. Non-file
+    // requests use whatever gateway is configured unchanged.
     const fileMediaTypes = extractMediaTypeArrayFromMessages(payload.messages);
     const hasFileParts = fileMediaTypes.length > 0;
     const openRouterFallbackKey = this.openRouterFallbackKey;
-    const useOpenRouterFallback = hasFileParts && openRouterFallbackKey !== '';
+    const useOpenRouterFallback =
+      hasFileParts &&
+      openRouterFallbackKey !== '' &&
+      !this.isLLMGatewayGateway();
 
     if (hasFileParts) {
       logger.info(
         `[IronaChatClient][completions] Messages contain file parts (${fileMediaTypes.join(', ')}). ${
           useOpenRouterFallback
             ? 'Routing through OpenRouter (OPENROUTER_API_KEY).'
-            : 'No OPENROUTER_API_KEY set — falling back to configured gateway.'
+            : this.isLLMGatewayGateway()
+              ? 'Routing through LLM Gateway (supports PDF input natively).'
+              : 'No OPENROUTER_API_KEY set — falling back to configured gateway.'
         }`
       );
     }

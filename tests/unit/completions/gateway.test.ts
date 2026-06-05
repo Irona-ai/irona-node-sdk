@@ -14,13 +14,18 @@ import {
   mockGetOpenRouterIdentifier,
   resetSupportedModelsMocks,
 } from '../../mocks/supported-models.mock';
-import { resetProviderUtilsMocks } from '../../mocks/provider-utils.mock';
+import {
+  mockExtractMediaTypeArrayFromMessages,
+  resetProviderUtilsMocks,
+} from '../../mocks/provider-utils.mock';
 import { createMockRouterClient } from '../../mocks/router-client.mock';
 import {
   createTestPayload,
   mockConsole,
   setupTestEnv,
 } from '../../utils/test-helpers';
+import * as llmGatewayFetchWrapper from '../../../src/utils/llmGatewayFetchWrapper';
+import * as llmGatewayMapper from '../../../src/utils/llmGatewayMapper';
 import * as openRouterMapper from '../../../src/utils/openRouterMapper';
 import * as openRouterFetchWrapper from '../../../src/utils/openRouterFetchWrapper';
 
@@ -374,6 +379,106 @@ describe('Gateway Completions', () => {
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
         expect.objectContaining({ reasoning: { effort: 'medium' } })
       );
+    });
+  });
+
+  describe('PDF routing', () => {
+    let buildLLMGatewayExtraBodySpy: jest.SpyInstance;
+    let createLLMGatewayFetchWrapperSpy: jest.SpyInstance;
+    let buildOpenRouterExtraBodySpy: jest.SpyInstance;
+    let createOpenRouterFetchWrapperSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      buildLLMGatewayExtraBodySpy = jest.spyOn(
+        llmGatewayMapper,
+        'buildLLMGatewayExtraBody'
+      );
+      createLLMGatewayFetchWrapperSpy = jest.spyOn(
+        llmGatewayFetchWrapper,
+        'createLLMGatewayFetchWrapper'
+      );
+      buildOpenRouterExtraBodySpy = jest.spyOn(
+        openRouterMapper,
+        'buildOpenRouterExtraBody'
+      );
+      createOpenRouterFetchWrapperSpy = jest.spyOn(
+        openRouterFetchWrapper,
+        'createOpenRouterFetchWrapper'
+      );
+    });
+
+    afterEach(() => {
+      buildLLMGatewayExtraBodySpy.mockRestore();
+      createLLMGatewayFetchWrapperSpy.mockRestore();
+      buildOpenRouterExtraBodySpy.mockRestore();
+      createOpenRouterFetchWrapperSpy.mockRestore();
+      delete process.env.OPENROUTER_API_KEY;
+    });
+
+    it('routes PDF requests through LLM Gateway when it is configured', async () => {
+      const mockRouter = createMockRouterClient();
+      const config: Config = {
+        apiKey: 'test-api-key',
+        gateway: {
+          baseUrl: 'https://api.llmgateway.io/v1',
+          apiKey: 'llmgateway-test-key',
+        },
+      };
+      const client = new IronaChatClient(config, mockRouter);
+
+      process.env.OPENROUTER_API_KEY = 'or-key';
+      mockExtractMediaTypeArrayFromMessages.mockReturnValue(['pdf']);
+      setupSuccessfulGeneration('LLM Gateway PDF response');
+
+      const result = await client.completions(createTestPayload());
+
+      expect(result.response.content).toBe('LLM Gateway PDF response');
+      expect(buildLLMGatewayExtraBodySpy).toHaveBeenCalled();
+      expect(createLLMGatewayFetchWrapperSpy).toHaveBeenCalled();
+      expect(buildOpenRouterExtraBodySpy).not.toHaveBeenCalled();
+      expect(createOpenRouterFetchWrapperSpy).not.toHaveBeenCalled();
+    });
+
+    it('routes PDF requests through OpenRouter when it is the configured gateway', async () => {
+      const mockRouter = createMockRouterClient();
+      const config: Config = {
+        apiKey: 'test-api-key',
+        gateway: {
+          baseUrl: 'https://openrouter.ai/api/v1',
+          apiKey: 'openrouter-test-key',
+        },
+      };
+      const client = new IronaChatClient(config, mockRouter);
+
+      mockExtractMediaTypeArrayFromMessages.mockReturnValue(['pdf']);
+      setupSuccessfulGeneration('OpenRouter PDF response');
+
+      const result = await client.completions(createTestPayload());
+
+      expect(result.response.content).toBe('OpenRouter PDF response');
+      expect(buildOpenRouterExtraBodySpy).toHaveBeenCalled();
+      expect(createOpenRouterFetchWrapperSpy).toHaveBeenCalled();
+      expect(buildLLMGatewayExtraBodySpy).not.toHaveBeenCalled();
+      expect(createLLMGatewayFetchWrapperSpy).not.toHaveBeenCalled();
+    });
+
+    it('uses OpenRouter fallback key for PDFs when no gateway is configured', async () => {
+      const mockRouter = createMockRouterClient();
+      const config: Config = {
+        apiKey: 'test-api-key',
+        openRouterFallbackKey: 'or-fallback-key',
+      };
+      const client = new IronaChatClient(config, mockRouter);
+
+      delete process.env.OPENAI_API_KEY;
+      mockExtractMediaTypeArrayFromMessages.mockReturnValue(['pdf']);
+      setupSuccessfulGeneration('OpenRouter fallback PDF response');
+
+      const result = await client.completions(createTestPayload());
+
+      expect(result.response.content).toBe('OpenRouter fallback PDF response');
+      expect(createOpenRouterFetchWrapperSpy).toHaveBeenCalled();
+      expect(createLLMGatewayFetchWrapperSpy).not.toHaveBeenCalled();
     });
   });
 });

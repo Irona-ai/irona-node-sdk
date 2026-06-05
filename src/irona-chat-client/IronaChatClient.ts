@@ -121,7 +121,13 @@ export class IronaChatClient {
     const forceVideoThroughOpenRouter =
       hasVideoParts && this.isLLMGateway() && openRouterFallbackKey !== '';
 
-    if (hasVideoParts && openRouterFallbackKey === '') {
+    if (hasVideoParts && this.isLLMGateway() && openRouterFallbackKey === '') {
+      throw new BadRequestError(
+        'Video input is not supported by LLM Gateway. Set OPENROUTER_API_KEY to enable automatic video routing through OpenRouter.'
+      );
+    }
+
+    if (hasVideoParts && !this.isLLMGateway() && openRouterFallbackKey === '') {
       logger.warn(
         '[IronaChatClient] Video input detected but no OPENROUTER_API_KEY — video may not be supported by the configured provider.'
       );

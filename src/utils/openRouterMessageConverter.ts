@@ -98,11 +98,9 @@ export function buildOpenRouterUserMessages(
         };
       }
 
-      // Unreachable due to exhaustive schema union, but satisfies TypeScript
-      return {
-        type: 'text' as const,
-        text: '',
-      };
+      throw new Error(
+        `Unsupported user message part type in OpenRouter converter: ${(part as { type: string }).type}`
+      );
     });
 
     result.push({ role: 'user', content });

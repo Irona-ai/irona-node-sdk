@@ -6,7 +6,7 @@ All notable changes to `ironaai` are documented here. This project loosely follo
 
 ### Added
 
-- **Video input support** — user messages now accept `video_url` (`{ type: 'video_url', video_url: { url }, filename? }`) and `video` (`{ type: 'video', video: <url> }`) content parts. Requests containing video are automatically routed through OpenRouter (`OPENROUTER_API_KEY`). When an LLM Gateway is configured, video parts bypass the gateway and go directly to OpenRouter since LLM Gateway does not support video ([ENG-541](https://github.com/Irona-ai/irona-node-sdk/pull/541)).
+- **Video input support** — user messages now accept `video_url` (`{ type: 'video_url', video_url: { url }, filename? }`) and `video` (`{ type: 'video', video: <url> }`) content parts. Requests containing video are automatically routed through OpenRouter (`OPENROUTER_API_KEY`). When an LLM Gateway is configured, video parts bypass the gateway and go directly to OpenRouter since LLM Gateway does not support video ([ENG-541](https://github.com/Irona-ai/irona-node-sdk/pull/85)).
 - `VideoUrlPartSchema` and `VideoPartSchema` added to the Zod message schema for runtime validation of video parts.
 
 ### Fixed

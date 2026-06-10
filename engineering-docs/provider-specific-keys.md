@@ -144,7 +144,7 @@ Since `isUsingGateway` is now `false` for providers with direct keys, all these 
 
 ```typescript
 const irona = await IronaAI.createInstance({
-  apiKey: process.env.IRONAAI_API_KEY,
+  apiKey: process.env.IRONLABS_AI_API_KEY,
   gateway: {
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: process.env.OPENROUTER_API_KEY!,

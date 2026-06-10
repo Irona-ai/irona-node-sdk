@@ -12,7 +12,7 @@ async function testSingleModel() {
 
   const ironaAI = await IronaAI.createInstance({
     apiKey:
-      process.env.IRONAAI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
+      process.env.IRONLABS_AI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
   });
 
   try {
@@ -38,7 +38,7 @@ async function testMultipleModels() {
 
   const ironaAI = await IronaAI.createInstance({
     apiKey:
-      process.env.IRONAAI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
+      process.env.IRONLABS_AI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji',
   });
 
   try {

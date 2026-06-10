@@ -6,17 +6,17 @@
  *
  * Requires: OPENROUTER_API_KEY set in environment or .env
  */
-const { IronaAI } = require('ironaai');
+const { IronaAI } = require('ironlabsai');
 
 const OPENROUTER_API_KEY =
   process.env.OPENROUTER_API_KEY ||
   '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';
 
-const IRONAAI_API_KEY =
-  process.env.IRONAAI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji';
+const IRONLABS_AI_API_KEY =
+  process.env.IRONLABS_AI_API_KEY || 'sk_4E61QXK1N7eKCfTHZ4J-yyGXWWeug7Ji';
 
 const gatewayConfig = {
-  apiKey: IRONAAI_API_KEY,
+  apiKey: IRONLABS_AI_API_KEY,
   gateway: {
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: OPENROUTER_API_KEY,

@@ -1,4 +1,4 @@
-const { IronaAI } = require('ironaai');
+const { IronaAI } = require('ironlabsai');
 const fs = require('fs');
 
 const body = {

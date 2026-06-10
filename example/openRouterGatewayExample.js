@@ -12,9 +12,9 @@
  *  - Web search through gateway
  *  - Streaming through gateway
  *
- * Requires: OPENROUTER_API_KEY and IRONAAI_API_KEY set in environment or .env
+ * Requires: OPENROUTER_API_KEY and IRONLABS_AI_API_KEY set in environment or .env
  */
-const { IronaAI } = require('ironaai');
+const { IronaAI } = require('ironlabsai');
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 
@@ -23,7 +23,7 @@ async function allThroughGateway() {
   console.log('\n=== All Traffic Through OpenRouter ===');
 
   const sdk = await IronaAI.createInstance({
-    apiKey: process.env.IRONAAI_API_KEY,
+    apiKey: process.env.IRONLABS_AI_API_KEY,
     gateway: {
       baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: process.env.OPENROUTER_API_KEY,
@@ -45,7 +45,7 @@ async function hybridRouting() {
   console.log('\n=== Hybrid Routing (Direct + Gateway) ===');
 
   const sdk = await IronaAI.createInstance({
-    apiKey: process.env.IRONAAI_API_KEY,
+    apiKey: process.env.IRONLABS_AI_API_KEY,
     gateway: {
       baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: process.env.OPENROUTER_API_KEY,
@@ -82,7 +82,7 @@ async function reasoningThroughGateway() {
   console.log('\n=== Reasoning Effort Through OpenRouter ===');
 
   const sdk = await IronaAI.createInstance({
-    apiKey: process.env.IRONAAI_API_KEY,
+    apiKey: process.env.IRONLABS_AI_API_KEY,
     gateway: {
       baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: process.env.OPENROUTER_API_KEY,
@@ -110,7 +110,7 @@ async function searchThroughGateway() {
   console.log('\n=== Web Search Through OpenRouter ===');
 
   const sdk = await IronaAI.createInstance({
-    apiKey: process.env.IRONAAI_API_KEY,
+    apiKey: process.env.IRONLABS_AI_API_KEY,
     gateway: {
       baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: process.env.OPENROUTER_API_KEY,
@@ -133,7 +133,7 @@ async function streamingThroughGateway() {
   console.log('\n=== Streaming Through OpenRouter ===');
 
   const sdk = await IronaAI.createInstance({
-    apiKey: process.env.IRONAAI_API_KEY,
+    apiKey: process.env.IRONLABS_AI_API_KEY,
     gateway: {
       baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: process.env.OPENROUTER_API_KEY,
@@ -166,7 +166,7 @@ async function multiModelWithFallbacks() {
   console.log('\n=== Multi-Model + Fallbacks Through OpenRouter ===');
 
   const sdk = await IronaAI.createInstance({
-    apiKey: process.env.IRONAAI_API_KEY,
+    apiKey: process.env.IRONLABS_AI_API_KEY,
     gateway: {
       baseUrl: 'https://openrouter.ai/api/v1',
       apiKey: process.env.OPENROUTER_API_KEY,

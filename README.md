@@ -6,7 +6,7 @@ We help you select the best AI model for your specific use case, optimizing for 
 Installation
 
 ```bash
-npm install ironaai
+npm install ironlabsai
 ```
 
 ## Quick Start
@@ -18,11 +18,11 @@ To use the API, you need to sign up for a IronaAI account & obtain an API key. S
 Here's a simple example of how to use IronaAI's model-routing to select the best model between GPT-4o, Claude 3.5 Sonnet, and Gemini 1.5 Pro, while optimizing for latency and outputting the raw text:
 
 ```typescript
-import { IronaAI } from 'ironaai';
+import { IronaAI } from 'ironlabsai';
 
 const ironaAI = new IronaAI({
   // Optional - automatically loads from environment variable
-  apiKey: process.env.IRONAAI_API_KEY,
+  apiKey: process.env.IRONLABS_AI_API_KEY,
 });
 
 async function basicExample() {
@@ -83,10 +83,10 @@ LLM_GATEWAY_INCLUDE_PROVIDER_IN_MODEL_NAME='true'  # set 'false' for gateways th
 **Via config object**:
 
 ```typescript
-import { IronaAI } from 'ironaai';
+import { IronaAI } from 'ironlabsai';
 
 const ironaAI = await IronaAI.createInstance({
-  apiKey: process.env.IRONAAI_API_KEY,
+  apiKey: process.env.IRONLABS_AI_API_KEY,
   gateway: {
     baseUrl: 'https://router.requesty.ai/v1',
     apiKey: process.env.LLM_GATEWAY_API_KEY!,
@@ -98,7 +98,7 @@ const ironaAI = await IronaAI.createInstance({
 
 ```typescript
 const ironaAI = await IronaAI.createInstance({
-  apiKey: process.env.IRONAAI_API_KEY,
+  apiKey: process.env.IRONLABS_AI_API_KEY,
   gateway: {
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: process.env.OPENROUTER_API_KEY!,
@@ -128,16 +128,16 @@ This does the following things in 1 go:
 
 ```
 npm run build
-npm link  # soft link for local for ironaai package.
+npm link  # soft link for local for ironlabsai package.
 cd example // go to run scripts
-npm link ironaai // linked local package is installed for use now. (equivalent to `npm install ironaai` for local testing)
+npm link ironlabsai // linked local package is installed for use now. (equivalent to `npm install ironlabsai` for local testing)
 ```
 
 and
 
 For published versions we can use the following:
 
-`npm install ironaai` # in this case sdk must be published by `npm publish`
+`npm install ironlabsai` # in this case sdk must be published by `npm publish`
 
 Ref [blog link](https://medium.com/@oresoftware/node-js-how-to-test-your-new-npm-module-without-publishing-it-every-5-minutes-3b6f8e0491dd).
 
@@ -147,7 +147,7 @@ Publishing uses **OIDC trusted publishing** — no npm tokens are needed. The Gi
 
 #### Prerequisites (one-time setup)
 
-- **npm trusted publisher** configured on [npmjs.com/package/ironaai/access](https://www.npmjs.com/package/ironaai/access) (GitHub org: `Irona-ai`, repo: `irona-node-sdk`, workflow: `publish.yml`, environment: `npm`)
+- **npm trusted publisher** configured on [npmjs.com/package/ironlabsai/access](https://www.npmjs.com/package/ironlabsai/access) (GitHub org: `Irona-ai`, repo: `irona-node-sdk`, workflow: `publish.yml`, environment: `npm`)
 - **GitHub environment** `npm` created in repo Settings > Environments with branch policy restricted to `main`
 
 #### Option A: Manual publish

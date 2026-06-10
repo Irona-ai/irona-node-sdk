@@ -9,7 +9,7 @@ import type { ModelSelectPayload } from './schemas/modelSelect.schema';
 import { updateProvidersFromGist } from './supported_models';
 import type { Config, GatewayConfig } from './types';
 import {
-  IRONAAI_API_KEY_PREFIX,
+  IRONLABS_AI_API_KEY_PREFIX,
   DEFAULT_BASE_URL,
   LLM_GATEWAY_DEFAULT_BASE_URL,
   OPENROUTER_DEFAULT_BASE_URL,
@@ -25,15 +25,15 @@ export class IronaAI {
   private llmChatService: IronaChatClient;
   private constructor(config: Config = {}) {
     // Check for API key
-    const apiKey = config.apiKey ?? process.env.IRONAAI_API_KEY ?? '';
+    const apiKey = config.apiKey ?? process.env.IRONLABS_AI_API_KEY ?? '';
     if (!apiKey) {
       throw new MissingApiKeyError(
-        "The API key is missing. Please provide the API key either through the 'IRONAAI_API_KEY' environment variable or the 'config.apiKey' property."
+        "The API key is missing. Please provide the API key either through the 'IRONLABS_AI_API_KEY' environment variable or the 'config.apiKey' property."
       );
     }
     if (
       typeof apiKey !== 'string' ||
-      !apiKey.startsWith(IRONAAI_API_KEY_PREFIX)
+      !apiKey.startsWith(IRONLABS_AI_API_KEY_PREFIX)
     ) {
       throw new MissingApiKeyError(
         "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."

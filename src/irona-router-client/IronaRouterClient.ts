@@ -24,10 +24,10 @@ export class IronaRouterClient extends Base implements Router {
   }
 
   async modelSelect(body: ModelSelectPayload): Promise<ModelSelectResponse> {
-    const apiKey = process.env.IRONAAI_API_KEY ?? '';
+    const apiKey = process.env.IRONLABS_AI_API_KEY ?? '';
     if (!apiKey) {
       throw new MissingApiKeyError(
-        'The IRONAAI_API_KEY environment variable is missing or empty. Please ensure that the IRONAAI_API_KEY is set in the environment variables.'
+        'The IRONLABS_AI_API_KEY environment variable is missing or empty. Please ensure that the IRONLABS_AI_API_KEY is set in the environment variables.'
       );
     }
     const validationResult = validateSchema(ModelSelectSchema, body);

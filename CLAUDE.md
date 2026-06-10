@@ -133,7 +133,7 @@ Mock utilities provide pre-configured scenarios — see `tests/README.md` for fu
 
 ## Environment Variables
 
-Required: `IRONAAI_API_KEY` (must start with `sk_`)
+Required: `IRONLABS_AI_API_KEY` (must start with `sk_`)
 
 Provider keys (optional, one per provider used): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `MISTRAL_API_KEY`, `PPLX_API_KEY`, `TOGETHER_API_KEY`
 

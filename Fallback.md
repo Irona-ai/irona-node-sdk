@@ -1,5 +1,5 @@
 ```typescript
-import { IronaAI } from 'ironaai';
+import { IronaAI } from 'ironlabsai';
 
 const ironaAI = new IronaAI();
 

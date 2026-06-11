@@ -188,24 +188,23 @@ describe('Non-streaming annotation normalisation', () => {
         message: {
           annotations: Array<{
             type: string;
-            url: string;
-            title: string;
-            start_index: number;
-            end_index: number;
-            url_citation?: unknown;
+            url_citation: {
+              url: string;
+              title: string;
+              start_index: number;
+              end_index: number;
+            };
           }>;
         };
       }>;
     };
 
     const ann = json.choices[0].message.annotations[0];
-    // Fields should be flat at top level
-    expect(ann.url).toBe('https://example.com');
-    expect(ann.title).toBe('Example');
-    expect(ann.start_index).toBe(0);
-    expect(ann.end_index).toBe(18);
-    // Nested sub-object should be removed
-    expect(ann.url_citation).toBeUndefined();
+    // Fields should be nested under url_citation
+    expect(ann.url_citation.url).toBe('https://example.com');
+    expect(ann.url_citation.title).toBe('Example');
+    expect(ann.url_citation.start_index).toBe(0);
+    expect(ann.url_citation.end_index).toBe(18);
     // Annotations array should still exist (not deleted!)
     expect(json.choices[0].message.annotations).toHaveLength(1);
   });
@@ -407,16 +406,19 @@ describe('Streaming reasoning injection', () => {
       choices: Array<{
         delta: {
           annotations: Array<{
-            url: string;
-            url_citation?: unknown;
+            url_citation: {
+              url: string;
+              title: string;
+              start_index: number;
+              end_index: number;
+            };
           }>;
         };
       }>;
     };
 
     const ann = parsed.choices[0].delta.annotations[0];
-    expect(ann.url).toBe('https://stream.example.com');
-    expect(ann.url_citation).toBeUndefined();
+    expect(ann.url_citation.url).toBe('https://stream.example.com');
   });
 });
 
@@ -483,7 +485,9 @@ describe('Combined reasoning + annotations in single response', () => {
         message: {
           content: string;
           reasoning?: string;
-          annotations: Array<{ url: string; url_citation?: unknown }>;
+          annotations: Array<{
+            url_citation: { url: string };
+          }>;
         };
       }>;
     };
@@ -494,10 +498,9 @@ describe('Combined reasoning + annotations in single response', () => {
     );
     expect(json.choices[0].message.reasoning).toBeUndefined();
 
-    // Annotations flattened
-    expect(json.choices[0].message.annotations[0].url).toBe(
+    // Annotations normalised to nested format
+    expect(json.choices[0].message.annotations[0].url_citation.url).toBe(
       'https://census.gov'
     );
-    expect(json.choices[0].message.annotations[0].url_citation).toBeUndefined();
   });
 });

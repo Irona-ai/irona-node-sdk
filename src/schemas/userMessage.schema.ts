@@ -72,6 +72,14 @@ export const DocumentPartSchema = z.object({
   ]),
 });
 
+export const VideoUrlPartSchema = z.object({
+  type: z.literal('video_url'),
+  video_url: z.object({
+    url: z.string().url(),
+  }),
+  filename: z.string().optional(),
+});
+
 /**
  * Union of content parts
  */
@@ -81,6 +89,7 @@ export const MessagePartSchema = z.union([
   ImageUrlPartSchema,
   FilePartSchema,
   DocumentPartSchema,
+  VideoUrlPartSchema,
 ]);
 
 /**

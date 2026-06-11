@@ -2,6 +2,30 @@
 
 All notable changes to `ironaai` are documented here. This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## 0.0.30 — 2026-06-02
+
+### Added
+
+- **Video input support** — user messages now accept `video_url` (`{ type: 'video_url', video_url: { url }, filename? }`) and `video` (`{ type: 'video', video: <url> }`) content parts. Requests containing video are automatically routed through OpenRouter (`OPENROUTER_API_KEY`). When an LLM Gateway is configured, video parts bypass the gateway and go directly to OpenRouter since LLM Gateway does not support video ([ENG-541](https://github.com/Irona-ai/irona-node-sdk/pull/85)).
+- `VideoUrlPartSchema` and `VideoPartSchema` added to the Zod message schema for runtime validation of video parts.
+
+### Fixed
+
+- **Citation stream handling** — reworked `gatewayResponseTransforms` to correctly surface citation data from gateway streaming responses.
+- **Binary image MIME type in OpenRouter converter** — `buildOpenRouterUserMessages` now wraps raw base64 image data in a `data:<mime>;base64,` URI. Previously a `Buffer`/`Uint8Array` image part produced a bare base64 string that OpenRouter rejected.
+- **`VideoUrlPartSchema` URL validation** — `video_url.url` is now validated with `z.string().url()`, consistent with other URL fields in the schema.
+- **`VideoPartSchema` URL validation** — the `video` field is now validated with `z.string().url()`.
+- **Duplicate `openRouterFallbackKey` variable** — removed a stray `process.env.OPENROUTER_API_KEY` local that shadowed the instance field and caused a TypeScript compile error.
+- **Duplicate video detection** — eliminated a redundant `resolvedMessages.some(…)` scan inside `invokeChatCompletions`; `hasVideoParts` is now computed once in `completions()` and threaded through `invokeChatCompletions` and `retryViaOpenRouter`.
+
+### Changed
+
+- `hasFileParts` renamed to `hasMediaParts` — the variable covers images, PDFs, and video, not just file parts.
+- `openRouterFallbackKey` is now resolved once at construction time and stored as a private readonly instance field, rather than being read from `process.env` on every `completions()` call.
+- `isLLMGatewayGateway()` renamed to `isLLMGateway()` (internal method cleanup).
+
+---
+
 ## 0.0.29 — 2026-06-01
 
 ### Added

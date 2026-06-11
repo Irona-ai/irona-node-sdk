@@ -1,11 +1,30 @@
 import { applyResponseReasoningTransform } from './gatewayResponseTransforms';
+import { logger } from './logger';
 import type { OpenRouterExtraBody } from './openRouterMapper';
+
+export type OpenRouterContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image_url'; image_url: { url: string; detail?: string } }
+  | { type: 'video_url'; video_url: { url: string }; filename?: string }
+  | { type: string; [key: string]: unknown };
+
+/**
+ * A user message in OpenRouter-native format.
+ */
+export interface OpenRouterUserMessage {
+  role: 'user';
+  content: string | OpenRouterContentPart[];
+}
 
 /**
  * Creates a custom fetch wrapper for OpenRouter that:
  * 1. Merges OpenRouter-specific params (`reasoning`, `plugins`, `provider`)
  *    into the JSON body of POST requests.
- * 2. When reasoning is active (`extraBody.reasoning` is set), injects
+ * 2. When `openRouterUserMessages` is provided, replaces user messages in the
+ *    outgoing request body with the pre-built OpenRouter-native versions. This
+ *    is used to inject `video_url` content parts that the Vercel AI SDK does
+ *    not natively understand.
+ * 3. When reasoning is active (`extraBody.reasoning` is set), injects
  *    `delta.reasoning` as `<think>…</think>` tags so
  *    `extractReasoningMiddleware({ tagName: 'think' })` can extract them.
  *    When reasoning is off, drops `delta.reasoning` entirely so those tokens
@@ -20,7 +39,8 @@ import type { OpenRouterExtraBody } from './openRouterMapper';
  */
 export function createOpenRouterFetchWrapper(
   extraBody: OpenRouterExtraBody,
-  baseFetch: typeof globalThis.fetch = globalThis.fetch
+  baseFetch: typeof globalThis.fetch = globalThis.fetch,
+  openRouterUserMessages?: OpenRouterUserMessage[]
 ): typeof globalThis.fetch {
   // Reasoning injection is active only when a reasoning config is present
   // (mapper omits the field entirely for 'off'/undefined)
@@ -44,7 +64,34 @@ export function createOpenRouterFetchWrapper(
       return baseFetch(input, init);
     }
 
-    const merged = { ...parsed, ...extraBody };
+    const merged: Record<string, unknown> = { ...parsed, ...extraBody };
+
+    // When pre-built OpenRouter-format user messages are provided (e.g. for
+    // video_url parts), replace only the user-role messages in the body.
+    // Non-user messages (system, assistant, tool) come from the Vercel AI SDK
+    // serialisation, which is already correct for those roles.
+    if (
+      openRouterUserMessages !== undefined &&
+      openRouterUserMessages.length > 0 &&
+      Array.isArray(merged.messages)
+    ) {
+      let userIdx = 0;
+      merged.messages = (merged.messages as Array<Record<string, unknown>>).map(
+        msg => {
+          if (msg['role'] === 'user') {
+            const override = openRouterUserMessages[userIdx];
+            userIdx++;
+            return override ?? msg;
+          }
+          return msg;
+        }
+      );
+      if (userIdx !== openRouterUserMessages.length) {
+        logger.warn(
+          `[openRouterFetchWrapper] User message count mismatch: expected ${openRouterUserMessages.length}, replaced ${userIdx}`
+        );
+      }
+    }
 
     const response = await baseFetch(input, {
       ...init,

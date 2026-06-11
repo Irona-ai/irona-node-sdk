@@ -57,10 +57,9 @@ export function doesModelSupportMediaTypes(
     return false;
   }
 
-  // Only check for "image" and "pdf" capabilities
+  // Only check for "image", "pdf", and "video" capabilities
   return medias.every(media => {
-    // Only allow "image" and "pdf" media types
-    if (media !== 'image' && media !== 'pdf') {
+    if (media !== 'image' && media !== 'pdf' && media !== 'video') {
       return false;
     }
     return modelCapabilities.includes(media);

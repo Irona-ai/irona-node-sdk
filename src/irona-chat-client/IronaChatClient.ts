@@ -106,18 +106,28 @@ export class IronaChatClient {
     }
 
     // Detect file parts (image/PDF/video) in messages once, before the retry loop.
-    // Files always route through OpenRouter (OPENROUTER_API_KEY) — this takes
-    // priority over any other configured gateway. Non-file requests use whatever
-    // gateway is configured (LLM Gateway, custom URL, etc.) unchanged.
-    //
-    // Special case: when LLM Gateway is configured and the request contains video
-    // parts, we force routing through OpenRouter regardless of whether a direct
-    // provider key exists — LLM Gateway does not support video.
+    // Images always use OpenRouter when available. PDFs prefer LLM Gateway when
+    // configured, otherwise fall back to OpenRouter. Videos are handled separately
+    // and always route through OpenRouter. Non-file requests use whatever gateway
+    // is configured unchanged.
     const fileMediaTypes = extractMediaTypeArrayFromMessages(payload.messages);
-    const hasMediaParts = fileMediaTypes.length > 0;
+    const hasImageParts = fileMediaTypes.includes('image');
+    const hasPdfParts = fileMediaTypes.includes('pdf');
     const hasVideoParts = fileMediaTypes.includes('video');
+    const hasFileParts = fileMediaTypes.length > 0;
     const openRouterFallbackKey = this.openRouterFallbackKey;
-    const useOpenRouterFallback = hasMediaParts && openRouterFallbackKey !== '';
+
+    // Images: Always use OpenRouter when available (preserves existing behavior)
+    // PDFs: Use OpenRouter only if LLM Gateway is not configured
+    // Videos: Always use OpenRouter when available (special case)
+    const useOpenRouterForImages =
+      hasImageParts && openRouterFallbackKey !== '';
+    const useOpenRouterForPdfs =
+      hasPdfParts &&
+      openRouterFallbackKey !== '' &&
+      !this.isLLMGateway();
+    const useOpenRouterFallback =
+      useOpenRouterForImages || useOpenRouterForPdfs;
     const forceVideoThroughOpenRouter =
       hasVideoParts && this.isLLMGateway() && openRouterFallbackKey !== '';
 
@@ -133,15 +143,28 @@ export class IronaChatClient {
       );
     }
 
-    if (hasMediaParts) {
+    if (hasFileParts) {
+      const routingInfo = [];
+      if (hasImageParts) {
+        routingInfo.push(
+          `Images: ${useOpenRouterForImages ? 'OpenRouter' : 'configured gateway'}`
+        );
+      }
+      if (hasPdfParts) {
+        const pdfRoute = this.isLLMGateway() && !useOpenRouterForPdfs
+          ? 'LLM Gateway'
+          : useOpenRouterForPdfs
+            ? 'OpenRouter'
+            : 'configured gateway';
+        routingInfo.push(`PDFs: ${pdfRoute}`);
+      }
+      if (hasVideoParts) {
+        routingInfo.push(
+          `Videos: ${forceVideoThroughOpenRouter ? 'OpenRouter (forced)' : useOpenRouterFallback ? 'OpenRouter' : 'configured gateway'}`
+        );
+      }
       logger.info(
-        `[IronaChatClient][completions] Messages contain file parts (${fileMediaTypes.join(', ')}). ${
-          forceVideoThroughOpenRouter
-            ? 'Video detected with LLM Gateway — forcing OpenRouter (OPENROUTER_API_KEY).'
-            : useOpenRouterFallback
-              ? 'Routing through OpenRouter (OPENROUTER_API_KEY).'
-              : 'No OPENROUTER_API_KEY set — falling back to configured gateway.'
-        }`
+        `[IronaChatClient][completions] Messages contain file parts (${fileMediaTypes.join(', ')}). ${routingInfo.join(', ')}.`
       );
     }
 

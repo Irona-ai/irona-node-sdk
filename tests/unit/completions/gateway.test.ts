@@ -222,7 +222,9 @@ describe('Gateway Completions', () => {
       );
       // When extra body is returned, the fetch wrapper is created
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ reasoning: { effort: 'high' } })
+        expect.objectContaining({ reasoning: { effort: 'high' } }),
+        expect.any(Function),
+        undefined
       );
       expect(mockGenerateText).toHaveBeenCalledTimes(1);
     });
@@ -253,7 +255,9 @@ describe('Gateway Completions', () => {
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           plugins: [{ id: 'web' }],
-        })
+        }),
+        expect.any(Function),
+        undefined
       );
     });
 
@@ -280,7 +284,9 @@ describe('Gateway Completions', () => {
         expect.objectContaining({
           reasoning: { effort: 'xhigh' },
           plugins: [{ id: 'web' }],
-        })
+        }),
+        expect.any(Function),
+        undefined
       );
     });
 
@@ -372,7 +378,9 @@ describe('Gateway Completions', () => {
         expect.objectContaining({ reasoningEffort: 'medium' })
       );
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ reasoning: { effort: 'medium' } })
+        expect.objectContaining({ reasoning: { effort: 'medium' } }),
+        expect.any(Function),
+        undefined
       );
     });
   });

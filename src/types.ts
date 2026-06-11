@@ -21,6 +21,7 @@ export type Config = {
   gateway?: GatewayConfig;
   router?: RouterConfig;
   providers?: Partial<Record<string, ProviderConfig>>;
+  openRouterFallbackKey?: string;
 };
 export type ChatModelConfig = {
   apiKey: string;

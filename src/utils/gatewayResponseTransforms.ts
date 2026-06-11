@@ -5,10 +5,10 @@
 //     them as reasoning parts in the AI SDK stream
 //   - `delta.reasoning` is dropped (when reasoning is off) so emitted thinking
 //     tokens never leak into final text
-//   - `url_citation` annotations are normalised from the nested
-//     `{type, url_citation: {url, title, …}}` shape (Google-style — emitted by
-//     both gateways for Gemini search responses) to the flat shape the AI SDK's
-//     Zod schema requires (`{type, url, title, start_index, end_index}`).
+//   - `url_citation` annotations are normalised to the nested shape that
+//     `@ai-sdk/openai` ≥ 2.0.97 requires: `{type, url_citation: {url, title, …}}`.
+//     Gemini/LLM Gateway emits a flat shape; OpenRouter emits nested. Both are
+//     accepted as input and both produce the same nested output.
 //   - top-level `metadata` (LLM Gateway routing info) is logged when present,
 //     since the Vercel AI SDK does not forward non-OpenAI-spec fields.
 //
@@ -19,17 +19,23 @@ import type { LLMGatewayCostData } from '../responseTypes';
 
 interface NormalisedUrlCitation {
   type: 'url_citation';
-  url: string;
-  title: string;
-  start_index: number;
-  end_index: number;
+  url_citation: {
+    url: string;
+    title: string;
+    start_index: number;
+    end_index: number;
+  };
 }
 
 /**
- * Flattens `url_citation` annotations to the AI SDK's expected schema.
- * Accepts both the OpenAI-style flat form and the Gemini-style nested form
- * (`{type:'url_citation', url_citation:{url,title,…}}`). Drops malformed
- * entries and the upstream `content` blob (which the AI SDK rejects).
+ * Ensures every `url_citation` annotation has a nested `url_citation` object,
+ * as required by `@ai-sdk/openai` ≥ 2.0.97.
+ *
+ * Gemini/LLM Gateway sends the flat form `{type, url, title, …}` while
+ * OpenRouter already sends the nested form `{type, url_citation:{url,…}}`.
+ * For flat entries we spread the original fields and inject the missing
+ * `url_citation` object — so validation passes regardless of provider version.
+ * Already-nested entries are passed through unchanged.
  */
 function normalizeAnnotations(
   raw: unknown
@@ -42,45 +48,39 @@ function normalizeAnnotations(
     const entry = a as Record<string, unknown>;
     if (entry['type'] !== 'url_citation') continue;
 
-    let url: string | undefined;
-    let title = '';
-    let startIndex = 0;
-    let endIndex = 0;
-
-    if (typeof entry['url'] === 'string') {
-      // Flat (OpenAI-style)
-      url = entry['url'];
-      title = typeof entry['title'] === 'string' ? entry['title'] : '';
-      if (typeof entry['start_index'] === 'number') {
-        startIndex = entry['start_index'];
-      }
-      if (typeof entry['end_index'] === 'number') {
-        endIndex = entry['end_index'];
-      }
-    } else if (
+    if (
       typeof entry['url_citation'] === 'object' &&
       entry['url_citation'] !== null
     ) {
-      // Nested (Gemini-style)
+      // Already nested — ensure start_index/end_index are present (Gemini omits them)
       const nested = entry['url_citation'] as Record<string, unknown>;
-      url = typeof nested['url'] === 'string' ? nested['url'] : undefined;
-      title = typeof nested['title'] === 'string' ? nested['title'] : '';
-      if (typeof nested['start_index'] === 'number') {
-        startIndex = nested['start_index'];
-      }
-      if (typeof nested['end_index'] === 'number') {
-        endIndex = nested['end_index'];
-      }
+      out.push({
+        ...entry,
+        url_citation: {
+          ...nested,
+          start_index:
+            typeof nested['start_index'] === 'number'
+              ? nested['start_index']
+              : 0,
+          end_index:
+            typeof nested['end_index'] === 'number' ? nested['end_index'] : 0,
+        },
+      } as unknown as NormalisedUrlCitation);
+    } else if (typeof entry['url'] === 'string') {
+      // Flat format — inject url_citation so the AI SDK schema accepts it
+      out.push({
+        ...entry,
+        url_citation: {
+          url: entry['url'],
+          title: typeof entry['title'] === 'string' ? entry['title'] : '',
+          start_index:
+            typeof entry['start_index'] === 'number' ? entry['start_index'] : 0,
+          end_index:
+            typeof entry['end_index'] === 'number' ? entry['end_index'] : 0,
+        },
+      } as unknown as NormalisedUrlCitation);
     }
-
-    if (url === undefined) continue;
-    out.push({
-      type: 'url_citation',
-      url,
-      title,
-      start_index: startIndex,
-      end_index: endIndex,
-    });
+    // Drop entries that are neither flat nor properly nested
   }
 
   return out.length > 0 ? out : undefined;

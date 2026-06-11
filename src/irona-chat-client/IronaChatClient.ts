@@ -104,26 +104,31 @@ export class IronaChatClient {
     }
 
     // Detect file parts (image/PDF) in messages once, before the retry loop.
-    // Files route through OpenRouter (OPENROUTER_API_KEY) unless LLM Gateway
-    // is configured — it supports image and PDF/document input natively. Non-file
-    // requests use whatever gateway is configured unchanged.
+    // Images always use OpenRouter when available. PDFs prefer LLM Gateway when
+    // configured, otherwise fall back to OpenRouter. Non-file requests use
+    // whatever gateway is configured unchanged.
     const fileMediaTypes = extractMediaTypeArrayFromMessages(payload.messages);
+    const hasImageParts = fileMediaTypes.includes('image');
+    const hasPdfParts = fileMediaTypes.includes('pdf');
     const hasFileParts = fileMediaTypes.length > 0;
     const openRouterFallbackKey = this.openRouterFallbackKey;
-    const useOpenRouterFallback =
-      hasFileParts &&
-      openRouterFallbackKey !== '' &&
-      !this.isLLMGatewayGateway();
+    
+    // Images: Always use OpenRouter when available (preserves existing behavior)
+    // PDFs: Use OpenRouter only if LLM Gateway is not configured
+    const useOpenRouterForImages = hasImageParts && openRouterFallbackKey !== '';
+    const useOpenRouterForPdfs = hasPdfParts && openRouterFallbackKey !== '' && !this.isLLMGatewayGateway();
+    const useOpenRouterFallback = useOpenRouterForImages || useOpenRouterForPdfs;
 
     if (hasFileParts) {
+      const routingInfo = [];
+      if (hasImageParts) {
+        routingInfo.push(`Images: ${useOpenRouterForImages ? 'OpenRouter' : 'configured gateway'}`);
+      }
+      if (hasPdfParts) {
+        routingInfo.push(`PDFs: ${this.isLLMGatewayGateway() && !useOpenRouterForPdfs ? 'LLM Gateway' : useOpenRouterForPdfs ? 'OpenRouter' : 'configured gateway'}`);
+      }
       logger.info(
-        `[IronaChatClient][completions] Messages contain file parts (${fileMediaTypes.join(', ')}). ${
-          useOpenRouterFallback
-            ? 'Routing through OpenRouter (OPENROUTER_API_KEY).'
-            : this.isLLMGatewayGateway()
-              ? 'Routing through LLM Gateway (supports image and PDF input natively).'
-              : 'No OPENROUTER_API_KEY set — falling back to configured gateway.'
-        }`
+        `[IronaChatClient][completions] Messages contain file parts (${fileMediaTypes.join(', ')}). ${routingInfo.join(', ')}.`
       );
     }
 

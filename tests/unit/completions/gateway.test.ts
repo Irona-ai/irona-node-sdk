@@ -480,5 +480,50 @@ describe('Gateway Completions', () => {
       expect(createOpenRouterFetchWrapperSpy).toHaveBeenCalled();
       expect(createLLMGatewayFetchWrapperSpy).not.toHaveBeenCalled();
     });
+
+    it('preserves OpenRouter routing for images when LLM Gateway is configured', async () => {
+      const mockRouter = createMockRouterClient();
+      const config: Config = {
+        apiKey: 'test-api-key',
+        gateway: {
+          baseUrl: 'https://api.llmgateway.io/v1',
+          apiKey: 'llmgateway-test-key',
+        },
+      };
+      const client = new IronaChatClient(config, mockRouter);
+
+      process.env.OPENROUTER_API_KEY = 'or-key';
+      mockExtractMediaTypeArrayFromMessages.mockReturnValue(['image']);
+      setupSuccessfulGeneration('OpenRouter image response');
+
+      const result = await client.completions(createTestPayload());
+
+      expect(result.response.content).toBe('OpenRouter image response');
+      expect(createOpenRouterFetchWrapperSpy).toHaveBeenCalled();
+      expect(createLLMGatewayFetchWrapperSpy).not.toHaveBeenCalled();
+    });
+
+    it('handles mixed image and PDF content correctly', async () => {
+      const mockRouter = createMockRouterClient();
+      const config: Config = {
+        apiKey: 'test-api-key',
+        gateway: {
+          baseUrl: 'https://api.llmgateway.io/v1',
+          apiKey: 'llmgateway-test-key',
+        },
+      };
+      const client = new IronaChatClient(config, mockRouter);
+
+      process.env.OPENROUTER_API_KEY = 'or-key';
+      mockExtractMediaTypeArrayFromMessages.mockReturnValue(['image', 'pdf']);
+      setupSuccessfulGeneration('OpenRouter mixed content response');
+
+      const result = await client.completions(createTestPayload());
+
+      // When both images and PDFs are present, OpenRouter is used because images require it
+      expect(result.response.content).toBe('OpenRouter mixed content response');
+      expect(createOpenRouterFetchWrapperSpy).toHaveBeenCalled();
+      expect(createLLMGatewayFetchWrapperSpy).not.toHaveBeenCalled();
+    });
   });
 });

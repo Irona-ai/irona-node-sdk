@@ -123,9 +123,7 @@ export class IronaChatClient {
     const useOpenRouterForImages =
       hasImageParts && openRouterFallbackKey !== '';
     const useOpenRouterForPdfs =
-      hasPdfParts &&
-      openRouterFallbackKey !== '' &&
-      !this.isLLMGateway();
+      hasPdfParts && openRouterFallbackKey !== '' && !this.isLLMGateway();
     const useOpenRouterFallback =
       useOpenRouterForImages || useOpenRouterForPdfs;
     const forceVideoThroughOpenRouter =
@@ -151,11 +149,12 @@ export class IronaChatClient {
         );
       }
       if (hasPdfParts) {
-        const pdfRoute = this.isLLMGateway() && !useOpenRouterForPdfs
-          ? 'LLM Gateway'
-          : useOpenRouterForPdfs
-            ? 'OpenRouter'
-            : 'configured gateway';
+        const pdfRoute =
+          this.isLLMGateway() && !useOpenRouterForPdfs
+            ? 'LLM Gateway'
+            : useOpenRouterForPdfs
+              ? 'OpenRouter'
+              : 'configured gateway';
         routingInfo.push(`PDFs: ${pdfRoute}`);
       }
       if (hasVideoParts) {

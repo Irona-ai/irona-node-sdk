@@ -5,7 +5,7 @@ import '../../mocks/provider-utils.mock';
 import { z } from 'zod';
 
 import { IronaAI } from '../../../src/index';
-import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
+import { IronlabsChatClient } from '../../../src/ironlabs-chat-client/IronlabsChatClient';
 import type { Config } from '../../../src/types';
 import {
   setupSuccessfulGeneration,
@@ -30,7 +30,7 @@ import {
 } from '../../utils/test-helpers';
 
 describe('Tools Support', () => {
-  let client: IronaChatClient;
+  let client: IronlabsChatClient;
   let mockRouter: ReturnType<typeof createMockRouterClient>;
 
   beforeEach(() => {
@@ -42,7 +42,7 @@ describe('Tools Support', () => {
 
     mockRouter = createMockRouterClient();
     const config: Config = { apiKey: 'test-api-key' };
-    client = new IronaChatClient(config, mockRouter);
+    client = new IronlabsChatClient(config, mockRouter);
   });
 
   describe('Completions with Tools', () => {

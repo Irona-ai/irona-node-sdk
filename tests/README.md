@@ -42,7 +42,7 @@ import '../../mocks/supported-models.mock';
 import '../../mocks/provider-utils.mock';
 
 // Then import your code
-import { IronaChatClient } from '../../../src/irona-chat-client/IronaChatClient';
+import { IronlabsChatClient } from '../../../src/ironlabs-chat-client/IronlabsChatClient';
 ```
 
 ### 2. Use test helpers

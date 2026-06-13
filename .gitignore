@@ -33,3 +33,6 @@ dist-ssr
 tmp/
 # Sentry Config File
 .sentryclirc
+
+# Antigravity CLI
+.antigravitycli/

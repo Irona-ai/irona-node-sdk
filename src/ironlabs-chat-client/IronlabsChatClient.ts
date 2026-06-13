@@ -697,7 +697,9 @@ export class IronlabsChatClient {
                   `Failed to fetch file part (${res.status}): ${part.data}`
                 );
               }
-              if (!IronlabsChatClient.OPENAI_NATIVE_FILE_RE.test(part.mediaType)) {
+              if (
+                !IronlabsChatClient.OPENAI_NATIVE_FILE_RE.test(part.mediaType)
+              ) {
                 return { type: 'text' as const, text: await res.text() };
               }
               const base64 = Buffer.from(await res.arrayBuffer()).toString(

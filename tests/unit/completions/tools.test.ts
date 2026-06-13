@@ -269,7 +269,7 @@ describe('IronaAI SDK Tools Integration', () => {
     const mockModelSelect = jest.fn().mockResolvedValue({
       providers: [{ provider: 'openai', model: 'gpt-4o-mini' }],
     });
-    (ironaAI as any).ironaRouter.modelSelect = mockModelSelect;
+    (ironaAI as any).ironlabsRouter.modelSelect = mockModelSelect;
 
     const mockTool = {
       description: 'Test tool',

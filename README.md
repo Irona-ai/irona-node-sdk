@@ -6,7 +6,7 @@ We help you select the best AI model for your specific use case, optimizing for 
 Installation
 
 ```bash
-npm install ironaai
+npm install ironlabsai
 ```
 
 ## Quick Start
@@ -18,9 +18,11 @@ To use the API, you need to sign up for a IronaAI account & obtain an API key. S
 Here's a simple example of how to use IronaAI's model-routing to select the best model between GPT-4o, Claude 3.5 Sonnet, and Gemini 1.5 Pro, while optimizing for latency and outputting the raw text:
 
 ```typescript
-import { IronaAI } from 'ironaai';
+import { IronlabsAI } from 'ironlabsai';
+// IronaAI is also exported as a backwards-compat alias
+// import { IronaAI } from 'ironlabsai';
 
-const ironaAI = new IronaAI({
+const ironaAI = new IronlabsAI({
   // Optional - automatically loads from environment variable
   apiKey: process.env.IRONAAI_API_KEY,
 });
@@ -123,21 +125,13 @@ const ironaAI = await IronaAI.createInstance({
 
 For local building & testing the package without publishing on npm.
 
-Shortcut command: `npm run eg-test`
-This does the following things in 1 go:
-
-```
-npm run build
-npm link  # soft link for local for ironaai package.
-cd example // go to run scripts
-npm link ironaai // linked local package is installed for use now. (equivalent to `npm install ironaai` for local testing)
-```
+`npm run build && npm link && cd example && npm link ironlabsai`
 
 and
 
 For published versions we can use the following:
 
-`npm install ironaai` # in this case sdk must be published by `npm publish`
+`npm install ironlabsai` # in this case sdk must be published by `npm publish`
 
 Ref [blog link](https://medium.com/@oresoftware/node-js-how-to-test-your-new-npm-module-without-publishing-it-every-5-minutes-3b6f8e0491dd).
 

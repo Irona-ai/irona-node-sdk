@@ -2,6 +2,43 @@
 
 All notable changes to `ironaai` are documented here. This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## 1.0.0 — 2026-06-13
+
+### ⚠️ Breaking: package renamed
+
+The package has been renamed from **`ironaai`** to **`ironlabsai`**.
+
+```bash
+# Remove old package and install the new one:
+npm uninstall ironaai
+npm install ironlabsai
+```
+
+The old `ironaai` package on npm is deprecated and will no longer receive updates — install `ironlabsai` going forward.
+
+### Changed
+
+- **Package name** `ironaai` → `ironlabsai`.
+- **Primary export** `IronaAI` → `IronlabsAI`. `IronaAI` is retained as a deprecated re-export alias for backwards compatibility and will be removed in a future major version.
+- **Environment variable** `IRONAAI_API_KEY` → `IRONLABS_AI_API_KEY`. The old name is still accepted as a fallback during the migration window.
+- **Internal class renames** (no public API impact):
+  - `IronaChatClient` → `IronlabsChatClient` (in `ironlabs-chat-client/`)
+  - `IronaRouterClient` → `IronlabsRouterClient` (in `ironlabs-router-client/`)
+
+### Unchanged
+
+- All gateway logic introduced in 0.0.29 and 0.0.30 (smart per-media-type routing, PDF/image/video routing, citation stream fix, `detectGatewayTypeFromUrl`, `GATEWAY_BASE_URL`, etc.) is fully preserved.
+- The `completions.create()` and `modelSelect()` public APIs are unchanged.
+- `config.gateway`, `config.router`, and all other config fields are unchanged.
+
+### Release notes
+
+- **Published using:** granular npm access token + temporary scoped `.npmrc` ([README → Option A](./README.md#option-a-preferred-manual-publish-with-a-granular-npm-token)).
+- **Branch sync:** `feat/rename-to-ironlabsai` rebased on `development` (0.0.30), then merged to `main`.
+- **Old package deprecated:** `npm deprecate ironaai "Package renamed to ironlabsai"`.
+
+---
+
 ## 0.0.30 — 2026-06-02
 
 ### Added

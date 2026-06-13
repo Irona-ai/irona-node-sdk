@@ -1,4 +1,4 @@
-const { IronaAI } = require('ironaai');
+const { IronaAI } = require('ironlabsai');
 
 const body = {
   messages: [

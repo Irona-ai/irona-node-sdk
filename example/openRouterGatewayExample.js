@@ -14,7 +14,7 @@
  *
  * Requires: OPENROUTER_API_KEY and IRONAAI_API_KEY set in environment or .env
  */
-const { IronaAI } = require('ironaai');
+const { IronaAI } = require('ironlabsai');
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 

@@ -6,7 +6,7 @@
  *
  * Requires: OPENROUTER_API_KEY set in environment or .env
  */
-const { IronaAI } = require('ironaai');
+const { IronaAI } = require('ironlabsai');
 
 const OPENROUTER_API_KEY =
   process.env.OPENROUTER_API_KEY ||

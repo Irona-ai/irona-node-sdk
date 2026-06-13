@@ -13,7 +13,7 @@
  * 3. Default: Irona API router
  */
 
-import { IronaRouterClient } from '../irona-router-client/IronaRouterClient';
+import { IronlabsRouterClient } from '../ironlabs-router-client/IronlabsRouterClient';
 import type { Config } from '../types';
 import { logger } from '../utils/logger';
 
@@ -59,8 +59,8 @@ export function createRouter(config: Config): Router {
   const routerConfig = resolveRouterConfig(config.router);
 
   if (routerConfig == null) {
-    logger.info('[RouterFactory] Using default Irona API router');
-    return new IronaRouterClient(config);
+    logger.info('[RouterFactory] Using default Ironlabs API router');
+    return new IronlabsRouterClient(config);
   }
 
   switch (routerConfig.type) {
@@ -77,7 +77,9 @@ export function createRouter(config: Config): Router {
       return new LocalRouter(routerConfig.scoringConfig);
 
     default:
-      logger.info('[RouterFactory] Falling back to default Irona API router');
-      return new IronaRouterClient(config);
+      logger.info(
+        '[RouterFactory] Falling back to default Ironlabs API router'
+      );
+      return new IronlabsRouterClient(config);
   }
 }

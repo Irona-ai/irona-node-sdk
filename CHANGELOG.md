@@ -1,6 +1,38 @@
 # Changelog
 
-All notable changes to `ironaai` are documented here. This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
+All notable changes to `ironlabs` (previously `ironlabsai`, originally `ironaai`) are documented here. This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
+
+## 2.0.0 — 2026-06-15
+
+### ⚠️ Breaking: package renamed again
+
+The package has been renamed from **`ironlabsai`** (v1.0.0, two days ago) to its final name **`ironlabs`**.
+
+```bash
+# Migrate:
+npm uninstall ironlabsai     # or: npm uninstall ironaai
+npm install ironlabs
+```
+
+Both `ironaai` and `ironlabsai` on npm are deprecated and will no longer receive updates — install `ironlabs` going forward. The double-rename is acknowledged churn; `ironlabs` is the final brand-aligned name.
+
+### Changed
+
+- **Package name** `ironlabsai` → `ironlabs`.
+- **New canonical export** `IronLabs` (matches package name). `IronlabsAI` and `IronaAI` remain as deprecated re-export aliases.
+- **Environment variable** primary is now `IRONLABS_API_KEY`. Fallback chain: `IRONLABS_API_KEY → IRONLABS_AI_API_KEY → IRONAAI_API_KEY`. The two older names log a one-time deprecation warning when used.
+
+### Unchanged
+
+- All gateway, routing, completions, and video-input behavior from 0.0.30 and 1.0.0 is preserved.
+- Public API surface (`completions.create()`, `modelSelect()`, config schema) is unchanged.
+
+### Release notes
+
+- **`ironlabsai`** (v1.0.0) deprecated: `npm deprecate ironlabsai "Package renamed to ironlabs. Run: npm i ironlabs"`.
+- **`ironaai`** (original) remains deprecated with the same redirect message.
+
+---
 
 ## 1.0.0 — 2026-06-13
 

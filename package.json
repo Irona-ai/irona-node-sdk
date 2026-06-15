@@ -1,6 +1,6 @@
 {
-  "name": "ironlabsai",
-  "version": "1.0.0",
+  "name": "ironlabs",
+  "version": "2.0.0",
   "main": "dist/index.js",
   "module": "dist/index.m.js",
   "unpkg": "dist/index.umd.js",
@@ -13,7 +13,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "eg-test": "npm run build && npm link && cd example && npm link ironlabsai",
+    "eg-test": "npm run build && npm link && cd example && npm link ironlabs",
     "lint": "eslint . --ext .ts,.tsx",
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "type-check": "tsc --noEmit",
@@ -34,7 +34,7 @@
     "ironlabs",
     "ironlabsai",
     "irona",
-    "irona.ai",
+    "ironlabs.ai",
     "ironaai",
     "llm router",
     "best llm router",
@@ -44,7 +44,7 @@
     "ai based llm router",
     "intelligent router"
   ],
-  "author": "Chandraprakash Pal <chandraprakash@irona.ai>",
+  "author": "Chandraprakash Pal <chandraprakash@ironlabs.ai>",
   "license": "MIT",
   "files": [
     "dist"

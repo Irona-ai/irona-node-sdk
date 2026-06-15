@@ -19,20 +19,32 @@ import { detectGatewayTypeFromUrl } from './utils/gatewayType';
 import { logger } from './utils/logger';
 require('dotenv').config();
 
+// Aliases for prior package names — keep these for migration code paths.
 export class IronlabsAI {
   private static providersLoadedPromise: Promise<void> | null = null;
   private ironlabsRouter: Router;
   private llmChatService: IronlabsChatClient;
   private constructor(config: Config = {}) {
-    // Check for API key — accepts both new IRONLABS_AI_API_KEY and legacy IRONAAI_API_KEY
+    // Check for API key — accepts IRONLABS_API_KEY (preferred), legacy IRONLABS_AI_API_KEY,
+    // and IRONAAI_API_KEY (oldest). Older names log a deprecation warning on use.
     const apiKey =
       config.apiKey ??
+      process.env.IRONLABS_API_KEY ??
       process.env.IRONLABS_AI_API_KEY ??
       process.env.IRONAAI_API_KEY ??
       '';
+    if (
+      !config.apiKey &&
+      !process.env.IRONLABS_API_KEY &&
+      (process.env.IRONLABS_AI_API_KEY || process.env.IRONAAI_API_KEY)
+    ) {
+      logger.warn(
+        "IRONLABS_AI_API_KEY / IRONAAI_API_KEY are deprecated. Set IRONLABS_API_KEY instead."
+      );
+    }
     if (!apiKey) {
       throw new MissingApiKeyError(
-        "The API key is missing. Please provide the API key either through the 'IRONLABS_AI_API_KEY' environment variable or the 'config.apiKey' property."
+        "The API key is missing. Please provide the API key either through the 'IRONLABS_API_KEY' environment variable or the 'config.apiKey' property."
       );
     }
     if (
@@ -40,7 +52,7 @@ export class IronlabsAI {
       !apiKey.startsWith(IRONLABS_AI_API_KEY_PREFIX)
     ) {
       throw new MissingApiKeyError(
-        "The provided API key is invalid. Please generate a new key at 'https://app.irona.ai/dashboard/api-keys'."
+        "The provided API key is invalid. Please generate a new key at 'https://app.ironlabs.ai/dashboard/api-keys'."
       );
     }
 
@@ -239,8 +251,13 @@ export class IronlabsAI {
 }
 
 /**
- * @deprecated Use `IronlabsAI` instead. This alias is kept for backwards
- * compatibility with the old `ironaai` package and will be removed in a
- * future major version.
+ * Canonical export — matches the `ironlabs` package name (v2.0.0+).
+ */
+export { IronlabsAI as IronLabs };
+
+/**
+ * @deprecated Use `IronLabs` instead. This alias is kept for backwards
+ * compatibility with the old `ironaai` / `ironlabsai` packages and will be
+ * removed in a future major version.
  */
 export { IronlabsAI as IronaAI };

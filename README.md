@@ -1,35 +1,36 @@
-# IronaAI Node SDK
+# IronLabs Node SDK
 
-This library provides convenient access to the IronaAI's model-routing API from TypeScript or JavaScript.
+This library provides convenient access to IronLabs' model-routing API from TypeScript or JavaScript.
 We help you select the best AI model for your specific use case, optimizing for factors like cost, latency, or performance.
 
 Installation
 
 ```bash
-npm install ironlabsai
+npm install ironlabs
 ```
+
+> **Migrating from `ironaai` or `ironlabsai`?** The package was renamed to **`ironlabs`** in v2.0.0. Update your install and imports — your existing API key keeps working (the SDK accepts `IRONLABS_API_KEY`, `IRONLABS_AI_API_KEY`, and `IRONAAI_API_KEY`).
 
 ## Quick Start
 
-To use the API, you need to sign up for a IronaAI account & obtain an API key. Sign up [here](https://app.irona.ai/).
+To use the API, you need to sign up for a IronaAI account & obtain an API key. Sign up [here](https://app.ironlabs.ai/).
 
 ## Basic Usage
 
 Here's a simple example of how to use IronaAI's model-routing to select the best model between GPT-4o, Claude 3.5 Sonnet, and Gemini 1.5 Pro, while optimizing for latency and outputting the raw text:
 
 ```typescript
-import { IronlabsAI } from 'ironlabsai';
-// IronaAI is also exported as a backwards-compat alias
-// import { IronaAI } from 'ironlabsai';
+import { IronLabs } from 'ironlabs';
+// Legacy aliases also exported: IronlabsAI, IronaAI
 
-const ironaAI = new IronlabsAI({
+const client = new IronLabs({
   // Optional - automatically loads from environment variable
-  apiKey: process.env.IRONAAI_API_KEY,
+  apiKey: process.env.IRONLABS_API_KEY,
 });
 
 async function basicExample() {
   // 1. Select the best model
-  const result = await ironaAI.completions.create({
+  const result = await client.completions.create({
     // Define the user's message
     messages: [{ content: 'What is the golden ratio?', role: 'user' }],
     // Specify the LLM providers and models to choose from
@@ -230,7 +231,7 @@ Picks up pricing from env variable if available from `SUPPORTED_MODELS_URL`
 
 ## Support
 
-If you encounter any issues or have questions, please open an issue on our GitHub repository or email us at support@irona.ai.
+If you encounter any issues or have questions, please open an issue on our GitHub repository or email us at support@ironlabs.ai.
 
 ## License
 

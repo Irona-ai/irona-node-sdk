@@ -33,13 +33,15 @@ export class IronlabsAI {
       process.env.IRONLABS_AI_API_KEY ??
       process.env.IRONAAI_API_KEY ??
       '';
-    if (
-      !config.apiKey &&
-      !process.env.IRONLABS_API_KEY &&
-      (process.env.IRONLABS_AI_API_KEY || process.env.IRONAAI_API_KEY)
-    ) {
+    const hasPrimaryKey =
+      (config.apiKey ?? '') !== '' ||
+      (process.env.IRONLABS_API_KEY ?? '') !== '';
+    const hasDeprecatedKey =
+      (process.env.IRONLABS_AI_API_KEY ?? '') !== '' ||
+      (process.env.IRONAAI_API_KEY ?? '') !== '';
+    if (!hasPrimaryKey && hasDeprecatedKey) {
       logger.warn(
-        "IRONLABS_AI_API_KEY / IRONAAI_API_KEY are deprecated. Set IRONLABS_API_KEY instead."
+        'IRONLABS_AI_API_KEY / IRONAAI_API_KEY are deprecated. Set IRONLABS_API_KEY instead.'
       );
     }
     if (!apiKey) {

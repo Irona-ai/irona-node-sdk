@@ -1,3 +1,5 @@
+import type { LLMGatewayCostData } from '../responseTypes';
+
 import { applyResponseReasoningTransform } from './gatewayResponseTransforms';
 import { logger } from './logger';
 import type { OpenRouterExtraBody } from './openRouterMapper';
@@ -36,11 +38,18 @@ export interface OpenRouterUserMessage {
  * The transform is always applied so that `delta.reasoning` is always cleaned
  * up — models like gpt-5-nano emit it unconditionally even without a reasoning
  * request, which would otherwise cause tokens to leak into text-delta parts.
+ *
+ * 4. When `onCost` is provided, surfaces OpenRouter's ground-truth cost
+ *    (`usage.cost` / `usage.cost_details`, always included in the final stream
+ *    chunk) via the same callback the LLM Gateway wrapper uses — so consumers
+ *    receive a single `llmgateway-cost` part regardless of which gateway served
+ *    the request.
  */
 export function createOpenRouterFetchWrapper(
   extraBody: OpenRouterExtraBody,
   baseFetch: typeof globalThis.fetch = globalThis.fetch,
-  openRouterUserMessages?: OpenRouterUserMessage[]
+  openRouterUserMessages?: OpenRouterUserMessage[],
+  onCost?: (data: LLMGatewayCostData) => void
 ): typeof globalThis.fetch {
   // Reasoning injection is active only when a reasoning config is present
   // (mapper omits the field entirely for 'off'/undefined)
@@ -98,6 +107,6 @@ export function createOpenRouterFetchWrapper(
       body: JSON.stringify(merged),
     });
 
-    return applyResponseReasoningTransform(response, injectReasoning);
+    return applyResponseReasoningTransform(response, injectReasoning, onCost);
   };
 }

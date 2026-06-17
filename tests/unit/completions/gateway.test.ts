@@ -318,6 +318,7 @@ describe('Gateway Completions', () => {
       expect(buildExtraBodySpy).toHaveBeenCalled();
       expect(buildExtraBodySpy).toHaveReturnedWith({
         provider: { sort: 'latency' },
+        usage: { include: true },
       });
       // Fetch wrapper is always created for OpenRouter (provider sort is always set)
       expect(fetchWrapperSpy).toHaveBeenCalled();

@@ -25,6 +25,9 @@ export interface OpenRouterExtraBody {
   reasoning?: OpenRouterReasoningConfig;
   plugins?: Array<{ id: string }>;
   provider?: OpenRouterProviderConfig;
+  /** Enables OpenRouter usage accounting so the response includes the real
+   * per-request cost (`usage.cost` / `usage.cost_details`). */
+  usage?: { include: boolean };
 }
 
 export interface BuildOpenRouterExtraBodyInput {
@@ -80,7 +83,9 @@ export function mapSearchToOpenRouter(
 
 /**
  * Builds the merged extra body for an OpenRouter request.
- * Always includes `provider.sort: "latency"` to prefer the lowest-latency provider.
+ * Always includes `provider.sort: "latency"` to prefer the lowest-latency
+ * provider, and `usage.include: true` so the response carries the real
+ * per-request cost (surfaced via the onCost callback as `llmgateway-cost`).
  */
 export function buildOpenRouterExtraBody(
   input: BuildOpenRouterExtraBodyInput
@@ -90,6 +95,7 @@ export function buildOpenRouterExtraBody(
 
   const extra: OpenRouterExtraBody = {
     provider: { sort: 'latency' },
+    usage: { include: true },
   };
   if (reasoning !== undefined) {
     extra.reasoning = reasoning;

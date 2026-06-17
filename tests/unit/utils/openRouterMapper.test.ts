@@ -61,6 +61,7 @@ describe('buildOpenRouterExtraBody', () => {
   it('always includes provider sort by latency', () => {
     expect(buildOpenRouterExtraBody({ supportsWebSearch: false })).toEqual({
       provider: { sort: 'latency' },
+      usage: { include: true },
     });
   });
 
@@ -87,6 +88,7 @@ describe('buildOpenRouterExtraBody', () => {
       })
     ).toEqual({
       provider: { sort: 'latency' },
+      usage: { include: true },
     });
   });
 
@@ -98,6 +100,7 @@ describe('buildOpenRouterExtraBody', () => {
       })
     ).toEqual({
       provider: { sort: 'latency' },
+      usage: { include: true },
       reasoning: { effort: 'high' },
     });
   });
@@ -110,6 +113,7 @@ describe('buildOpenRouterExtraBody', () => {
       })
     ).toEqual({
       provider: { sort: 'latency' },
+      usage: { include: true },
       plugins: [{ id: 'web' }],
     });
   });
@@ -123,6 +127,7 @@ describe('buildOpenRouterExtraBody', () => {
       })
     ).toEqual({
       provider: { sort: 'latency' },
+      usage: { include: true },
       reasoning: { effort: 'xhigh' },
       plugins: [{ id: 'web' }],
     });
@@ -136,6 +141,7 @@ describe('buildOpenRouterExtraBody', () => {
       })
     ).toEqual({
       provider: { sort: 'latency' },
+      usage: { include: true },
     });
   });
 });

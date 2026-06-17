@@ -2,6 +2,12 @@
 
 All notable changes to `ironlabs` (previously `ironlabsai`, originally `ironaai`) are documented here. This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## 2.1.1 — 2026-06-17
+
+### Fixed: OpenRouter cost now actually returned
+
+2.1.0 added the `onCost` reader for OpenRouter but cost still came back empty: OpenRouter only includes `usage.cost` in the response when the request enables usage accounting. `buildOpenRouterExtraBody` now always sends `usage: { include: true }`, so OpenRouter returns the real per-request cost, which the wrapper surfaces via the `llmgateway-cost` part. (Without this, consumers saw $0 cost on OpenRouter completions.)
+
 ## 2.1.0 — 2026-06-17
 
 ### Added: OpenRouter ground-truth cost

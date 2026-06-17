@@ -362,6 +362,9 @@ export class IronlabsChatClient {
         openRouterUserMessages = buildOpenRouterUserMessages(resolvedMessages);
       }
 
+      const captureGatewayCost = (cost: LLMGatewayCostData): void => {
+        llmGatewayCost = cost;
+      };
       const gatewayFactory = isOpenRouter
         ? effectiveUseOpenRouterFallback
           ? createOpenAI({
@@ -371,17 +374,17 @@ export class IronlabsChatClient {
               fetch: createOpenRouterFetchWrapper(
                 openRouterExtra ?? {},
                 globalThis.fetch,
-                openRouterUserMessages
+                openRouterUserMessages,
+                captureGatewayCost
               ),
             }).chat
           : this.getOpenRouterModelFactory(
               openRouterExtra ?? {},
-              openRouterUserMessages
+              openRouterUserMessages,
+              captureGatewayCost
             )
         : isLLMGateway
-          ? this.getLLMGatewayModelFactory(llmGatewayExtra, cost => {
-              llmGatewayCost = cost;
-            })
+          ? this.getLLMGatewayModelFactory(llmGatewayExtra, captureGatewayCost)
           : undefined;
 
       const modelFactory =
@@ -558,6 +561,9 @@ export class IronlabsChatClient {
                   `Empty stream response from ${provider}/${model}`
                 );
               }
+              // Ground-truth gateway cost (LLM Gateway or OpenRouter — both
+              // report it as usage.cost/cost_details). Emitted under one part
+              // type so consumers read a single mechanism regardless of gateway.
               if (llmGatewayCost !== null) {
                 yield { type: 'llmgateway-cost' as const, ...llmGatewayCost };
               }
@@ -932,7 +938,8 @@ export class IronlabsChatClient {
    */
   private getOpenRouterModelFactory(
     extraBody: OpenRouterExtraBody,
-    openRouterUserMessages?: OpenRouterUserMessage[]
+    openRouterUserMessages?: OpenRouterUserMessage[],
+    onCost?: (data: LLMGatewayCostData) => void
   ): ReturnType<typeof createOpenAI>['chat'] | undefined {
     if (this.config.gateway === undefined) {
       return undefined;
@@ -945,7 +952,8 @@ export class IronlabsChatClient {
       fetch: createOpenRouterFetchWrapper(
         extraBody,
         globalThis.fetch,
-        openRouterUserMessages
+        openRouterUserMessages,
+        onCost
       ),
     }).chat;
   }

@@ -2,6 +2,12 @@
 
 All notable changes to `ironlabs` (previously `ironlabsai`, originally `ironaai`) are documented here. This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## 2.1.0 — 2026-06-17
+
+### Added: OpenRouter ground-truth cost
+
+OpenRouter now reports per-request cost (`usage.cost` / `usage.cost_details`) in the final stream chunk, but it was being dropped — only the LLM Gateway fetch wrapper forwarded cost to consumers. The OpenRouter fetch wrapper now accepts the same `onCost` callback and surfaces the cost under the existing `llmgateway-cost` stream part, so consumers receive ground-truth cost through **one** mechanism regardless of which gateway (OpenRouter or LLM Gateway) served the request.
+
 ## 2.0.0 — 2026-06-15
 
 ### ⚠️ Breaking: package renamed again

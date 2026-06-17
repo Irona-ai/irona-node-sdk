@@ -423,6 +423,82 @@ describe('Streaming reasoning injection', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Ground-truth cost: OpenRouter surfaces usage.cost via the onCost callback
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('OpenRouter ground-truth cost (onCost)', () => {
+  it('invokes onCost with usage.cost/cost_details from the final stream chunk', async () => {
+    const chunks = [
+      { choices: [{ index: 0, delta: { content: 'Hi' } }] },
+      {
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+        usage: {
+          prompt_tokens: 10,
+          completion_tokens: 5,
+          total_tokens: 15,
+          cost: 0.0001024,
+          cost_details: { upstream_inference_cost: 0.0001 },
+        },
+      },
+    ];
+
+    const mockFetch = createStreamingMockFetch(buildSSEBody(chunks));
+    const onCost = jest.fn();
+    const wrapper = createOpenRouterFetchWrapper(
+      {},
+      mockFetch,
+      undefined,
+      onCost
+    );
+
+    const response = await wrapper(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        method: 'POST',
+        body: JSON.stringify({ model: 'test', messages: [] }),
+      }
+    );
+    await readStreamToString(response.body!);
+
+    expect(onCost).toHaveBeenCalledTimes(1);
+    expect(onCost).toHaveBeenCalledWith({
+      cost: 0.0001024,
+      cost_details: { upstream_inference_cost: 0.0001 },
+    });
+  });
+
+  it('does not invoke onCost when no usage.cost is present', async () => {
+    const chunks = [
+      { choices: [{ index: 0, delta: { content: 'Hi' } }] },
+      {
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+      },
+    ];
+
+    const mockFetch = createStreamingMockFetch(buildSSEBody(chunks));
+    const onCost = jest.fn();
+    const wrapper = createOpenRouterFetchWrapper(
+      {},
+      mockFetch,
+      undefined,
+      onCost
+    );
+
+    const response = await wrapper(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        method: 'POST',
+        body: JSON.stringify({ model: 'test', messages: [] }),
+      }
+    );
+    await readStreamToString(response.body!);
+
+    expect(onCost).not.toHaveBeenCalled();
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Bug 4: buildOpenRouterExtraBody returning undefined → no fetch wrapper
 // (Tested via the public wrapper API to verify transform is always applied)
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -229,7 +229,8 @@ describe('Gateway Completions', () => {
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
         expect.objectContaining({ reasoning: { effort: 'high' } }),
         expect.any(Function),
-        undefined
+        undefined,
+        expect.any(Function)
       );
       expect(mockGenerateText).toHaveBeenCalledTimes(1);
     });
@@ -262,7 +263,8 @@ describe('Gateway Completions', () => {
           plugins: [{ id: 'web' }],
         }),
         expect.any(Function),
-        undefined
+        undefined,
+        expect.any(Function)
       );
     });
 
@@ -291,7 +293,8 @@ describe('Gateway Completions', () => {
           plugins: [{ id: 'web' }],
         }),
         expect.any(Function),
-        undefined
+        undefined,
+        expect.any(Function)
       );
     });
 
@@ -385,7 +388,8 @@ describe('Gateway Completions', () => {
       expect(fetchWrapperSpy).toHaveBeenCalledWith(
         expect.objectContaining({ reasoning: { effort: 'medium' } }),
         expect.any(Function),
-        undefined
+        undefined,
+        expect.any(Function)
       );
     });
   });

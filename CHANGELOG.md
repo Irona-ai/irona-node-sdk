@@ -2,11 +2,29 @@
 
 All notable changes to `ironlabs` (previously `ironlabsai`, originally `ironaai`) are documented here. This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## 2.1.4 — 2026-07-13
+
+### Fixed: Perplexity Sonar streaming no longer crashes on `url_citation` sources
+
+Perplexity Sonar emits `url_citation` annotations that the AI SDK surfaces as `source` stream parts. When a chunk failed validation or the provider yielded no output, `streamText()` settled promises (`sources`, `content`, `text`, and others beyond the five originally guarded) rejected without handlers. Because the client only consumes `fullStream`, those sibling rejections were unhandled and could crash the host process (Node exit 128 / `uncaughtException`). The client now attaches no-op catch handlers to every settled promise on the `streamText()` result, so Perplexity citation streams complete without leaking rejections.
+
+### Fixed: `topk_models` snake_case alias accepted in model-select
+
+Some callers (e.g. the chat backend) send `topk_models` instead of the canonical `topkModels`. Model-select validation and routing now accept both spellings via a shared resolver; camelCase takes precedence when both are present.
+
 ## 2.1.3 — 2026-06-22
 
 ### Changed: gateway reasoning policy is now fetched remotely
 
 Per-model reasoning support for the LLM Gateway/OpenRouter path (which efforts a model accepts, its default, whether it reasons via token budget instead) is no longer vendored in the SDK — it is fetched at initialization from the `llm-pricing-info` repo (single source of truth), the same way `model_pricing.json` is loaded. Override the source with the `REASONING_CONFIG_URL` env var. The fetch is **non-fatal**: if it fails (e.g. network/404), the SDK still initializes and routes normally, falling back to a generic effort mapping until the config is available. Direct-provider reasoning config (Google/Anthropic/OpenAI thinking/effort mapping) is unaffected and remains hardcoded in the SDK.
+
+## 2.1.2 — 2026-06-18
+
+### Fixed: unhandled rejection crash on no-output streams
+
+`streamText()` exposes settled promises (`finishReason` / `totalUsage` / `steps` / `text` / `usage`) that reject with `AI_NoOutputGeneratedError` when a provider yields no output. The client only consumes `fullStream`, so those sibling promises reject unhandled and crash the host process (Node exit 128) — on serverless platforms this can take out co-located in-flight requests.
+
+Attached no-op catch handlers to those promises right after `streamText()`. Safe because `fullStream` is a fresh tee per access, so iteration is unaffected.
 
 ## 2.1.1 — 2026-06-17
 

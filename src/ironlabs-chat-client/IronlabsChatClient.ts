@@ -518,6 +518,20 @@ export class IronlabsChatClient {
 
         const stream = streamText(streamConfig);
 
+        // Prevent unhandled promise rejections. streamText exposes settled
+        // promises (finishReason/totalUsage/steps/text/usage) that reject with
+        // AI_NoOutputGeneratedError when a provider yields no output. We only
+        // ever consume `fullStream`, so without handlers those sibling promises
+        // reject unhandled and crash the host process (Node exit 128). Attach
+        // no-op catch handlers — `fullStream` is a fresh tee per access, so this
+        // does not disturb stream iteration.
+        const swallowRejection = (): void => {};
+        void stream.finishReason.catch(swallowRejection);
+        void stream.totalUsage.catch(swallowRejection);
+        void stream.usage.catch(swallowRejection);
+        void stream.steps.catch(swallowRejection);
+        void stream.text.catch(swallowRejection);
+
         // Return the stream immediately — no early validation.
         // Errors are caught inline via the error-handling wrapper below
         // and will propagate up to completions() for fallback retry.

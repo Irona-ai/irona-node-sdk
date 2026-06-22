@@ -13,10 +13,12 @@ import {
   DEFAULT_BASE_URL,
   LLM_GATEWAY_DEFAULT_BASE_URL,
   OPENROUTER_DEFAULT_BASE_URL,
+  REASONING_CONFIG_DEFAULT_URL,
   SUPPORTED_MODELS_DEFAULT_URL,
 } from './utils/constants';
 import { detectGatewayTypeFromUrl } from './utils/gatewayType';
 import { logger } from './utils/logger';
+import { updateReasoningConfig } from './utils/reasoningConfig';
 require('dotenv').config();
 
 // Aliases for prior package names — keep these for migration code paths.
@@ -84,10 +86,19 @@ export class IronlabsAI {
   ): Promise<void> {
     const SUPPORTED_MODELS_GIST_URL =
       process.env.SUPPORTED_MODELS_URL ?? SUPPORTED_MODELS_DEFAULT_URL;
+    const REASONING_CONFIG_URL =
+      process.env.REASONING_CONFIG_URL ?? REASONING_CONFIG_DEFAULT_URL;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        await updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL);
+        await Promise.all([
+          updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL),
+          updateReasoningConfig(REASONING_CONFIG_URL).catch(reasoningError => {
+            logger.warn(
+              `Failed to load Reasoning config; reasoning options will be disabled until it is available. ${reasoningError}`
+            );
+          }),
+        ]);
         return;
       } catch (error) {
         logger.warn(

@@ -1,6 +1,8 @@
 export const DEFAULT_BASE_URL = 'https://irona-ai--model-select.modal.run';
 export const SUPPORTED_MODELS_DEFAULT_URL =
   'https://raw.githubusercontent.com/Irona-ai/llm-pricing-info/refs/heads/main/model_pricing.json';
+export const REASONING_CONFIG_DEFAULT_URL =
+  'https://raw.githubusercontent.com/Irona-ai/llm-pricing-info/refs/heads/main/reasoning_config.json';
 export const IRONLABS_AI_API_KEY_PREFIX = 'sk_';
 /** @deprecated Use IRONLABS_AI_API_KEY_PREFIX */
 export const IRONAAI_API_KEY_PREFIX = IRONLABS_AI_API_KEY_PREFIX;

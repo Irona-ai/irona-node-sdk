@@ -16,9 +16,9 @@ import {
   REASONING_CONFIG_DEFAULT_URL,
   SUPPORTED_MODELS_DEFAULT_URL,
 } from './utils/constants';
+import { updateGatewayReasoningConfig } from './utils/gatewayReasoning';
 import { detectGatewayTypeFromUrl } from './utils/gatewayType';
 import { logger } from './utils/logger';
-import { updateReasoningConfig } from './utils/reasoningConfig';
 require('dotenv').config();
 
 // Aliases for prior package names — keep these for migration code paths.
@@ -93,11 +93,13 @@ export class IronlabsAI {
       try {
         await Promise.all([
           updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL),
-          updateReasoningConfig(REASONING_CONFIG_URL).catch(reasoningError => {
-            logger.warn(
-              `Failed to load Reasoning config; reasoning options will be disabled until it is available. ${reasoningError}`
-            );
-          }),
+          updateGatewayReasoningConfig(REASONING_CONFIG_URL).catch(
+            reasoningError => {
+              logger.warn(
+                `Failed to load gateway reasoning config; provider-specific reasoning will use generic defaults. ${reasoningError}`
+              );
+            }
+          ),
         ]);
         return;
       } catch (error) {

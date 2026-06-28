@@ -2,7 +2,7 @@ import axios from 'axios';
 
 import {
   genericGatewayReasoning,
-  getProviderReasoningPolicy,
+  getModelReasoningPolicy,
   resolveGatewayReasoning,
   updateGatewayReasoningConfig,
 } from '../../../src/utils/gatewayReasoning';
@@ -10,87 +10,60 @@ import {
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
-// Mirrors the v3.1 reasoningConfig shape the SDK fetches at runtime.
 const TEST_CONFIG = {
-  version: '3.1',
   effort_budget_ratios: {
-    none: 0.0,
+    none: 0,
     minimal: 0.1,
     low: 0.25,
     medium: 0.5,
     high: 0.85,
     xhigh: 1.0,
   },
-  budget_clamp: { min: 1024, max: 64000 },
+  budget_clamp: { min: 1024, max: 100000 },
   providers: {
     openai: {
-      supported_efforts: ['xhigh', 'high', 'medium', 'low', 'minimal'],
-      default_effort: 'medium',
-      default_enabled: true,
-      supports_max_tokens: false,
-      mandatory: false,
+      models: {
+        'gpt-5.4': {
+          supported_efforts: ['low', 'medium', 'high', 'xhigh'],
+          supports_max_tokens: false,
+          default_enabled: true,
+        },
+      },
     },
     anthropic: {
-      supported_efforts: ['xhigh', 'high', 'medium', 'low'],
-      default_effort: 'medium',
-      default_enabled: false,
-      supports_max_tokens: true,
-      max_budget: 64000,
-      mandatory: false,
-    },
-    google: {
-      supported_efforts: ['xhigh', 'high', 'medium', 'low'],
-      default_effort: 'medium',
-      default_enabled: true,
-      supports_max_tokens: false,
-      mandatory: false,
+      models: {
+        'claude-sonnet-4-6': {
+          supported_efforts: null,
+          supports_max_tokens: true,
+          default_enabled: false,
+          max_budget: 64000,
+        },
+        'claude-opus-4-6': {
+          supported_efforts: null,
+          supports_max_tokens: true,
+          default_enabled: false,
+          max_budget: 32000,
+        },
+      },
     },
     xai: {
-      supported_efforts: ['xhigh', 'high', 'low'],
-      default_effort: 'high',
-      default_enabled: true,
-      supports_max_tokens: false,
-      mandatory: false,
-    },
-    moonshotai: {
-      supported_efforts: null,
-      default_effort: null,
-      default_enabled: true,
-      supports_max_tokens: false,
-      mandatory: false,
-    },
-    deepseek: {
-      supported_efforts: ['xhigh', 'high', 'medium', 'low'],
-      default_effort: 'medium',
-      default_enabled: true,
-      supports_max_tokens: false,
-      mandatory: false,
-    },
-    xiaomi: {
-      supported_efforts: null,
-      default_effort: null,
-      default_enabled: true,
-      supports_max_tokens: false,
-      mandatory: false,
-    },
-    'z-ai': {
-      supported_efforts: null,
-      default_effort: null,
-      default_enabled: true,
-      supports_max_tokens: false,
-      mandatory: false,
+      models: {
+        'grok-4.3': {
+          supported_efforts: ['xhigh', 'high', 'low'],
+          supports_max_tokens: false,
+          default_enabled: true,
+        },
+      },
     },
   },
 };
 
 beforeAll(async () => {
-  mockedAxios.get.mockResolvedValue({ data: TEST_CONFIG });
-  await updateGatewayReasoningConfig(
-    'https://test.example/reasoning_config.json'
-  );
+  mockedAxios.get.mockResolvedValueOnce({ data: TEST_CONFIG });
+  await updateGatewayReasoningConfig('https://test.example.com/config.json');
 });
 
-// ── genericGatewayReasoning (no provider policy) ─────────────────────────────
+// ── genericGatewayReasoning ───────────────────────────────────────────────────
 
 describe('genericGatewayReasoning', () => {
   it('returns undefined for undefined and "off"', () => {
@@ -104,16 +77,16 @@ describe('genericGatewayReasoning', () => {
     expect(genericGatewayReasoning('high')).toEqual({ effort: 'high' });
   });
 
-  it('applies the wire alias for "max" (max -> xhigh)', () => {
-    expect(genericGatewayReasoning('max')).toEqual({ effort: 'xhigh' });
+  it('passes "xhigh" through as "xhigh" on the wire', () => {
+    expect(genericGatewayReasoning('xhigh')).toEqual({ effort: 'xhigh' });
   });
 });
 
-// ── getProviderReasoningPolicy ───────────────────────────────────────────────
+// ── getModelReasoningPolicy ───────────────────────────────────────────────────
 
-describe('getProviderReasoningPolicy', () => {
-  it('returns the effort-based policy for openai', () => {
-    const policy = getProviderReasoningPolicy('openai');
+describe('getModelReasoningPolicy', () => {
+  it('returns the effort-based policy for a known openai model', () => {
+    const policy = getModelReasoningPolicy('openai', 'gpt-5.4');
     expect(policy).toMatchObject({
       supports_max_tokens: false,
       default_enabled: true,
@@ -121,8 +94,8 @@ describe('getProviderReasoningPolicy', () => {
     expect(policy?.supported_efforts).toContain('high');
   });
 
-  it('returns the budget-based policy for anthropic (max_budget 64000)', () => {
-    const policy = getProviderReasoningPolicy('anthropic');
+  it('returns the budget-based policy for a known anthropic model', () => {
+    const policy = getModelReasoningPolicy('anthropic', 'claude-sonnet-4-6');
     expect(policy).toMatchObject({
       supports_max_tokens: true,
       default_enabled: false,
@@ -130,83 +103,98 @@ describe('getProviderReasoningPolicy', () => {
     });
   });
 
-  it('returns undefined for an unknown / missing provider', () => {
-    expect(getProviderReasoningPolicy('nope')).toBeUndefined();
-    expect(getProviderReasoningPolicy(undefined)).toBeUndefined();
+  it('returns undefined for an unknown provider or model', () => {
+    expect(getModelReasoningPolicy('nope', 'nope')).toBeUndefined();
+    expect(getModelReasoningPolicy(undefined, 'gpt-5.4')).toBeUndefined();
+    expect(getModelReasoningPolicy('openai', undefined)).toBeUndefined();
+    expect(getModelReasoningPolicy('openai', 'unknown-model')).toBeUndefined();
   });
 });
 
 // ── resolveGatewayReasoning ──────────────────────────────────────────────────
 
 describe('resolveGatewayReasoning', () => {
-  it('falls back to generic passthrough for providers without a policy', () => {
-    expect(resolveGatewayReasoning('high', 'nope')).toEqual({ effort: 'high' });
-    expect(resolveGatewayReasoning('max', 'nope')).toEqual({ effort: 'xhigh' });
-    expect(resolveGatewayReasoning('off', 'nope')).toBeUndefined();
-  });
-
-  it('falls back to generic passthrough when provider is omitted', () => {
+  it('falls back to generic passthrough when no provider/model given', () => {
     expect(resolveGatewayReasoning('high')).toEqual({ effort: 'high' });
+    expect(resolveGatewayReasoning('xhigh')).toEqual({ effort: 'xhigh' });
     expect(resolveGatewayReasoning('off')).toBeUndefined();
   });
 
-  it('omits reasoning for "off"/undefined on known providers', () => {
-    expect(resolveGatewayReasoning('off', 'openai')).toBeUndefined();
-    expect(resolveGatewayReasoning(undefined, 'openai')).toBeUndefined();
-    expect(resolveGatewayReasoning('off', 'anthropic')).toBeUndefined();
+  it('falls back to generic passthrough for unknown provider/model', () => {
+    expect(resolveGatewayReasoning('high', 'nope', 'nope')).toEqual({
+      effort: 'high',
+    });
+    expect(resolveGatewayReasoning('xhigh', 'nope', 'nope')).toEqual({
+      effort: 'xhigh',
+    });
   });
 
-  describe('effort-based providers', () => {
-    it('sends the wire effort for openai', () => {
-      expect(resolveGatewayReasoning('low', 'openai')).toEqual({
+  it('omits reasoning for "off"/undefined on known models', () => {
+    expect(resolveGatewayReasoning('off', 'openai', 'gpt-5.4')).toBeUndefined();
+    expect(
+      resolveGatewayReasoning(undefined, 'openai', 'gpt-5.4')
+    ).toBeUndefined();
+    expect(
+      resolveGatewayReasoning('off', 'anthropic', 'claude-sonnet-4-6')
+    ).toBeUndefined();
+  });
+
+  describe('effort-based models', () => {
+    it('sends the wire effort for openai/gpt-5.4', () => {
+      expect(resolveGatewayReasoning('low', 'openai', 'gpt-5.4')).toEqual({
         effort: 'low',
       });
-      expect(resolveGatewayReasoning('high', 'openai')).toEqual({
+      expect(resolveGatewayReasoning('high', 'openai', 'gpt-5.4')).toEqual({
         effort: 'high',
       });
-      expect(resolveGatewayReasoning('max', 'openai')).toEqual({
+      expect(resolveGatewayReasoning('xhigh', 'openai', 'gpt-5.4')).toEqual({
         effort: 'xhigh',
       });
     });
 
-    it('passes effort through for providers without a discrete selector (z-ai)', () => {
-      expect(resolveGatewayReasoning('high', 'z-ai')).toEqual({
+    it('clamps an unsupported effort to the nearest supported one (rounding up)', () => {
+      // xai/grok-4.3 supports [xhigh, high, low] — "medium" is equidistant
+      // from low and high, so it rounds up to high.
+      expect(resolveGatewayReasoning('medium', 'xai', 'grok-4.3')).toEqual({
         effort: 'high',
       });
-      expect(resolveGatewayReasoning('max', 'z-ai')).toEqual({
-        effort: 'xhigh',
+      expect(resolveGatewayReasoning('low', 'xai', 'grok-4.3')).toEqual({
+        effort: 'low',
       });
-    });
-
-    it('clamps an unsupported effort onto the nearest supported one (rounding up)', () => {
-      // xai supports [xhigh, high, low] — "medium" is unsupported and sits
-      // equidistant from low and high, so it rounds up to high.
-      expect(resolveGatewayReasoning('medium', 'xai')).toEqual({
-        effort: 'high',
-      });
-      // "low" is supported and passes through unchanged.
-      expect(resolveGatewayReasoning('low', 'xai')).toEqual({ effort: 'low' });
     });
   });
 
-  describe('budget-based providers (supports_max_tokens)', () => {
-    it('computes max_tokens from max_budget * effort_budget_ratios (anthropic, budget 64000)', () => {
-      expect(resolveGatewayReasoning('low', 'anthropic')).toEqual({
-        max_tokens: 16000, // 64000 * 0.25
-      });
-      expect(resolveGatewayReasoning('medium', 'anthropic')).toEqual({
-        max_tokens: 32000, // 64000 * 0.5
-      });
-      expect(resolveGatewayReasoning('high', 'anthropic')).toEqual({
-        max_tokens: 54400, // 64000 * 0.85
-      });
-      expect(resolveGatewayReasoning('max', 'anthropic')).toEqual({
-        max_tokens: 64000, // 64000 * 1.0, clamped to budget_clamp.max
-      });
+  describe('budget-based models (supports_max_tokens)', () => {
+    it('computes max_tokens for anthropic/claude-sonnet-4-6 (max_budget 64000)', () => {
+      expect(
+        resolveGatewayReasoning('low', 'anthropic', 'claude-sonnet-4-6')
+      ).toEqual({ max_tokens: 16000 }); // 64000 * 0.25
+      expect(
+        resolveGatewayReasoning('medium', 'anthropic', 'claude-sonnet-4-6')
+      ).toEqual({ max_tokens: 32000 }); // 64000 * 0.5
+      expect(
+        resolveGatewayReasoning('high', 'anthropic', 'claude-sonnet-4-6')
+      ).toEqual({ max_tokens: 54400 }); // 64000 * 0.85
+      expect(
+        resolveGatewayReasoning('xhigh', 'anthropic', 'claude-sonnet-4-6')
+      ).toEqual({ max_tokens: 64000 }); // 64000 * 1.0, clamped to budget_clamp.max
     });
 
-    it('never sends an effort field for budget-based providers', () => {
-      const r = resolveGatewayReasoning('high', 'anthropic');
+    it('computes max_tokens for anthropic/claude-opus-4-6 (max_budget 32000)', () => {
+      expect(
+        resolveGatewayReasoning('medium', 'anthropic', 'claude-opus-4-6')
+      ).toEqual({ max_tokens: 16000 }); // 32000 * 0.5
+      expect(
+        resolveGatewayReasoning('xhigh', 'anthropic', 'claude-opus-4-6')
+      ).toEqual({ max_tokens: 32000 }); // 32000 * 1.0
+    });
+
+    it('never sends an effort field for budget-based models', () => {
+      const r = resolveGatewayReasoning(
+        'high',
+        'anthropic',
+        'claude-sonnet-4-6'
+      );
       expect(r).toBeDefined();
       expect(r?.effort).toBeUndefined();
     });

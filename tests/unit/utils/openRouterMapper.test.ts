@@ -28,8 +28,8 @@ describe('mapReasoningToOpenRouter', () => {
     expect(mapReasoningToOpenRouter('high')).toEqual({ effort: 'high' });
   });
 
-  it('maps "max" to { effort: "xhigh" }', () => {
-    expect(mapReasoningToOpenRouter('max')).toEqual({ effort: 'xhigh' });
+  it('maps "xhigh" to { effort: "xhigh" }', () => {
+    expect(mapReasoningToOpenRouter('xhigh')).toEqual({ effort: 'xhigh' });
   });
 });
 
@@ -121,7 +121,7 @@ describe('buildOpenRouterExtraBody', () => {
   it('returns reasoning, search, and provider when both are requested', () => {
     expect(
       buildOpenRouterExtraBody({
-        reasoningEffort: 'max',
+        reasoningEffort: 'xhigh',
         search: true,
         supportsWebSearch: true,
       })

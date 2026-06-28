@@ -30,10 +30,13 @@ export interface ProviderReasoningPolicy {
 }
 
 interface ReasoningConfig {
-  version: string;
+  gateway_effort_levels?: string[];
   effort_budget_ratios: Record<string, number>;
   budget_clamp: { min: number; max: number };
-  providers: Record<string, ProviderReasoningPolicy>;
+  providers: Record<
+    string,
+    { models: Record<string, ProviderReasoningPolicy> }
+  >;
 }
 
 let CONFIG: ReasoningConfig | null = null;
@@ -59,7 +62,8 @@ const SDK_TO_CONFIG_EFFORT: Record<
   low: 'low',
   medium: 'medium',
   high: 'high',
-  max: 'xhigh',
+  xhigh: 'xhigh',
+  minimal: 'minimal',
 };
 
 const EFFORT_ORDER: ConfigEffort[] = [
@@ -71,11 +75,13 @@ const EFFORT_ORDER: ConfigEffort[] = [
   'xhigh',
 ];
 
-export function getProviderReasoningPolicy(
-  provider: string | undefined
+export function getModelReasoningPolicy(
+  provider: string | undefined,
+  model: string | undefined
 ): ProviderReasoningPolicy | undefined {
-  if (CONFIG === null || provider === undefined) return undefined;
-  return CONFIG.providers[provider];
+  if (CONFIG === null || provider === undefined || model === undefined)
+    return undefined;
+  return CONFIG.providers[provider]?.models[model];
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -115,22 +121,19 @@ export function genericGatewayReasoning(
 
 export function resolveGatewayReasoning(
   effort: ReasoningEffort | undefined,
-  provider?: string
+  provider?: string,
+  model?: string
 ): GatewayReasoning | undefined {
-  const policy = getProviderReasoningPolicy(provider);
+  const policy = getModelReasoningPolicy(provider, model);
 
-  // Config not loaded yet, or provider without a policy — generic passthrough.
-  if (CONFIG === null || policy === undefined) {
+  if (policy === undefined) {
     return genericGatewayReasoning(effort);
   }
 
-  // 'off'/undefined omit the field. For mandatory-reasoning providers this lets
-  // the model keep its forced default instead of being handed enabled:false.
   if (effort === undefined || effort === 'off') {
     return undefined;
   }
 
-  // Map the SDK effort onto the config's effort vocabulary (max → xhigh).
   let level: ConfigEffort = SDK_TO_CONFIG_EFFORT[effort];
   if (Array.isArray(policy.supported_efforts)) {
     level = clampEffortToSupported(
@@ -141,10 +144,10 @@ export function resolveGatewayReasoning(
   }
 
   if (
+    CONFIG !== null &&
     policy.supports_max_tokens === true &&
     typeof policy.max_budget === 'number'
   ) {
-    // Budget-based providers (e.g. Anthropic) reason by token budget.
     const ratio = CONFIG.effort_budget_ratios[level] ?? 1;
     const budget = clamp(
       Math.floor(policy.max_budget * ratio),
@@ -154,6 +157,5 @@ export function resolveGatewayReasoning(
     return { max_tokens: budget };
   }
 
-  // Effort-based providers send the wire effort value verbatim.
   return { effort: level };
 }

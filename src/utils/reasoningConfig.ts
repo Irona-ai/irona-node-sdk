@@ -6,7 +6,13 @@ import { doesModelSupportReasoning } from '../supported_models';
 
 import { logger } from './logger';
 
-export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
+export type ReasoningEffort =
+  | 'off'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
+  | 'minimal';
 
 export interface GoogleThinkingConfig {
   thinkingBudget?: number;

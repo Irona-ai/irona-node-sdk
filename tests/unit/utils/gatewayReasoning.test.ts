@@ -1,3 +1,5 @@
+// Mocks MUST be registered before source code is imported (see CLAUDE.md).
+jest.mock('axios');
 import axios from 'axios';
 
 import {
@@ -7,7 +9,6 @@ import {
   updateGatewayReasoningConfig,
 } from '../../../src/utils/gatewayReasoning';
 
-jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 const TEST_CONFIG = {
@@ -61,6 +62,33 @@ const TEST_CONFIG = {
 beforeAll(async () => {
   mockedAxios.get.mockResolvedValueOnce({ data: TEST_CONFIG });
   await updateGatewayReasoningConfig('https://test.example.com/config.json');
+});
+
+// ── updateGatewayReasoningConfig (timeout + payload validation) ───────────────
+
+describe('updateGatewayReasoningConfig', () => {
+  it('passes a network timeout to axios', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: TEST_CONFIG });
+    await updateGatewayReasoningConfig('https://test.example.com/config.json');
+    expect(mockedAxios.get).toHaveBeenLastCalledWith(
+      'https://test.example.com/config.json',
+      expect.objectContaining({ timeout: expect.any(Number) })
+    );
+  });
+
+  it('rejects a malformed payload (missing required keys)', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: { nope: true } });
+    await expect(
+      updateGatewayReasoningConfig('https://test.example.com/bad.json')
+    ).rejects.toThrow('malformed');
+  });
+
+  it('rejects a CDN error page (HTML string body)', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: '<html>404</html>' });
+    await expect(
+      updateGatewayReasoningConfig('https://test.example.com/404.html')
+    ).rejects.toThrow();
+  });
 });
 
 // ── genericGatewayReasoning ───────────────────────────────────────────────────

@@ -40,19 +40,37 @@ interface ReasoningConfig {
 }
 
 let CONFIG: ReasoningConfig | null = null;
+const CONFIG_FETCH_TIMEOUT_MS = 5000;
 
 export async function updateGatewayReasoningConfig(url: string): Promise<void> {
   try {
-    const response = await axios.get(url);
+    const response = await axios.get(url, { timeout: CONFIG_FETCH_TIMEOUT_MS });
     const data = response.data;
-    CONFIG = (
-      typeof data === 'string' ? JSON.parse(data) : data
-    ) as ReasoningConfig;
+    const parsed: unknown = typeof data === 'string' ? JSON.parse(data) : data;
+    if (!isReasoningConfig(parsed)) {
+      throw new Error(
+        'Gateway reasoning config payload is malformed: expected object with `effort_budget_ratios`, `budget_clamp`, and `providers` keys.'
+      );
+    }
+    CONFIG = parsed;
     logger.info('Gateway reasoning config loaded from remote source.');
   } catch (error) {
     logger.error('Failed to load gateway reasoning config from remote source.');
     throw error;
   }
+}
+
+function isReasoningConfig(value: unknown): value is ReasoningConfig {
+  if (value === null || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    obj.effort_budget_ratios !== null &&
+    typeof obj.effort_budget_ratios === 'object' &&
+    obj.budget_clamp !== null &&
+    typeof obj.budget_clamp === 'object' &&
+    obj.providers !== null &&
+    typeof obj.providers === 'object'
+  );
 }
 
 const SDK_TO_CONFIG_EFFORT: Record<
@@ -145,17 +163,22 @@ export function resolveGatewayReasoning(
   }
 
   if (
-    CONFIG !== null &&
     policy.supports_max_tokens === true &&
     typeof policy.max_budget === 'number'
   ) {
-    const ratio = CONFIG.effort_budget_ratios[level] ?? 1;
-    const budget = clamp(
-      Math.floor(policy.max_budget * ratio),
-      CONFIG.budget_clamp.min,
-      CONFIG.budget_clamp.max
-    );
-    return { max_tokens: budget };
+    if (CONFIG === null) {
+      logger.warn(
+        `[gatewayReasoning] ${provider}/${model} reasons by token budget but the gateway reasoning config is not loaded; falling back to effort "${level}", which this model may not support.`
+      );
+    } else {
+      const ratio = CONFIG.effort_budget_ratios[level] ?? 1;
+      const budget = clamp(
+        Math.floor(policy.max_budget * ratio),
+        CONFIG.budget_clamp.min,
+        CONFIG.budget_clamp.max
+      );
+      return { max_tokens: budget };
+    }
   }
 
   return { effort: level };

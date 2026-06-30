@@ -6,7 +6,14 @@ import { doesModelSupportReasoning } from '../supported_models';
 
 import { logger } from './logger';
 
-export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
+export type ReasoningEffort =
+  | 'off'
+  | 'low'
+  | 'minimal'
+  | 'medium'
+  | 'high'
+  | 'max'
+  | 'xhigh';
 
 export interface GoogleThinkingConfig {
   thinkingBudget?: number;
@@ -57,10 +64,12 @@ export interface ProviderReasoningOptions {
 export class ReasoningConfig {
   private static readonly EFFORT_MAPPING: Record<ReasoningEffort, number> = {
     off: 0.0,
+    minimal: 0.1,
     low: 0.25,
     medium: 0.5,
-    high: 0.85,
-    max: 1.0,
+    high: 0.75,
+    max: 0.9,
+    xhigh: 1.0,
   };
 
   static getReasoningConfig(

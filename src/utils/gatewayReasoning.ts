@@ -64,6 +64,7 @@ const SDK_TO_CONFIG_EFFORT: Record<
   high: 'high',
   xhigh: 'xhigh',
   minimal: 'minimal',
+  max: 'xhigh',
 };
 
 const EFFORT_ORDER: ConfigEffort[] = [

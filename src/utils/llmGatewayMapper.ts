@@ -1,4 +1,4 @@
-import { genericGatewayReasoning } from './gatewayReasoning';
+import { resolveGatewayReasoning } from './gatewayReasoning';
 import type { GatewayReasoning } from './gatewayReasoning';
 import type { ReasoningEffort } from './reasoningConfig';
 
@@ -19,20 +19,27 @@ export interface BuildLLMGatewayExtraBodyInput {
   reasoningEffort?: ReasoningEffort;
   search?: boolean;
   supportsWebSearch: boolean;
+  provider?: string;
+  model?: string;
 }
 
 // ── Mappers ──────────────────────────────────────────────────────────────────
 
 /**
- * Maps SDK `reasoningEffort` to LLM Gateway's `reasoning` config without
- * per-model metadata. Returns `undefined` when no reasoning key should be sent —
- * the gateway uses the model's own default in that case (rather than rejecting
- * `effort: 'none'` on models that mandate reasoning, e.g. gpt-5-nano).
+ * Maps SDK `reasoningEffort` to LLM Gateway's `reasoning` config. When
+ * `provider`/`model` are supplied, resolves against that model's reasoning
+ * policy (clamping to supported efforts, or computing `max_tokens` for
+ * budget-based models); otherwise falls back to a generic passthrough.
+ * Returns `undefined` when no reasoning key should be sent — the gateway uses
+ * the model's own default in that case (rather than rejecting `effort: 'none'`
+ * on models that mandate reasoning, e.g. gpt-5-nano).
  */
 export function mapReasoningToLLMGateway(
-  effort: ReasoningEffort | undefined
+  effort: ReasoningEffort | undefined,
+  provider?: string,
+  model?: string
 ): LLMGatewayReasoningConfig | undefined {
-  return genericGatewayReasoning(effort);
+  return resolveGatewayReasoning(effort, provider, model);
 }
 
 /**
@@ -56,12 +63,16 @@ export function mapSearchToLLMGateway(
  * `delta.reasoning` cleanup.
  *
  * Reasoning is resolved from the provider's policy in reasoningConfig.json when
- * `provider` is supplied.
+ * `provider`/`model` are supplied.
  */
 export function buildLLMGatewayExtraBody(
   input: BuildLLMGatewayExtraBodyInput
 ): LLMGatewayExtraBody {
-  const reasoning = genericGatewayReasoning(input.reasoningEffort);
+  const reasoning = resolveGatewayReasoning(
+    input.reasoningEffort,
+    input.provider,
+    input.model
+  );
   const webSearch = mapSearchToLLMGateway(
     input.search,
     input.supportsWebSearch

@@ -1,13 +1,12 @@
+import { resolveGatewayReasoning } from './gatewayReasoning';
+import type { GatewayReasoning } from './gatewayReasoning';
 import type { ReasoningEffort } from './reasoningConfig';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export interface LLMGatewayReasoningConfig {
-  effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'none';
-  max_tokens?: number;
-  exclude?: boolean;
-  enabled?: boolean;
-}
+// LLM Gateway's `reasoning` object is the unified gateway reasoning shape — the
+// same one OpenRouter accepts. The gateway translates it per provider.
+export type LLMGatewayReasoningConfig = GatewayReasoning;
 
 export interface LLMGatewayExtraBody {
   reasoning?: LLMGatewayReasoningConfig;
@@ -20,34 +19,27 @@ export interface BuildLLMGatewayExtraBodyInput {
   reasoningEffort?: ReasoningEffort;
   search?: boolean;
   supportsWebSearch: boolean;
+  provider?: string;
+  model?: string;
 }
 
 // ── Mappers ──────────────────────────────────────────────────────────────────
 
-const REASONING_EFFORT_MAP: Record<
-  string,
-  LLMGatewayReasoningConfig | undefined
-> = {
-  off: { effort: 'none' },
-  low: { effort: 'low' },
-  medium: { effort: 'medium' },
-  high: { effort: 'high' },
-  max: { effort: 'xhigh' },
-};
-
 /**
- * Maps SDK `reasoningEffort` to LLM Gateway's `reasoning` config.
+ * Maps SDK `reasoningEffort` to LLM Gateway's `reasoning` config. When
+ * `provider`/`model` are supplied, resolves against that model's reasoning
+ * policy (clamping to supported efforts, or computing `max_tokens` for
+ * budget-based models); otherwise falls back to a generic passthrough.
  * Returns `undefined` when no reasoning key should be sent — the gateway uses
  * the model's own default in that case (rather than rejecting `effort: 'none'`
  * on models that mandate reasoning, e.g. gpt-5-nano).
  */
 export function mapReasoningToLLMGateway(
-  effort: ReasoningEffort | undefined
+  effort: ReasoningEffort | undefined,
+  provider?: string,
+  model?: string
 ): LLMGatewayReasoningConfig | undefined {
-  if (effort === undefined || effort === 'off') {
-    return undefined;
-  }
-  return REASONING_EFFORT_MAP[effort];
+  return resolveGatewayReasoning(effort, provider, model);
 }
 
 /**
@@ -69,11 +61,18 @@ export function mapSearchToLLMGateway(
  * Builds the merged extra body for an LLM Gateway request. Returns `{}` if no
  * features are requested — the fetch wrapper is still created for unconditional
  * `delta.reasoning` cleanup.
+ *
+ * Reasoning is resolved from the provider's policy in reasoningConfig.json when
+ * `provider`/`model` are supplied.
  */
 export function buildLLMGatewayExtraBody(
   input: BuildLLMGatewayExtraBodyInput
 ): LLMGatewayExtraBody {
-  const reasoning = mapReasoningToLLMGateway(input.reasoningEffort);
+  const reasoning = resolveGatewayReasoning(
+    input.reasoningEffort,
+    input.provider,
+    input.model
+  );
   const webSearch = mapSearchToLLMGateway(
     input.search,
     input.supportsWebSearch

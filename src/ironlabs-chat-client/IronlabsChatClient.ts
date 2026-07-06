@@ -344,12 +344,16 @@ export class IronlabsChatClient {
           reasoningEffort: payload.reasoningEffort,
           search: payload.search,
           supportsWebSearch,
+          provider,
+          model,
         });
       } else if (isLLMGateway) {
         llmGatewayExtra = buildLLMGatewayExtraBody({
           reasoningEffort: payload.reasoningEffort,
           search: payload.search,
           supportsWebSearch,
+          provider,
+          model,
         });
       }
 

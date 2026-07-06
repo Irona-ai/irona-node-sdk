@@ -13,8 +13,10 @@ import {
   DEFAULT_BASE_URL,
   LLM_GATEWAY_DEFAULT_BASE_URL,
   OPENROUTER_DEFAULT_BASE_URL,
+  REASONING_CONFIG_DEFAULT_URL,
   SUPPORTED_MODELS_DEFAULT_URL,
 } from './utils/constants';
+import { updateGatewayReasoningConfig } from './utils/gatewayReasoning';
 import { detectGatewayTypeFromUrl } from './utils/gatewayType';
 import { logger } from './utils/logger';
 require('dotenv').config();
@@ -84,18 +86,39 @@ export class IronlabsAI {
   ): Promise<void> {
     const SUPPORTED_MODELS_GIST_URL =
       process.env.SUPPORTED_MODELS_URL ?? SUPPORTED_MODELS_DEFAULT_URL;
+    const REASONING_CONFIG_URL =
+      process.env.REASONING_CONFIG_URL ?? REASONING_CONFIG_DEFAULT_URL;
+
+    let reasoningConfigLoaded = false;
 
     for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        await updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL);
-        return;
-      } catch (error) {
+      const [modelsResult, reasoningResult] = await Promise.allSettled([
+        updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL),
+        reasoningConfigLoaded
+          ? Promise.resolve()
+          : updateGatewayReasoningConfig(REASONING_CONFIG_URL),
+      ]);
+
+      if (reasoningResult.status === 'fulfilled') {
+        reasoningConfigLoaded = true;
+      } else {
         logger.warn(
-          `Attempt ${attempt} to load Supported Models details failed. Retrying... ${error}`
+          `Attempt ${attempt} to load gateway reasoning config failed. ${
+            attempt < retries
+              ? 'Retrying...'
+              : 'Provider-specific reasoning will use generic defaults.'
+          } ${reasoningResult.reason}`
         );
-        if (attempt < retries) {
-          await new Promise(res => setTimeout(res, delay));
-        }
+      }
+
+      if (modelsResult.status === 'fulfilled') {
+        return;
+      }
+      logger.warn(
+        `Attempt ${attempt} to load Supported Models details failed. Retrying... ${modelsResult.reason}`
+      );
+      if (attempt < retries) {
+        await new Promise(res => setTimeout(res, delay));
       }
     }
 

@@ -142,8 +142,16 @@ function setupStream(chunks: string[] = ['Hello', ' world']) {
         }
       },
     },
+    finishReason: Promise.resolve('stop'),
+    totalUsage: Promise.resolve({}),
+    usage: Promise.resolve({}),
+    steps: Promise.resolve([]),
+    text: Promise.resolve(''),
   };
-  mockStreamText.mockResolvedValue(mockStream);
+  // streamText() returns its result synchronously — mockReturnValue mirrors
+  // that (mockResolvedValue would make `stream` a Promise, breaking the
+  // client's `stream.finishReason.catch(...)` no-op handlers).
+  mockStreamText.mockReturnValue(mockStream);
   return mockStream;
 }
 

@@ -25,10 +25,25 @@ export const setupSuccessfulGeneration = (text: string = 'Test response') => {
   mockGenerateText.mockResolvedValue({ text });
 };
 
+// streamText() returns its result synchronously (the promise fields on the
+// result settle later) — it is not itself async. Mocks must mirror that with
+// mockReturnValue, not mockResolvedValue, and must expose the settled-promise
+// fields the client attaches no-op .catch() handlers to.
+const withSettledPromiseFields = <T extends { fullStream: unknown }>(
+  stream: T
+) => ({
+  ...stream,
+  finishReason: Promise.resolve('stop'),
+  totalUsage: Promise.resolve({}),
+  usage: Promise.resolve({}),
+  steps: Promise.resolve([]),
+  text: Promise.resolve(''),
+});
+
 export const setupSuccessfulStream = (
   chunks: string[] = ['Hello', ' world']
 ) => {
-  const mockStream = {
+  const mockStream = withSettledPromiseFields({
     fullStream: {
       [Symbol.asyncIterator]: async function* () {
         for (const chunk of chunks) {
@@ -36,32 +51,32 @@ export const setupSuccessfulStream = (
         }
       },
     },
-  };
-  mockStreamText.mockResolvedValue(mockStream);
+  });
+  mockStreamText.mockReturnValue(mockStream);
   return mockStream;
 };
 
 export const setupStreamError = () => {
-  const mockStream = {
+  const mockStream = withSettledPromiseFields({
     fullStream: {
       [Symbol.asyncIterator]: async function* () {
         yield { type: 'error', error: 'Stream error' };
       },
     },
-  };
-  mockStreamText.mockResolvedValue(mockStream);
+  });
+  mockStreamText.mockReturnValue(mockStream);
   return mockStream;
 };
 
 export const setupEmptyStream = () => {
-  const mockStream = {
+  const mockStream = withSettledPromiseFields({
     fullStream: {
       [Symbol.asyncIterator]: async function* () {
         // Yields nothing — empty stream
       },
     },
-  };
-  mockStreamText.mockResolvedValue(mockStream);
+  });
+  mockStreamText.mockReturnValue(mockStream);
   return mockStream;
 };
 

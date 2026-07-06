@@ -1,9 +1,16 @@
+// Mocks MUST be registered before source code is imported (see CLAUDE.md).
+jest.mock('axios');
+import axios from 'axios';
+
+import { updateGatewayReasoningConfig } from '../../../src/utils/gatewayReasoning';
+import { createOpenRouterFetchWrapper } from '../../../src/utils/openRouterFetchWrapper';
 import {
   mapReasoningToOpenRouter,
   mapSearchToOpenRouter,
   buildOpenRouterExtraBody,
 } from '../../../src/utils/openRouterMapper';
-import { createOpenRouterFetchWrapper } from '../../../src/utils/openRouterFetchWrapper';
+
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 // ── mapReasoningToOpenRouter ─────────────────────────────────────────────────
 
@@ -28,8 +35,8 @@ describe('mapReasoningToOpenRouter', () => {
     expect(mapReasoningToOpenRouter('high')).toEqual({ effort: 'high' });
   });
 
-  it('maps "max" to { effort: "xhigh" }', () => {
-    expect(mapReasoningToOpenRouter('max')).toEqual({ effort: 'xhigh' });
+  it('maps "xhigh" to { effort: "xhigh" }', () => {
+    expect(mapReasoningToOpenRouter('xhigh')).toEqual({ effort: 'xhigh' });
   });
 });
 
@@ -121,7 +128,7 @@ describe('buildOpenRouterExtraBody', () => {
   it('returns reasoning, search, and provider when both are requested', () => {
     expect(
       buildOpenRouterExtraBody({
-        reasoningEffort: 'max',
+        reasoningEffort: 'xhigh',
         search: true,
         supportsWebSearch: true,
       })
@@ -143,6 +150,55 @@ describe('buildOpenRouterExtraBody', () => {
       provider: { sort: 'latency' },
       usage: { include: true },
     });
+  });
+});
+
+// ── provider/model-aware resolution (gateway reasoning policy) ──────────────
+
+describe('provider/model-aware reasoning resolution', () => {
+  beforeAll(async () => {
+    mockedAxios.get.mockResolvedValueOnce({
+      data: {
+        effort_budget_ratios: { low: 0.25, medium: 0.5, high: 0.85, xhigh: 1 },
+        budget_clamp: { min: 1024, max: 100000 },
+        providers: {
+          anthropic: {
+            models: {
+              'claude-sonnet-4-6': {
+                supports_max_tokens: true,
+                max_budget: 64000,
+              },
+            },
+          },
+        },
+      },
+    });
+    await updateGatewayReasoningConfig('https://test.example.com/config.json');
+  });
+
+  it('mapReasoningToOpenRouter computes max_tokens when provider/model match a budget-based policy', () => {
+    expect(
+      mapReasoningToOpenRouter('medium', 'anthropic', 'claude-sonnet-4-6')
+    ).toEqual({ max_tokens: 32000 });
+  });
+
+  it('buildOpenRouterExtraBody threads provider/model through to the policy resolver', () => {
+    expect(
+      buildOpenRouterExtraBody({
+        reasoningEffort: 'medium',
+        supportsWebSearch: false,
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-6',
+      })
+    ).toEqual({
+      provider: { sort: 'latency' },
+      usage: { include: true },
+      reasoning: { max_tokens: 32000 },
+    });
+  });
+
+  it('falls back to generic effort passthrough when provider/model are omitted', () => {
+    expect(mapReasoningToOpenRouter('medium')).toEqual({ effort: 'medium' });
   });
 });
 

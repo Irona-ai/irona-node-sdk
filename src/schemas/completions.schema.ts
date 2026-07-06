@@ -21,7 +21,9 @@ export const CompletionsSchema = ModelSelectSchema.extend({
     .optional(),
   stream: z.boolean().optional(),
   search: z.boolean().optional(),
-  reasoningEffort: z.enum(['off', 'low', 'medium', 'high', 'max']).optional(),
+  reasoningEffort: z
+    .enum(['off', 'minimal', 'low', 'medium', 'high', 'max', 'xhigh'])
+    .optional(),
   // Note: tools parameter is inherited from ModelSelectSchema
 });
 

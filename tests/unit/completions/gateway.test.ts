@@ -284,7 +284,7 @@ describe('Gateway Completions', () => {
       setupSuccessfulGeneration('Combined response');
 
       await client.completions(
-        createTestPayload({ reasoningEffort: 'max', search: true })
+        createTestPayload({ reasoningEffort: 'xhigh', search: true })
       );
 
       expect(fetchWrapperSpy).toHaveBeenCalledWith(

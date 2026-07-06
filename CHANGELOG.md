@@ -2,6 +2,12 @@
 
 All notable changes to `ironlabs` (previously `ironlabsai`, originally `ironaai`) are documented here. This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## 2.1.3 — 2026-06-22
+
+### Changed: gateway reasoning policy is now fetched remotely
+
+Per-model reasoning support for the LLM Gateway/OpenRouter path (which efforts a model accepts, its default, whether it reasons via token budget instead) is no longer vendored in the SDK — it is fetched at initialization from the `llm-pricing-info` repo (single source of truth), the same way `model_pricing.json` is loaded. Override the source with the `REASONING_CONFIG_URL` env var. The fetch is **non-fatal**: if it fails (e.g. network/404), the SDK still initializes and routes normally, falling back to a generic effort mapping until the config is available. Direct-provider reasoning config (Google/Anthropic/OpenAI thinking/effort mapping) is unaffected and remains hardcoded in the SDK.
+
 ## 2.1.1 — 2026-06-17
 
 ### Fixed: OpenRouter cost now actually returned

@@ -1,13 +1,11 @@
+import { resolveGatewayReasoning } from './gatewayReasoning';
+import type { GatewayReasoning } from './gatewayReasoning';
 import type { ReasoningEffort } from './reasoningConfig';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export interface OpenRouterReasoningConfig {
-  effort?: 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'none';
-  max_tokens?: number;
-  exclude?: boolean;
-  enabled?: boolean;
-}
+// OpenRouter's `reasoning` object is the unified gateway reasoning shape.
+export type OpenRouterReasoningConfig = GatewayReasoning;
 
 export interface OpenRouterSearchConfig {
   plugins: Array<{ id: string }>;
@@ -34,35 +32,29 @@ export interface BuildOpenRouterExtraBodyInput {
   reasoningEffort?: ReasoningEffort;
   search?: boolean;
   supportsWebSearch: boolean;
+  provider?: string;
+  model?: string;
 }
 
 // ── Mappers ──────────────────────────────────────────────────────────────────
 
-const REASONING_EFFORT_MAP: Record<
-  string,
-  OpenRouterReasoningConfig | undefined
-> = {
-  off: { effort: 'none' },
-  low: { effort: 'low' },
-  medium: { effort: 'medium' },
-  high: { effort: 'high' },
-  max: { effort: 'xhigh' },
-};
-
 /**
- * Maps SDK reasoningEffort to OpenRouter's `reasoning` config.
+ * Maps SDK reasoningEffort to OpenRouter's `reasoning` config. When
+ * `provider`/`model` are supplied, resolves against that model's reasoning
+ * policy (clamping to supported efforts, or computing `max_tokens` for
+ * budget-based models); otherwise falls back to a generic passthrough.
  * Returns `undefined` when no reasoning key should be sent.
+ *
+ * 'off' and undefined both mean "don't send a reasoning field" so that models
+ * which mandate reasoning (e.g. gpt-5-nano, gemini-2.5-flash) use their own
+ * default instead of rejecting a `{ effort: 'none' }` payload.
  */
 export function mapReasoningToOpenRouter(
-  effort: ReasoningEffort | undefined
+  effort: ReasoningEffort | undefined,
+  provider?: string,
+  model?: string
 ): OpenRouterReasoningConfig | undefined {
-  // 'off' and undefined both mean "don't send a reasoning field" so that models
-  // which mandate reasoning (e.g. gpt-5-nano, gemini-2.5-flash) use their own
-  // default instead of rejecting a { effort: 'none' } payload.
-  if (effort === undefined || effort === 'off') {
-    return undefined;
-  }
-  return REASONING_EFFORT_MAP[effort];
+  return resolveGatewayReasoning(effort, provider, model);
 }
 
 /**
@@ -86,11 +78,18 @@ export function mapSearchToOpenRouter(
  * Always includes `provider.sort: "latency"` to prefer the lowest-latency
  * provider, and `usage.include: true` so the response carries the real
  * per-request cost (surfaced via the onCost callback as `llmgateway-cost`).
+ *
+ * Reasoning is resolved from the provider's policy in reasoningConfig.json when
+ * `provider`/`model` are supplied.
  */
 export function buildOpenRouterExtraBody(
   input: BuildOpenRouterExtraBodyInput
 ): OpenRouterExtraBody {
-  const reasoning = mapReasoningToOpenRouter(input.reasoningEffort);
+  const reasoning = resolveGatewayReasoning(
+    input.reasoningEffort,
+    input.provider,
+    input.model
+  );
   const search = mapSearchToOpenRouter(input.search, input.supportsWebSearch);
 
   const extra: OpenRouterExtraBody = {

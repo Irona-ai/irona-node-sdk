@@ -6,7 +6,14 @@ import { doesModelSupportReasoning } from '../supported_models';
 
 import { logger } from './logger';
 
-export type ReasoningEffort = 'off' | 'low' | 'medium' | 'high' | 'max';
+export type ReasoningEffort =
+  | 'off'
+  | 'low'
+  | 'minimal'
+  | 'medium'
+  | 'high'
+  | 'max'
+  | 'xhigh';
 
 export interface GoogleThinkingConfig {
   thinkingBudget?: number;
@@ -14,8 +21,19 @@ export interface GoogleThinkingConfig {
   thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high';
 }
 
+// OpenAI's reasoning `effort` accepts a fixed set that is NOT the same as the
+// SDK's `ReasoningEffort` — there is no `'off'`/`'max'`; disabling is `'none'`
+// and the top tier is `'xhigh'`.
+export type OpenAIEffort =
+  | 'none'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh';
+
 export interface OpenAIReasoningConfig {
-  effort?: ReasoningEffort;
+  effort?: OpenAIEffort;
   reasoningSummary?: 'auto' | 'detailed';
 }
 
@@ -57,10 +75,12 @@ export interface ProviderReasoningOptions {
 export class ReasoningConfig {
   private static readonly EFFORT_MAPPING: Record<ReasoningEffort, number> = {
     off: 0.0,
+    minimal: 0.1,
     low: 0.25,
     medium: 0.5,
-    high: 0.85,
-    max: 1.0,
+    high: 0.75,
+    max: 0.9,
+    xhigh: 1.0,
   };
 
   static getReasoningConfig(
@@ -85,6 +105,9 @@ export class ReasoningConfig {
             if (model.includes('gemini-3-flash')) {
               // Gemini 3 Flash supports: 'minimal', 'low', 'medium', 'high'
               switch (reasoningEffort) {
+                case 'minimal':
+                  thinkingLevel = 'minimal';
+                  break;
                 case 'low':
                   thinkingLevel = 'low';
                   break;
@@ -93,6 +116,8 @@ export class ReasoningConfig {
                   break;
                 case 'high':
                 case 'max':
+                case 'xhigh':
+                  // 'max'/'xhigh' clamp up to the model's top tier 'high'
                   thinkingLevel = 'high';
                   break;
                 default:
@@ -103,9 +128,12 @@ export class ReasoningConfig {
               switch (reasoningEffort) {
                 case 'high':
                 case 'max':
+                case 'xhigh':
+                  // 'max'/'xhigh' clamp up to the model's top tier 'high'
                   thinkingLevel = 'high';
                   break;
                 default:
+                  // 'minimal'/'low'/'medium' round down to the floor tier 'low'
                   thinkingLevel = 'low';
               }
             }
@@ -146,13 +174,27 @@ export class ReasoningConfig {
         }
         break;
 
-      case 'openai':
+      case 'openai': {
+        // OpenAI accepts none|minimal|low|medium|high|xhigh. Map the SDK values
+        // that don't exist on OpenAI: 'off' → 'none', 'max' → top tier 'xhigh'.
+        let openaiEffort: OpenAIEffort;
+        switch (reasoningEffort) {
+          case 'off':
+            openaiEffort = 'none';
+            break;
+          case 'max':
+            openaiEffort = 'xhigh';
+            break;
+          default:
+            openaiEffort = reasoningEffort;
+        }
         return {
           openai: {
-            effort: (isOff ? 'none' : reasoningEffort) as ReasoningEffort,
+            effort: openaiEffort,
             reasoningSummary: 'auto',
           },
         };
+      }
 
       case 'anthropic':
         if (model.includes('claude')) {

@@ -89,26 +89,36 @@ export class IronlabsAI {
     const REASONING_CONFIG_URL =
       process.env.REASONING_CONFIG_URL ?? REASONING_CONFIG_DEFAULT_URL;
 
+    let reasoningConfigLoaded = false;
+
     for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        await Promise.all([
-          updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL),
-          updateGatewayReasoningConfig(REASONING_CONFIG_URL).catch(
-            reasoningError => {
-              logger.warn(
-                `Failed to load gateway reasoning config; provider-specific reasoning will use generic defaults. ${reasoningError}`
-              );
-            }
-          ),
-        ]);
-        return;
-      } catch (error) {
+      const [modelsResult, reasoningResult] = await Promise.allSettled([
+        updateProvidersFromGist(SUPPORTED_MODELS_GIST_URL),
+        reasoningConfigLoaded
+          ? Promise.resolve()
+          : updateGatewayReasoningConfig(REASONING_CONFIG_URL),
+      ]);
+
+      if (reasoningResult.status === 'fulfilled') {
+        reasoningConfigLoaded = true;
+      } else {
         logger.warn(
-          `Attempt ${attempt} to load Supported Models details failed. Retrying... ${error}`
+          `Attempt ${attempt} to load gateway reasoning config failed. ${
+            attempt < retries
+              ? 'Retrying...'
+              : 'Provider-specific reasoning will use generic defaults.'
+          } ${reasoningResult.reason}`
         );
-        if (attempt < retries) {
-          await new Promise(res => setTimeout(res, delay));
-        }
+      }
+
+      if (modelsResult.status === 'fulfilled') {
+        return;
+      }
+      logger.warn(
+        `Attempt ${attempt} to load Supported Models details failed. Retrying... ${modelsResult.reason}`
+      );
+      if (attempt < retries) {
+        await new Promise(res => setTimeout(res, delay));
       }
     }
 

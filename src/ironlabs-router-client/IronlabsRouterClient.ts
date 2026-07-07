@@ -67,7 +67,7 @@ export class IronlabsRouterClient extends Base implements Router {
       };
     }
     const formattedPayload = {
-      topk_models: body?.topkModels,
+      topk_models: body?.topkModels ?? body?.topk_models,
       messages: body.messages,
       llm_providers: mediaSupportedProviderAndModelArray,
       kwargs: body?.kwargs,

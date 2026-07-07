@@ -4,6 +4,9 @@ import { MessageSchema, ModelSchema } from './common.schema';
 
 export const ModelSelectSchema = z.object({
   topkModels: z.number().int().optional(),
+  // snake_case alias — some callers (e.g. the chat backend) send `topk_models`.
+  // Accepted here so Zod doesn't strip it; routers coalesce the two.
+  topk_models: z.number().int().optional(),
   messages: z.array(MessageSchema).nonempty('Messages array cannot be empty'),
   models: z.array(ModelSchema).nonempty('Models array cannot be empty'),
   fallbackModels: z.array(ModelSchema).optional(),

@@ -80,7 +80,7 @@ export class APIRouter extends Base implements Router {
     const payload = {
       messages: body.messages,
       llm_providers: mediaSupportedModels,
-      topk_models: body?.topkModels,
+      topk_models: body?.topkModels ?? body?.topk_models,
       kwargs: body?.kwargs,
       ...this.extraBody,
     };

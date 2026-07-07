@@ -103,7 +103,7 @@ export class LocalRouter implements Router {
       : mediaSupportedModels.slice(0, 1);
 
     // Arcade mode: select a second model when topkModels >= 2
-    const topK = body.topkModels ?? 1;
+    const topK = body.topkModels ?? body.topk_models ?? 1;
     if (topK >= 2 && providers.length > 0 && mediaSupportedModels.length > 1) {
       const secondModel = this.selectSecondModel(
         tier,

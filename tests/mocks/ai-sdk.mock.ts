@@ -27,17 +27,35 @@ export const setupSuccessfulGeneration = (text: string = 'Test response') => {
 
 // streamText() returns its result synchronously (the promise fields on the
 // result settle later) — it is not itself async. Mocks must mirror that with
-// mockReturnValue, not mockResolvedValue, and must expose the settled-promise
-// fields the client attaches no-op .catch() handlers to.
+// mockReturnValue, not mockResolvedValue, and must expose EVERY settled-promise
+// field the client attaches no-op .catch() handlers to. The client guards all
+// of them (content/text/reasoning/sources/toolCalls/finishReason/usage/…) so a
+// stream failure can never leak an unhandled rejection — so a mock missing any
+// field would make the client throw `undefined.catch()`.
 const withSettledPromiseFields = <T extends { fullStream: unknown }>(
   stream: T
 ) => ({
-  ...stream,
-  finishReason: Promise.resolve('stop'),
-  totalUsage: Promise.resolve({}),
-  usage: Promise.resolve({}),
-  steps: Promise.resolve([]),
+  content: Promise.resolve([]),
   text: Promise.resolve(''),
+  reasoning: Promise.resolve([]),
+  reasoningText: Promise.resolve(undefined),
+  files: Promise.resolve([]),
+  sources: Promise.resolve([]),
+  toolCalls: Promise.resolve([]),
+  staticToolCalls: Promise.resolve([]),
+  dynamicToolCalls: Promise.resolve([]),
+  toolResults: Promise.resolve([]),
+  staticToolResults: Promise.resolve([]),
+  dynamicToolResults: Promise.resolve([]),
+  finishReason: Promise.resolve('stop'),
+  usage: Promise.resolve({}),
+  totalUsage: Promise.resolve({}),
+  warnings: Promise.resolve(undefined),
+  steps: Promise.resolve([]),
+  request: Promise.resolve({}),
+  response: Promise.resolve({}),
+  providerMetadata: Promise.resolve(undefined),
+  ...stream,
 });
 
 export const setupSuccessfulStream = (
@@ -48,6 +66,23 @@ export const setupSuccessfulStream = (
       [Symbol.asyncIterator]: async function* () {
         for (const chunk of chunks) {
           yield { type: 'text-delta', textDelta: chunk };
+        }
+      },
+    },
+  });
+  mockStreamText.mockReturnValue(mockStream);
+  return mockStream;
+};
+
+// Emit an arbitrary sequence of fullStream parts (text-delta, source, error…).
+// Used to exercise provider-specific streams such as Perplexity url_citation
+// sources.
+export const setupStreamWithParts = (parts: unknown[]) => {
+  const mockStream = withSettledPromiseFields({
+    fullStream: {
+      [Symbol.asyncIterator]: async function* () {
+        for (const part of parts) {
+          yield part;
         }
       },
     },

@@ -142,11 +142,28 @@ function setupStream(chunks: string[] = ['Hello', ' world']) {
         }
       },
     },
-    finishReason: Promise.resolve('stop'),
-    totalUsage: Promise.resolve({}),
-    usage: Promise.resolve({}),
-    steps: Promise.resolve([]),
+    // The client attaches no-op .catch() handlers to EVERY settled promise
+    // streamText exposes, so all must be present or `undefined.catch()` throws.
+    content: Promise.resolve([]),
     text: Promise.resolve(''),
+    reasoning: Promise.resolve([]),
+    reasoningText: Promise.resolve(undefined),
+    files: Promise.resolve([]),
+    sources: Promise.resolve([]),
+    toolCalls: Promise.resolve([]),
+    staticToolCalls: Promise.resolve([]),
+    dynamicToolCalls: Promise.resolve([]),
+    toolResults: Promise.resolve([]),
+    staticToolResults: Promise.resolve([]),
+    dynamicToolResults: Promise.resolve([]),
+    finishReason: Promise.resolve('stop'),
+    usage: Promise.resolve({}),
+    totalUsage: Promise.resolve({}),
+    warnings: Promise.resolve(undefined),
+    steps: Promise.resolve([]),
+    request: Promise.resolve({}),
+    response: Promise.resolve({}),
+    providerMetadata: Promise.resolve(undefined),
   };
   // streamText() returns its result synchronously — mockReturnValue mirrors
   // that (mockResolvedValue would make `stream` a Promise, breaking the

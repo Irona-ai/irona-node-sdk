@@ -337,6 +337,40 @@ describe('LocalRouter arcade mode (topkModels)', () => {
     });
     expect(result2.providers.length).toBe(1);
   });
+
+  // snake_case `topk_models` alias — the payload the chat backend actually
+  // sends. This is the whole point of the alias support, so cover it directly.
+  it('returns 2 models when topk_models (snake_case) is 2', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0.5); // 80% path
+    const result = await router.modelSelect({
+      models: threeModels as [string, ...string[]],
+      messages: [{ role: 'user', content: 'What is the capital of France?' }],
+      topk_models: 2,
+    });
+    expect(result.providers.length).toBe(2);
+    expect(result.providers[0].model).not.toBe(result.providers[1].model);
+    jest.restoreAllMocks();
+  });
+
+  it('returns 1 model when topk_models (snake_case) is 1', async () => {
+    const result = await router.modelSelect({
+      models: threeModels as [string, ...string[]],
+      messages: [{ role: 'user', content: 'Hello' }],
+      topk_models: 1,
+    });
+    expect(result.providers.length).toBe(1);
+  });
+
+  it('prefers camelCase topkModels when both fields are present', async () => {
+    // topkModels: 1 must win over topk_models: 2 → single model
+    const result = await router.modelSelect({
+      models: threeModels as [string, ...string[]],
+      messages: [{ role: 'user', content: 'Hello' }],
+      topkModels: 1,
+      topk_models: 2,
+    });
+    expect(result.providers.length).toBe(1);
+  });
 });
 
 // ── Arcade Mode E2E: Two distinct models guaranteed ─────────────────────────

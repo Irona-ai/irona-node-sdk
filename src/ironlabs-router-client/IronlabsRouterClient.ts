@@ -12,6 +12,7 @@ import {
   getSupportedProviderAndModelArray,
 } from '../utils/providerAndModelUtils';
 import { validateSchema } from '../utils/requestValidator';
+import { getTopKModels } from '../utils/topKModels';
 
 import { Base } from './base';
 export { ModelInfo, ModelSelectResponse };
@@ -67,7 +68,7 @@ export class IronlabsRouterClient extends Base implements Router {
       };
     }
     const formattedPayload = {
-      topk_models: body?.topkModels,
+      topk_models: getTopKModels(body),
       messages: body.messages,
       llm_providers: mediaSupportedProviderAndModelArray,
       kwargs: body?.kwargs,

@@ -94,13 +94,29 @@ describe('Perplexity streaming — url_citation sources', () => {
     // the client now attaches a handler to every settled promise it exposes.
     const mockStream = setupSuccessfulStream(['hello']);
 
+    // Must match the full set of settled promises the client guards in
+    // IronlabsChatClient (the `for (const settled of [...])` loop). Keep in sync:
+    // if the client wraps a new field, add it here so a dropped .catch() is caught.
     const guardedFields = [
       'content',
-      'sources',
+      'text',
       'reasoning',
+      'reasoningText',
       'files',
+      'sources',
       'toolCalls',
+      'staticToolCalls',
+      'dynamicToolCalls',
+      'toolResults',
+      'staticToolResults',
+      'dynamicToolResults',
+      'finishReason',
+      'usage',
+      'totalUsage',
       'warnings',
+      'steps',
+      'request',
+      'response',
       'providerMetadata',
     ] as const;
     const catchSpies = guardedFields.map(field =>

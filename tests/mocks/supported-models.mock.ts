@@ -22,6 +22,8 @@ export const mockDoesModelSupportMediaTypes =
   require('../../src/supported_models').doesModelSupportMediaTypes as jest.Mock;
 export const mockDoesModelSupportWebSearch =
   require('../../src/supported_models').doesModelSupportWebSearch as jest.Mock;
+export const mockDoesModelSupportReasoning =
+  require('../../src/supported_models').doesModelSupportReasoning as jest.Mock;
 export const mockProviderApiKeyName = require('../../src/supported_models')
   .providerApiKeyName as jest.Mock;
 export const mockGetOpenRouterIdentifier = require('../../src/supported_models')
@@ -30,6 +32,7 @@ export const mockGetOpenRouterIdentifier = require('../../src/supported_models')
 export const resetSupportedModelsMocks = () => {
   mockDoesModelSupportMediaTypes.mockReset().mockReturnValue(true);
   mockDoesModelSupportWebSearch.mockReset().mockReturnValue(false);
+  mockDoesModelSupportReasoning.mockReset().mockReturnValue(false);
   mockGetOpenRouterIdentifier.mockReset().mockReturnValue(null);
   mockProviderApiKeyName.mockReset().mockImplementation((provider: string) => {
     const mapping: { [key: string]: string } = {

@@ -522,19 +522,41 @@ export class IronlabsChatClient {
 
         const stream = streamText(streamConfig);
 
-        // Prevent unhandled promise rejections. streamText exposes settled
-        // promises (finishReason/totalUsage/steps/text/usage) that reject with
-        // AI_NoOutputGeneratedError when a provider yields no output. We only
-        // ever consume `fullStream`, so without handlers those sibling promises
-        // reject unhandled and crash the host process (Node exit 128). Attach
-        // no-op catch handlers — `fullStream` is a fresh tee per access, so this
-        // does not disturb stream iteration.
+        // Prevent unhandled promise rejections. streamText exposes many settled
+        // promises (content/text/reasoning/sources/toolCalls/finishReason/usage/…)
+        // that ALL reject with the underlying error when a provider yields no
+        // output or a chunk fails validation (e.g. a malformed url_citation
+        // annotation). We only ever consume `fullStream`, so any of these left
+        // without a handler rejects unhandled and crashes the host process
+        // (Node exit 128 / uncaughtException — which in turn kills pino's
+        // logging worker). Attach no-op catch handlers to every settled promise
+        // — `fullStream` is a fresh tee per access, so this does not disturb
+        // stream iteration.
         const swallowRejection = (): void => {};
-        void stream.finishReason.catch(swallowRejection);
-        void stream.totalUsage.catch(swallowRejection);
-        void stream.usage.catch(swallowRejection);
-        void stream.steps.catch(swallowRejection);
-        void stream.text.catch(swallowRejection);
+        for (const settled of [
+          stream.content,
+          stream.text,
+          stream.reasoning,
+          stream.reasoningText,
+          stream.files,
+          stream.sources,
+          stream.toolCalls,
+          stream.staticToolCalls,
+          stream.dynamicToolCalls,
+          stream.toolResults,
+          stream.staticToolResults,
+          stream.dynamicToolResults,
+          stream.finishReason,
+          stream.usage,
+          stream.totalUsage,
+          stream.warnings,
+          stream.steps,
+          stream.request,
+          stream.response,
+          stream.providerMetadata,
+        ]) {
+          void settled.catch(swallowRejection);
+        }
 
         // Return the stream immediately — no early validation.
         // Errors are caught inline via the error-handling wrapper below

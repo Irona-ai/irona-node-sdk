@@ -22,6 +22,7 @@ import {
   getSupportedProviderAndModelArray,
 } from '../../utils/providerAndModelUtils';
 import { validateSchema } from '../../utils/requestValidator';
+import { getTopKModels } from '../../utils/topKModels';
 import type { Router, ScoringConfig, Tier } from '../types';
 
 import { classifyByRules } from './classifier';
@@ -102,8 +103,9 @@ export class LocalRouter implements Router {
       ? [selected]
       : mediaSupportedModels.slice(0, 1);
 
-    // Arcade mode: select a second model when topkModels >= 2
-    const topK = body.topkModels ?? 1;
+    // Arcade mode: select a second model when top-k >= 2
+    // (accepts either `topkModels` or the snake_case `topk_models` alias).
+    const topK = getTopKModels(body) ?? 1;
     if (topK >= 2 && providers.length > 0 && mediaSupportedModels.length > 1) {
       const secondModel = this.selectSecondModel(
         tier,
@@ -186,7 +188,8 @@ export class LocalRouter implements Router {
   }
 
   /**
-   * Select a second model for arcade mode (topkModels >= 2).
+   * Select a second model for arcade mode (top-k >= 2, i.e. `topkModels`
+   * or the snake_case `topk_models` alias).
    *
    * 80% of the time: picks a stronger model (one tier above the first).
    *   If already at REASONING (highest tier), picks one tier below (COMPLEX).

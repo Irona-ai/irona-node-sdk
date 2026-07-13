@@ -19,6 +19,7 @@ import {
   getSupportedProviderAndModelArray,
 } from '../utils/providerAndModelUtils';
 import { validateSchema } from '../utils/requestValidator';
+import { getTopKModels } from '../utils/topKModels';
 
 import type { Router, APIRouterConfig } from './types';
 
@@ -80,7 +81,7 @@ export class APIRouter extends Base implements Router {
     const payload = {
       messages: body.messages,
       llm_providers: mediaSupportedModels,
-      topk_models: body?.topkModels,
+      topk_models: getTopKModels(body),
       kwargs: body?.kwargs,
       ...this.extraBody,
     };

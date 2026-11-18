@@ -9,7 +9,7 @@ Installation
 npm install ironlabs
 ```
 
-> **Migrating from `ironaai` or `ironlabsai`?** The package was renamed to **`ironlabs`** in v2.0.0. Update your install and imports — your existing API key keeps working (the SDK accepts `IRONLABS_API_KEY`, `IRONLABS_AI_API_KEY`, and `IRONAAI_API_KEY`).
+> **Migrating from `ironaai` or `ironlabsai`?** The package was renamed to **`ironlabs`** in v2.0.0. Update your install and imports — your existing API key keeps working. Set it as `INFERENCELAB_API_KEY`; the SDK still accepts the older names `IRONLABS_API_KEY`, `IRONLABS_AI_API_KEY` and `IRONAAI_API_KEY` as fallbacks (checked in that order, with a deprecation warning).
 
 ## Quick Start
 
@@ -25,7 +25,7 @@ import { IronLabs } from 'ironlabs';
 
 const client = new IronLabs({
   // Optional - automatically loads from environment variable
-  apiKey: process.env.IRONLABS_API_KEY,
+  apiKey: process.env.INFERENCELAB_API_KEY,
 });
 
 async function basicExample() {
@@ -89,7 +89,7 @@ LLM_GATEWAY_INCLUDE_PROVIDER_IN_MODEL_NAME='true'  # set 'false' for gateways th
 import { IronaAI } from 'ironaai';
 
 const ironaAI = await IronaAI.createInstance({
-  apiKey: process.env.IRONAAI_API_KEY,
+  apiKey: process.env.INFERENCELAB_API_KEY,
   gateway: {
     baseUrl: 'https://router.requesty.ai/v1',
     apiKey: process.env.LLM_GATEWAY_API_KEY!,
@@ -101,7 +101,7 @@ const ironaAI = await IronaAI.createInstance({
 
 ```typescript
 const ironaAI = await IronaAI.createInstance({
-  apiKey: process.env.IRONAAI_API_KEY,
+  apiKey: process.env.INFERENCELAB_API_KEY,
   gateway: {
     baseUrl: 'https://openrouter.ai/api/v1',
     apiKey: process.env.OPENROUTER_API_KEY!,

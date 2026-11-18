@@ -8,6 +8,7 @@ import type { CompletionsPayload } from './schemas/completions.schema';
 import type { ModelSelectPayload } from './schemas/modelSelect.schema';
 import { updateProvidersFromGist } from './supported_models';
 import type { Config, GatewayConfig } from './types';
+import { API_KEY_ENV_VAR, resolveApiKeyFromEnv } from './utils/apiKeyEnv';
 import {
   IRONLABS_AI_API_KEY_PREFIX,
   DEFAULT_BASE_URL,
@@ -27,28 +28,23 @@ export class IronlabsAI {
   private ironlabsRouter: Router;
   private llmChatService: IronlabsChatClient;
   private constructor(config: Config = {}) {
-    // Check for API key — accepts IRONLABS_API_KEY (preferred), legacy IRONLABS_AI_API_KEY,
-    // and IRONAAI_API_KEY (oldest). Older names log a deprecation warning on use.
-    const apiKey =
-      config.apiKey ??
-      process.env.IRONLABS_API_KEY ??
-      process.env.IRONLABS_AI_API_KEY ??
-      process.env.IRONAAI_API_KEY ??
-      '';
-    const hasPrimaryKey =
-      (config.apiKey ?? '') !== '' ||
-      (process.env.IRONLABS_API_KEY ?? '') !== '';
-    const hasDeprecatedKey =
-      (process.env.IRONLABS_AI_API_KEY ?? '') !== '' ||
-      (process.env.IRONAAI_API_KEY ?? '') !== '';
-    if (!hasPrimaryKey && hasDeprecatedKey) {
+    // Check for API key. INFERENCELAB_API_KEY is preferred; the legacy names
+    // IRONLABS_API_KEY, IRONLABS_AI_API_KEY and IRONAAI_API_KEY still work as
+    // fallbacks (in that order) and log a deprecation warning when used.
+    const envKey = resolveApiKeyFromEnv();
+    const apiKey = config.apiKey ?? envKey.apiKey;
+    if (
+      (config.apiKey ?? '') === '' &&
+      envKey.source !== undefined &&
+      envKey.source !== API_KEY_ENV_VAR
+    ) {
       logger.warn(
-        'IRONLABS_AI_API_KEY / IRONAAI_API_KEY are deprecated. Set IRONLABS_API_KEY instead.'
+        `${envKey.source} is deprecated. Set ${API_KEY_ENV_VAR} instead.`
       );
     }
     if (!apiKey) {
       throw new MissingApiKeyError(
-        "The API key is missing. Please provide the API key either through the 'IRONLABS_API_KEY' environment variable or the 'config.apiKey' property."
+        "The API key is missing. Please provide the API key either through the 'INFERENCELAB_API_KEY' environment variable or the 'config.apiKey' property."
       );
     }
     if (

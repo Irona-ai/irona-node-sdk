@@ -2,6 +2,15 @@
 
 All notable changes to `ironlabs` (previously `ironlabsai`, originally `ironaai`) are documented here. This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## Unreleased
+
+### Changed: API key environment variable is now `INFERENCELAB_API_KEY`
+
+The public brand moved to InferenceLab, so the SDK now reads the API key from `INFERENCELAB_API_KEY` first. Every existing name still works as a fallback, in this order: `INFERENCELAB_API_KEY → IRONLABS_API_KEY → IRONLABS_AI_API_KEY → IRONAAI_API_KEY`. Using any of the three older names logs a deprecation warning that points to `INFERENCELAB_API_KEY`. An empty variable is treated as unset. `config.apiKey` still takes precedence over all env vars. The package name, imports, client class and `sk_` key prefix are unchanged.
+
+- The "missing API key" error and the `.env.example`, README, examples and docs now name `INFERENCELAB_API_KEY`.
+- The default Irona router client previously read only `IRONLABS_AI_API_KEY`; it now uses the same fallback chain, so setting just `INFERENCELAB_API_KEY` (or any legacy name) works for `modelSelect()`.
+
 ## 2.1.4 — 2026-07-13
 
 ### Fixed: Perplexity Sonar streaming no longer crashes on `url_citation` sources

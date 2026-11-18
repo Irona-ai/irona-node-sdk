@@ -5,6 +5,7 @@ import type { ModelSelectPayload } from '../schemas/modelSelect.schema';
 import { ModelSelectSchema } from '../schemas/modelSelect.schema';
 import { doesModelSupportMediaTypes } from '../supported_models';
 import type { Config } from '../types';
+import { API_KEY_ENV_VAR, resolveApiKeyFromEnv } from '../utils/apiKeyEnv';
 import { SUPPORTED_MODELS_DEFAULT_URL } from '../utils/constants';
 import { logger } from '../utils/logger';
 import {
@@ -25,10 +26,10 @@ export class IronlabsRouterClient extends Base implements Router {
   }
 
   async modelSelect(body: ModelSelectPayload): Promise<ModelSelectResponse> {
-    const apiKey = process.env.IRONLABS_AI_API_KEY ?? '';
+    const { apiKey } = resolveApiKeyFromEnv();
     if (!apiKey) {
       throw new MissingApiKeyError(
-        'The IRONLABS_AI_API_KEY environment variable is missing or empty. Please ensure that the IRONLABS_AI_API_KEY is set in the environment variables.'
+        `The ${API_KEY_ENV_VAR} environment variable is missing or empty. Please ensure that ${API_KEY_ENV_VAR} is set in the environment variables.`
       );
     }
     const validationResult = validateSchema(ModelSelectSchema, body);
